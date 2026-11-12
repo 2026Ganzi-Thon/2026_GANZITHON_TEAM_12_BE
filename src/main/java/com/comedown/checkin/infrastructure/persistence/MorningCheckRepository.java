@@ -33,6 +33,20 @@ public interface MorningCheckRepository extends JpaRepository<MorningCheck, Long
 
     List<MorningCheck> findByUserIdAndCheckDateLessThanEqualOrderByCheckDateAsc(long userId, LocalDate through);
 
+    /** 호흡 기록이 없는 체크(건강 필드를 비우면 남을 것이 없음)를 지운다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM MorningCheck c WHERE c.userId = :userId AND c.breathingCompletedAt IS NULL")
+    int deleteWithoutBreathing(@Param("userId") long userId);
+
+    /** 남은 체크의 건강 필드(컨디션·교란 요인)와 완료 시각을 비운다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            UPDATE MorningCheck c
+               SET c.conditionScore = NULL, c.alcohol = NULL, c.sick = NULL, c.caffeine = NULL, c.completedAt = NULL
+             WHERE c.userId = :userId
+            """)
+    int clearHealthFields(@Param("userId") long userId);
+
     /** 최신 커밋 값을 잠금 읽기로 가져온다(동시 생성 직후에도 보이도록). */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM MorningCheck c WHERE c.userId = :userId AND c.checkDate = :checkDate")

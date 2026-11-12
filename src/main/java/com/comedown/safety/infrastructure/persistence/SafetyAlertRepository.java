@@ -5,6 +5,9 @@ import com.comedown.safety.domain.SafetyTrigger;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface SafetyAlertRepository extends JpaRepository<SafetyAlert, Long> {
 
@@ -14,4 +17,8 @@ public interface SafetyAlertRepository extends JpaRepository<SafetyAlert, Long> 
     List<SafetyAlert> findByUserIdOrderByTriggeredAtDescIdDesc(long userId);
 
     Optional<SafetyAlert> findByIdAndUserId(long id, long userId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM SafetyAlert a WHERE a.userId = :userId")
+    int deleteAllOfUser(@Param("userId") long userId);
 }
