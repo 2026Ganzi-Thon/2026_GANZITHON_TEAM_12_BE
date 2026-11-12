@@ -215,8 +215,17 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```
 - `level`: `LOW`(50 미만) `HIGH`(50 이상 75 미만) `VERY_HIGH`(75 이상). 이는 프로젝트 표시 기준이며 진단을 뜻하지 않습니다. `highRisk`(어느 하나 75 이상)면 `safety.show: true` → C3 안전 안내를 띄웁니다.
 
+- 검사 순서: 로그인(401) → 건강정보 동의(403 `HRV_CONSENT_REQUIRED`) → 형식 검증(400) → 회차 조건(409) → 재시도 키. INITIAL은 프로필 단계를 마친 뒤(`onboardingStep`이 `PROFILE`이면 409 `ONBOARDING_STEP_INVALID`) 제출하며, 현재 단계가 `CBI`일 때만 `LIFESTYLE`로 전진합니다(이미 지난 단계는 되돌리지 않음). DAY28의 응답 `onboardingStep`은 현재 단계(`DONE`)입니다.
+- 점수는 DB에 소수 둘째 자리(DECIMAL 5,2)로 저장하고, 응답은 소수 첫째 자리로 반올림합니다. `level`은 저장값으로 판정합니다.
+- **구현 해석(확인 필요)** `CBI_HIGH` 안내는 가장 최근 CBI 기준입니다. high_risk인 응답마다 새 안내를 만들고(같은 사용자의 열린 `CBI_HIGH`는 해제 후 대체), high_risk가 아닌 응답은 열린 `CBI_HIGH`를 해제(`resolved_at`)합니다.
+
 ### `GET /api/cbi/assessments` → 200
 내 응답 이력(최신순). 원점수 없이 점수·level만.
+```json
+{ "assessments": [{ "id": 5, "round": "INITIAL", "takenAt": "2026-11-03T21:02:00+09:00",
+    "personal": { "score": 62.5, "level": "HIGH" }, "work": { "score": 55.4, "level": "HIGH" }, "highRisk": false }] }
+```
+- 로그인만 필요합니다(온보딩 중 허용). 응답한 적이 없으면 빈 배열입니다.
 
 ### `PUT /api/me/settings` — A4 생활 정보 (마이페이지 수정과 공용)
 ```json
@@ -275,6 +284,11 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 - `todayCheck.status`: `NOT_STARTED` `IN_PROGRESS` `DONE` → `NOT_STARTED`면 "측정하러 가기"를 위에 크게.
 - `recovery.status`: `BUILDING` `NORMAL` `LOW` `INSUFFICIENT`. 0~100 회복 점수는 쓰지 않고 "평소 대비 %"(`changePct`) + 상태로 표시합니다(예: "평소보다 6% 낮아요").
 - `judgment`: `OK` `OVERLOAD_OK` `OVERLOAD_LOW` `NORMAL_LOW` `BUILDING` `INSUFFICIENT`. 기준선이 있어도 최근 자료가 부족하면 `INSUFFICIENT`이며 HRV에 근거한 LOW/NORMAL 판단을 하지 않습니다.
+- 온보딩 완료 후에만 조회합니다(403 `ONBOARDING_REQUIRED`). 읽기 전용이라 회복 상태·추천을 계산하거나 만들지 않습니다.
+- `todayCheck.status`: 오늘 체크가 없으면 `NOT_STARTED`, 있으나 컨디션 전이면 `IN_PROGRESS`, 컨디션까지 저장했으면 `DONE`.
+- `todaySuggestions`: 오늘 날짜(`targetDate`)의 PRE_START·RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것(시작 시각 순).
+- **구현 해석(확인 필요)** `recovery.status`·`changePct`·`baseline`은 오늘 이하에서 가장 최근 회복 상태 기준입니다(오늘 기록 전이면 어제까지 계산값). 기록이 없으면 `BUILDING`. `excludedToday`는 오늘 컨디션까지 입력했는데 적격일이 아닐 때(교란 요인·대표값 없음) true입니다.
+- **현재 구현 범위**: `thisWeekLoad`(schedule 읽기 계약)·`plan`(subscription 읽기 계약)은 일정축 계약이 생기기 전까지 null, `judgment`는 추천 임계값 확정 전까지 null입니다.
 
 ---
 
@@ -343,6 +357,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 상태 규칙: `PROPOSED → APPROVING → APPROVED`; `PROPOSED → DISMISSED/EXPIRED`; 확정 등록 실패만 `APPROVING → FAILED`(재시도는 FAILED → APPROVING). 타임아웃은 FAILED로 확정하지 않습니다.
 - dismiss는 PROPOSED에서만, undo는 APPROVED에서만 허용합니다. undo는 앱 소유 Google 일정임을 확인하고 삭제 후 UNDONE(이미 삭제된 404도 성공). done은 APPROVED에서 일정 종료 후 허용하고 `doneAt`만 채우며 상태는 유지합니다. 완료한 일정은 undo 불가입니다. 반복 dismiss/undo/done은 같은 결과 200, 그 외 전이는 409 `INVALID_STATE`입니다.
 - generate는 기존 APPROVED를 보존하고 미승인 중복을 만들지 않습니다. 모든 갱신 응답은 최신 Suggestion입니다.
+- 조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). `type=RECOVERY` 조회는 온보딩 완료 후(403 `ONBOARDING_REQUIRED`), PRE_START는 온보딩 중에도 조회합니다. `type`·`status`가 정의된 값이 아니거나 `date`가 `YYYY-MM-DD`가 아니면 400입니다. 목록은 시작 시각 순입니다.
+- done을 일정 종료 전에 부르면 409 `INVALID_STATE`("일정이 끝난 뒤에 체크할 수 있어요.")입니다. `message`는 문구가 없으면 null입니다.
+- 제안의 등록 키(`registration_key`)는 생성 때 서버가 만드는 Google event id(`cd` + 32자, base32hex 문자만)이며 응답에 내보내지 않습니다. 승인 시작 때 같은 사용자의 다른 APPROVING·APPROVED 예약과 겹치면 409 `SLOT_CONFLICT`입니다. 만료 시각이 지난 PROPOSED는 서버가 주기적으로 `EXPIRED`로 바꿉니다.
+- **현재 구현 범위**: `relatedEvent`는 calendar 읽기 계약(일정축)이 생기기 전까지 null입니다. RECOVERY 추천 생성은 "1~7일 컨디션 기반 추천 임계값" 확정 후 구현합니다.
 
 ---
 
@@ -364,6 +382,9 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 }
 ```
 - 컨디션까지 끝났으면 `result`에 아래 TodayResult가 들어옵니다(다시 들어와도 결과 화면). `steps`는 화면 순서대로 measurement → condition → breathing입니다. GET은 체크 행을 만들지 않습니다. 측정·컨디션·호흡 중 첫 저장에서 생성합니다. `DONE`은 completed_at 기준이며 측정·호흡을 못 한 날도 컨디션 완료로 마칠 수 있습니다.
+- 접근 조건은 온보딩 완료(403)만 봅니다. 건강정보 동의·측정 켜짐이 없어도 조회할 수 있습니다(저장된 기록이 없을 뿐). 조회는 회복 상태를 계산하지 않습니다.
+- `dayIndex`는 현재 n일차(온보딩 완료 서울 날짜 = 1일차)입니다. `phase`·`baseline.validDays`는 오늘 이하의 가장 최근 회복 상태 기준이며, 기록이 없으면 `BUILDING`·0입니다.
+- **구현 해석(확인 필요)** `steps.measurement`: 보여줄 측정은 하루 대표 측정(첫 GOOD·FAIR) → 가장 최근 수동 입력(`UNVERIFIED`) → 가장 최근 측정(`RETRY`) 순입니다. `done`은 그 측정이 GOOD·FAIR·UNVERIFIED일 때 true이고, RETRY만 있으면 false + `qualityLevel: RETRY`(재측정 안내)입니다. 측정이 없으면 `measurementId`·`qualityLevel`은 null입니다.
 
 ### `POST /api/hrv/measurements` → 201 — ① 손가락 측정 저장
 **CAMERA**: 프론트는 약 70초(준비 10초 포함) 동안 수집한 프레임별 밝기 배열을 그대로 보내고, **백엔드가 RMSSD와 품질을 계산**합니다. 원신호(t·r·g)는 계산에만 쓰고 DB에 저장하지 않습니다(최소 수집).
@@ -386,9 +407,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 | t | 시작 = 0 기준 ms, 증가 순서. 준비 10초 포함 총 약 70초 |
 | r, g | 프레임별 빨강·초록 평균 밝기(0~255) |
 
-- 검증(400): t·r·g 길이 동일, 각 배열 최대 10,000개, 모든 값 유한수, r·g는 0~255. 요청 본문 상한 512KB(60fps 기준 약 100KB). **측정 시간 부족·프레임 부족은 400이 아니라 품질 판정(`RETRY`)으로 처리**합니다.
+- 검증(400): t·r·g 길이 동일, 각 배열 최대 10,000개, 모든 값 유한수, r·g는 0~255. 요청 본문 상한 512KB(60fps 기준 약 100KB, 넘으면 400 `VALIDATION_FAILED` "요청 본문이 너무 커요."). **측정 시간 부족·프레임 부족은 400이 아니라 품질 판정(`RETRY`)으로 처리**합니다.
+- 검사 순서: 로그인(401) → 접근 조건(403: 온보딩 → 건강정보 동의 → 측정 켜짐) → 요청 검증(400) → 재시도 키(409). 건강정보 동의는 `SENSITIVE_HRV`의 가장 최근 동의가 철회되지 않았을 때 유효하고, 생활 정보 설정이 없으면 측정 꺼짐으로 봅니다.
 - 계산 순서·품질 기준은 [계산_정책.md](계산_정책.md) 3절(참고 구현 `checkin.domain.measurement.HrvAnalyzer`, `algorithm_version: hrv-cam-v1`). 프레임 수·길이·fps·유효/제외 박동 간격·잡음비·채널은 서버 계산값으로 저장합니다.
-- local 프로필에서만 임계값 조정용으로 원신호를 파일로 남기는 설정 플래그를 둡니다(기본 꺼짐, Git 제외 경로). 운영에서는 켤 수 없습니다.
+- local 프로필에서만 임계값 조정용으로 원신호를 파일로 남기는 설정 플래그를 둡니다(기본 꺼짐, Git 제외 경로). 운영에서는 켤 수 없습니다. 설정: `comedown.hrv.signal-recording.enabled=true`, 위치 `comedown.hrv.signal-recording.dir`(기본 `recordings/`). 파일에는 사용자 식별자를 넣지 않습니다.
 - **MANUAL**(카메라를 못 쓰는 기기에서 워치 값 입력): 기존대로 `{ "source": "MANUAL", "measuredAt": "...", "rmssdMs": 42.5 }`. **RMSSD(ms)**만 허용(SDNN 불가), qualityLevel `UNVERIFIED`, 기준선·자동 회복 판정에서 제외하고 참고용으로만 표시합니다.
 - 공통: **측정 날짜는 측정 시작 시각(CAMERA `startedAt`, MANUAL `measuredAt`)의 서울 날짜**로 정합니다(자정 직전에 시작해 자정 뒤에 저장돼도 시작한 날의 체크). 시작 시각은 오늘 또는 어제여야 하고 미래 시각은 허용하지 않으며, 폰 시계 오류·조작을 막기 위해 서버 수신 시각과 5분 넘게 차이 나면 400입니다. 운영에서 과거 측정 입력은 지원하지 않습니다.
 - 응답:
@@ -408,6 +430,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 | `TOO_NOISY` | 유효 간격 쌍·유효 비율·잡음비 기준 미달 |
 - `BUILDING`에도 적격 측정은 기준선 구축에 씁니다. 7일 확보 전 HRV를 회복 판정·추천 근거로 쓰지 않습니다(IA "반영은 X"). 재측정은 컨디션 저장 후에도 같은 아침 체크에 연결하고 결과·리포트·미승인 추천을 다시 계산합니다.
 - 그날 컨디션·교란 요인을 아직 입력하지 않았다면 무교란으로 간주하지 않습니다. 컨디션 저장 전 측정은 기준선 적격일에 포함하지 않습니다.
+- **구현 해석(확인 필요)**
+  - 탈퇴 처리 중(`deletion_status ≠ ACTIVE`)인 계정의 측정 저장은 409 `INVALID_STATE`("탈퇴를 처리하고 있어요.")입니다.
+  - "미래 시각 불가"는 서버 시각보다 1초라도 늦으면 400입니다(폰 시계가 앞서면 거절될 수 있음). 정확히 5분 전까지 허용합니다.
+  - 아침 체크의 `dayIndex`는 온보딩 완료 서울 날짜를 1일차로 셉니다. 완료일 이전 날짜의 측정(자정 직전 측정 등)은 1일차로 둡니다.
 
 ### `PUT /api/morning-checks/today/condition` → 200 — ② 컨디션 체크 → 오늘 결과 계산
 ```json
@@ -434,12 +460,19 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - `excludedFromBaseline: true` → "오늘은 계산에서 빠졌어요". `phase: BUILDING`이면 `recovery`는 `status: BUILDING`이고 나머지는 null, `baseline.validDays`로 "n/7".
 - `recovery.status`: `BUILDING` `NORMAL` `LOW` `INSUFFICIENT`. `trendRmssdMs`·`normalRange`는 ln 단위 계산값을 exp로 변환한 표시값입니다([계산_정책.md](계산_정책.md) 4절).
 - 추천 문구는 AI가 5초 안에 응답하지 않으면 규칙 기반 문구로 대체합니다(측정 후 5초 안에 결과 표시).
+- 검증·접근: `score` 1~5, `alcohol`·`sick`·`caffeine`은 모두 필수(400). 접근 조건은 온보딩 → 건강정보 동의 순서(403)이며 측정 꺼짐(`hrvEnabled: false`)이어도 컨디션은 저장할 수 있습니다. 접근 조건을 요청 검증보다 먼저 봅니다.
+- 다시 저장하면 값을 바꾸고 결과를 다시 계산합니다. `completed_at`(DONE 기준)은 처음 완료한 시각을 유지합니다. 측정 저장도 그 날짜부터 회복 상태를 다시 계산하므로, 컨디션 저장 뒤 재측정하면 결과가 바뀝니다.
+- 표시값 반올림: `trendRmssdMs`·`normalRange`·`heartRateBpm`은 소수 첫째 자리, `changePct`는 저장값(소수 첫째 자리) 그대로입니다.
+- `qualityLevel`·`heartRateBpm`은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. `excludedFromBaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
+- **현재 구현 범위**: `judgment`는 null, `suggestions`는 빈 배열입니다. 2축 판단과 RECOVERY 추천은 "1~7일 컨디션 기반 추천 임계값"(14절 남은 항목)과 추천 기능이 정해진 뒤 채웁니다. 2주 연속 낮음 안전 평가도 safety 구현 후 연결합니다.
 
 ### `POST /api/morning-checks/today/breathing` → 204 — ③ 호흡 1분 완료 (건너뛰기 가능)
 ```json
 { "durationSec": 60 }
 ```
 - 컨디션 저장 뒤에 부릅니다. 건너뛰면 부르지 않으며 결과·완료 여부에 영향이 없습니다.
+- 호흡은 건강정보가 아니므로 건강정보 동의·측정 켜짐 없이도 기록합니다(온보딩 완료는 필요, 403). `durationSec`은 1~3600 정수(400)이며 저장하지 않습니다. 다시 불러도 처음 완료한 시각(`breathing_completed_at`)을 유지합니다.
+- **구현 해석(확인 필요)** 컨디션 저장 전에 불러도 거절하지 않고 오늘 체크에 기록합니다(체크가 없으면 만듦, "측정·컨디션·호흡 중 첫 저장에서 생성" 규칙).
 
 ---
 
@@ -486,7 +519,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 
 - 두 그래프를 겹쳐 그리거나 위아래로 나눠 X축만 맞추는 것은 프론트 선택입니다. `normalRange`는 오늘 기준 정상 범위(요약 표시용)입니다. `loadWeeks`는 캘린더 미연결이면 빈 배열입니다.
 - `rangePosition`(dayIndex ≥ 28이면서 7일 추세 값이 20개 이상일 때): `recovery`·`load` 각각 `{ "position": 35, "low": 33.2, "high": 55.0 }`. `position` = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + `INSUFFICIENT_DATA`. 회복과 부하는 따로 계산합니다([계산_정책.md](계산_정책.md) 6절).
-- `days`는 7~90.
+- `days`는 7~90(아니면 400). 온보딩 완료 후에만 조회합니다(403). 건강정보 동의가 없으면 200 + `locked: true` + `unavailableReason: "CONSENT_REQUIRED"`이며, 잠금일 때는 `unlock` 외 항목이 null입니다.
+- 그래프 값은 ms 소수 첫째 자리입니다. `points.excluded`는 교란일, `normalRange`·`hrvVsUsualPct`는 오늘 이하 가장 최근 회복 상태 기준, `latestQuality`는 기간 안에서 가장 최근 대표 측정의 품질입니다.
+- `rangePosition.availableFrom` = 온보딩 완료 서울 날짜 + 27일(28일차). 공개 전이면 `recovery`·`load`가 null입니다. 공개 후 null인 항목은 `recoveryUnavailableReason`·`loadUnavailableReason`(`INSUFFICIENT_DATA`)으로 이유를 줍니다. `position`은 정수로 반올림하고 `low`·`high`는 ms 표시값입니다.
+- **현재 구현 범위**: `loadWeeks`(빈 배열)·`loadVsUsualPct`·`rangePosition.load`(null + `INSUFFICIENT_DATA`)는 schedule 읽기 계약(일정축) 전까지 비어 있습니다. `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
 
 ### `GET /api/reports/four-week` → 200 — 28일차 비교 리포트
 ```json
@@ -505,6 +541,11 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 }
 ```
 - dayIndex < 28이면 200 + `available: false`, `cbiDue: false`, `availableFrom`(온보딩 서울 날짜 + 27일), 나머지 보고서 항목은 null입니다. 28일차이나 DAY28 CBI를 아직 안 했으면 `available: false` + `"cbiDue": true` → 재응답 화면으로(`POST /api/cbi/assessments`, round `DAY28`).
+- 온보딩 완료 후에만 조회합니다(403). 응답에는 항상 `unavailableReason`이 있으며 건강정보 동의가 없으면 `CONSENT_REQUIRED`(그 외 null)입니다.
+- `cbi`: 점수는 소수 첫째 자리, `diff` = DAY28 − INITIAL. INITIAL을 건너뛰었으면 `initial`·`diff`는 null입니다.
+- `suggestions`: 1~28일차에 날짜가 걸린 제안 중 `approved` = 상태가 APPROVED인 수, `done` = "했어요"를 누른 수.
+- **구현 해석(확인 필요)** `recovery`: 첫 주 = 1~7일차, 마지막 주 = 22~28일차. 각 주에서 대표값이 있고 교란일이 아닌 날의 ln 평균을 exp로 바꾼 값(ms, 단순 RMSSD 산술 평균 아님)이며, `changePct` = (exp(마지막 주 − 첫 주) − 1) × 100입니다. 어느 한 주라도 값이 없으면 그 값과 `changePct`는 null입니다.
+- **현재 구현 범위**: `load`(schedule 읽기 계약)·`plan`(subscription 읽기 계약)은 일정축 계약 전까지 null, `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
 
 ---
 
@@ -525,6 +566,8 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 
 - `GET /api/me/settings`는 measureTime·sleepStart·sleepEnd·preferredActivities·hrvEnabled를 반환합니다. `PUT /api/me/settings`는 앞의 생활 정보 4필드 전체 교체이며 hrvEnabled 변경은 동의 API로만 처리합니다. 시간 HH:mm, 수면 시작≠종료, 활동 중복·미등록 코드 불가입니다.
 - `DELETE /api/hrv/data`와 `deleteData=true`는 측정·일별 회복 상태·컨디션 및 교란 요인·CBI 응답·회복 AI 캐시·회복 기반 미승인 추천·안전 안내를 삭제하고 기준선과 카운터를 초기화합니다. morning_checks에는 호흡 완료 등 비건강 메타데이터만 남길 수 있습니다. 승인된 일정·이력의 건강 근거는 제거합니다. CBI로 이미 통과한 온보딩 단계는 되돌리지 않습니다. "건강 기록 전체 삭제"로 UI에 표시하며 사용자가 삭제 범위를 확인하게 합니다.
+- 기능별 삭제 계약(조율은 `experience.accountlifecycle`, 한 트랜잭션): `SuggestionDataDeletion.removeHealthBasis` → `SafetyDataDeletion.deleteAll` → `CbiDataDeletion.deleteAll` → `RecoveryDataDeletion.deleteAll` → `CheckinDataDeletion.eraseHealthData` → `IdempotencyService.deleteForUser(userId, "hrv-")`·`("cbi-")`. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. 회복 AI 캐시(`ai_outputs`)는 ai 구현 때 같은 순서에 추가합니다.
+- **구현 해석(확인 필요)** 아침 체크는 호흡 기록이 있으면 건강 필드(컨디션·교란 요인)와 `completed_at`만 비우고 남기며, 남을 것이 없는 체크는 지웁니다. "회복 기반 미승인 추천"은 RECOVERY 중 `APPROVING`·`APPROVED`가 아닌 것이며 지웁니다(`APPROVING`은 외부 등록 확인 전이라 남김). 남는 RECOVERY 제안은 "건강 근거 제거"로 `judgment_state`·`message`를 비우고 `reason_code`를 `HEALTH_DATA_DELETED`로 바꾸며, PRE_START는 `judgment_state`만 비웁니다(제목·시간·Google 일정·승인 상태는 유지). 안전 안내는 `LOW_RECOVERY_2W`·`CBI_HIGH` 모두 건강 근거이므로 지웁니다.
 - 민감정보 비동의/철회 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.
 
 용어 사전(C4)은 프론트 정적 데이터로 둡니다(API 없음).
@@ -546,10 +589,14 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 ```
 - resources 예시는 구조용 placeholder입니다. 실제 연락처·링크는 출시 전에 공식 기관 정보로 확인하고 verifiedAt을 기록해야 하며 미확인 항목에는 전화 버튼을 노출하지 않습니다.
 - 조건: 회복 낮음 2주 연속(`LOW_RECOVERY_2W`) 또는 CBI 75점 이상(`CBI_HIGH`). 마이페이지 메뉴에서는 `show`와 상관없이 언제든 볼 수 있습니다.
+- 로그인만 필요합니다(온보딩 중·건강정보 동의 없이도 조회). `alerts`는 조건이 아직 풀리지 않은 안내(최신순, 닫은 안내 포함)이고, `show`는 그중 닫지 않은 안내가 있을 때 true입니다.
+- 평가 시점: `LOW_RECOVERY_2W`는 측정 저장·컨디션 저장으로 회복 상태를 다시 계산할 때마다, `CBI_HIGH`는 CBI 제출 때 평가합니다.
+- **구현 해석(확인 필요)** `CBI_HIGH`의 `message`는 기획 확정 전 임시 문구("번아웃 체크에서 피로 점수가 높게 나왔어요.")입니다. `resources`는 공식 확인 전까지 위 placeholder 1건(전화·링크 없음)을 그대로 내려줍니다.
 
 ### `POST /api/safety/alerts/{id}/acknowledge` → 204 — "닫기"
 - `LOW_RECOVERY_2W`: 최근 14일 중 대표값이 있는 날이 7일 이상이고 그 날들의 회복 상태가 모두 `LOW`. 측정하지 않은 날은 판정에서 빠집니다(낮음으로도 정상으로도 세지 않음).
 - 단순 acknowledge는 조건 해제와 다릅니다. 닫은 안내는 같은 연속 구간에서는 다시 띄우지 않고, 조건이 해제(`resolved_at`)됐다가 다시 충족되면 새 안내로 노출합니다([계산_정책.md](계산_정책.md) 5절).
+- 다시 불러도 204(처음 닫은 시각 유지). 다른 사용자의 안내 id는 404 `NOT_FOUND`입니다. `LOW_RECOVERY_2W`의 `source_ref`는 낮음 구간 첫 날짜(창 안에서 대표값이 있는 가장 이른 날)입니다.
 
 ---
 
@@ -578,6 +625,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 ## 11. 개발용 (local 프로필에서만)
 | 메서드 | 경로 | 내용 |
 |---|---|---|
+| POST | `/api/dev/login` | 테스트 로그인 → 204 `{ "userId": 1 }`. Google 로그인 없이 그 사용자로 세션을 만듦(로그인 없이 호출 가능, CSRF 필요). 사용자 행은 만들지 않으므로 DB에 있어야 함. 로그인 뒤 `GET /api/auth/csrf` 다시 호출 |
 | POST | `/api/dev/seed` | 4주치 시연 데이터(일정 + HRV + CBI) `{ "scenario": "DEMO_OVERLOAD" }` |
 | POST | `/api/dev/clock` | 서버 기준 날짜 이동(28일차 시연) `{ "date": "2026-12-01" }` |
 | DELETE | `/api/dev/data` | 모든 사용자 데이터 삭제 |
