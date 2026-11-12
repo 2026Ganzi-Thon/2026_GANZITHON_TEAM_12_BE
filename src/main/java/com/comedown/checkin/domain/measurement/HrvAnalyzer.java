@@ -71,7 +71,16 @@ public final class HrvAnalyzer {
             int pairCount,
             double validRatio,
             double noiseRatio,
-            double periodicity) {
+            double periodicity,
+            int frameCount,       // 앞 10초 제거 후 분석에 쓴 프레임 수
+            Double durationSec,   // 분석 구간 길이(초). 프레임 2개 미만이면 null
+            Double fps) {         // 분석 구간 초당 프레임. 프레임 2개 미만이면 null
+
+        /** 분석 구간 정보를 붙인다. 채널 계산은 프레임 정보를 모르므로 analyze()에서 마지막에 채운다. */
+        Result withFrames(int frameCount, Double durationSec, Double fps) {
+            return new Result(ok, retryReason, quality, channel, rmssdMs, lnRmssd, hrBpm, validIbiCount,
+                    totalIbiCount, pairCount, validRatio, noiseRatio, periodicity, frameCount, durationSec, fps);
+        }
     }
 
     /**
@@ -95,7 +104,7 @@ public final class HrvAnalyzer {
         }
         int n = keep.size();
         if (n < 2) {
-            return retry("TOO_SHORT", null, Double.NaN, Double.NaN);
+            return retry("TOO_SHORT", null, Double.NaN, Double.NaN).withFrames(n, null, null);
         }
         double[] tt = new double[n];
         double[] rr = new double[n];
@@ -108,18 +117,19 @@ public final class HrvAnalyzer {
         }
 
         double duration = tt[n - 1] - tt[0];
+        double durationSec = duration / 1000.0;
+        double fps = (n - 1) / durationSec;
         if (duration < MIN_DURATION_MS) {
-            return retry("TOO_SHORT", null, Double.NaN, Double.NaN);
+            return retry("TOO_SHORT", null, Double.NaN, Double.NaN).withFrames(n, durationSec, fps);
         }
-        double fps = (n - 1) / (duration / 1000.0);
         if (fps < MIN_FPS) {
-            return retry("LOW_FPS", null, Double.NaN, Double.NaN);
+            return retry("LOW_FPS", null, Double.NaN, Double.NaN).withFrames(n, durationSec, fps);
         }
 
         // 8. 두 채널을 모두 계산하고 더 좋은 쪽 선택
         Result red = analyzeChannel(tt, rr, "R");
         Result green = analyzeChannel(tt, gg, "G");
-        return better(red, green);
+        return better(red, green).withFrames(n, durationSec, fps);
     }
 
     static Result analyzeChannel(double[] t, double[] x, String channel) {
@@ -236,13 +246,13 @@ public final class HrvAnalyzer {
         // 8. 품질 판정
         if (pairs < MIN_PAIRS || validRatio < MIN_VALID_RATIO || noiseRatio > MAX_NOISE_RATIO) {
             return new Result(false, "TOO_NOISY", "RETRY", channel, null, null, null,
-                    validCount, m, pairs, validRatio, noiseRatio, acMax);
+                    validCount, m, pairs, validRatio, noiseRatio, acMax, 0, null, null);
         }
         double rmssd = Math.sqrt(sumSq / pairs);
         double hr = 60_000.0 / median(validIbis);
         String quality = (validRatio >= GOOD_VALID_RATIO && noiseRatio <= GOOD_NOISE_RATIO) ? "GOOD" : "FAIR";
         return new Result(true, null, quality, channel, rmssd, Math.log(rmssd), hr,
-                validCount, m, pairs, validRatio, noiseRatio, acMax);
+                validCount, m, pairs, validRatio, noiseRatio, acMax, 0, null, null);
     }
 
     // ---------- 채널 선택 ----------
@@ -258,7 +268,7 @@ public final class HrvAnalyzer {
 
     static Result retry(String reason, String channel, double noiseRatio, double periodicity) {
         return new Result(false, reason, "RETRY", channel, null, null, null,
-                0, 0, 0, 0, noiseRatio, periodicity);
+                0, 0, 0, 0, noiseRatio, periodicity, 0, null, null);
     }
 
     // ---------- 신호 처리 도구 ----------
