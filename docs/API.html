@@ -675,9 +675,16 @@
   &quot;locked&quot;: false,
   &quot;unlock&quot;: { &quot;requireddays&quot;: 7, &quot;validdays&quot;: 9 },
   &quot;graph&quot;: {
+    &quot;from&quot;: &quot;2026-10-30&quot;, &quot;to&quot;: &quot;2026-11-12&quot;,
     &quot;points&quot;: [{ &quot;date&quot;: &quot;2026-11-05&quot;, &quot;rmssdms&quot;: 44.1, &quot;excluded&quot;: false, &quot;qualitylevel&quot;: &quot;good&quot; }],
     &quot;trend&quot;: [{ &quot;date&quot;: &quot;2026-11-05&quot;, &quot;rmssdms&quot;: 43.0 }],
-    &quot;normalrange&quot;: { &quot;lowerms&quot;: 38.1, &quot;upperms&quot;: 51.6 }
+    &quot;normalband&quot;: [{ &quot;date&quot;: &quot;2026-11-05&quot;, &quot;lowerms&quot;: 38.3, &quot;upperms&quot;: 51.2 }],
+    &quot;normalrange&quot;: { &quot;lowerms&quot;: 38.1, &quot;upperms&quot;: 51.6 },
+    &quot;loadweeks&quot;: [
+      { &quot;weekstart&quot;: &quot;2026-10-26&quot;, &quot;weekend&quot;: &quot;2026-11-01&quot;, &quot;loadscore&quot;: 41.0, &quot;vsusualpct&quot;: -5.0, &quot;risklevel&quot;: &quot;none&quot; },
+      { &quot;weekstart&quot;: &quot;2026-11-02&quot;, &quot;weekend&quot;: &quot;2026-11-08&quot;, &quot;loadscore&quot;: 52.0, &quot;vsusualpct&quot;: 25.0, &quot;risklevel&quot;: &quot;watch&quot; },
+      { &quot;weekstart&quot;: &quot;2026-11-09&quot;, &quot;weekend&quot;: &quot;2026-11-15&quot;, &quot;loadscore&quot;: 48.5, &quot;vsusualpct&quot;: 12.0, &quot;risklevel&quot;: &quot;none&quot; }
+    ]
   },
   &quot;hrvvsusualpct&quot;: -6.0,
   &quot;latestquality&quot;: &quot;good&quot;,
@@ -691,6 +698,17 @@
 }
 ```
 - 기준선 확정 전이면 200 + `locked: true` → &quot;유효 측정 7일이 모이면 공개돼요 · {validdays}/7&quot;. 원칙적으로 7일차 체크 완료 후 공개되며 달력 일수만으로 잠금을 풀지 않습니다.
+- **그래프**: hrv는 하루 단위, 일정 부하는 주 단위라 단위가 다르므로 **x축(날짜)만 공유하고 표현을 다르게** 합니다. 부하가 높은 주에 회복이 떨어졌는지를 한눈에 보기 위한 구성입니다.
+
+| 요소 | 필드 | 표현 |
+|---|---|---|
+| 날짜 축 | `from`·`to` | 서울 날짜, 오늘 포함 `days`일 |
+| hrv 점 | `points` | 날마다 점(하루 대표값). `excluded: true`(교란일)는 회색. 측정 없는 날은 항목 없음 |
+| 7일 평균선 | `trend` | exp(`trend_ln`). 추세가 없는 날은 항목 없음 |
+| 정상 범위 띠 | `normalband` | 날짜별 기준선 평균 ± 1sd(ms 변환). 기준선이 매일 갱신되므로 날짜별 값 |
+| 일정 부하 막대 | `loadweeks` | 주 단위 막대를 해당 주 월~일 폭으로 깔기. `from`~`to`와 겹치는 모든 주(첫·마지막 주는 범위 밖 날짜 포함) |
+
+- 두 그래프를 겹쳐 그리거나 위아래로 나눠 x축만 맞추는 것은 프론트 선택입니다. `normalrange`는 오늘 기준 정상 범위(요약 표시용)입니다. `loadweeks`는 캘린더 미연결이면 빈 배열입니다.
 - `rangeposition`(dayindex ≥ 28이면서 7일 추세 값이 20개 이상일 때): `recovery`·`load` 각각 `{ &quot;position&quot;: 35, &quot;low&quot;: 33.2, &quot;high&quot;: 55.0 }`. `position` = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + `insufficient_data`. 회복과 부하는 따로 계산합니다([계산_정책.md](계산_정책.md) 6절).
 - `days`는 7~90.
 
@@ -698,9 +716,16 @@
   &quot;locked&quot;: false,
   &quot;unlock&quot;: { &quot;requiredDays&quot;: 7, &quot;validDays&quot;: 9 },
   &quot;graph&quot;: {
+    &quot;from&quot;: &quot;2026-10-30&quot;, &quot;to&quot;: &quot;2026-11-12&quot;,
     &quot;points&quot;: [{ &quot;date&quot;: &quot;2026-11-05&quot;, &quot;rmssdMs&quot;: 44.1, &quot;excluded&quot;: false, &quot;qualityLevel&quot;: &quot;GOOD&quot; }],
     &quot;trend&quot;: [{ &quot;date&quot;: &quot;2026-11-05&quot;, &quot;rmssdMs&quot;: 43.0 }],
-    &quot;normalRange&quot;: { &quot;lowerMs&quot;: 38.1, &quot;upperMs&quot;: 51.6 }
+    &quot;normalBand&quot;: [{ &quot;date&quot;: &quot;2026-11-05&quot;, &quot;lowerMs&quot;: 38.3, &quot;upperMs&quot;: 51.2 }],
+    &quot;normalRange&quot;: { &quot;lowerMs&quot;: 38.1, &quot;upperMs&quot;: 51.6 },
+    &quot;loadWeeks&quot;: [
+      { &quot;weekStart&quot;: &quot;2026-10-26&quot;, &quot;weekEnd&quot;: &quot;2026-11-01&quot;, &quot;loadScore&quot;: 41.0, &quot;vsUsualPct&quot;: -5.0, &quot;riskLevel&quot;: &quot;NONE&quot; },
+      { &quot;weekStart&quot;: &quot;2026-11-02&quot;, &quot;weekEnd&quot;: &quot;2026-11-08&quot;, &quot;loadScore&quot;: 52.0, &quot;vsUsualPct&quot;: 25.0, &quot;riskLevel&quot;: &quot;WATCH&quot; },
+      { &quot;weekStart&quot;: &quot;2026-11-09&quot;, &quot;weekEnd&quot;: &quot;2026-11-15&quot;, &quot;loadScore&quot;: 48.5, &quot;vsUsualPct&quot;: 12.0, &quot;riskLevel&quot;: &quot;NONE&quot; }
+    ]
   },
   &quot;hrvVsUsualPct&quot;: -6.0,
   &quot;latestQuality&quot;: &quot;GOOD&quot;,
@@ -715,6 +740,46 @@
 </code></pre>
 <ul>
 <li>기준선 확정 전이면 200 + <code>locked: true</code> → &quot;유효 측정 7일이 모이면 공개돼요 · {validDays}/7&quot;. 원칙적으로 7일차 체크 완료 후 공개되며 달력 일수만으로 잠금을 풀지 않습니다.</li>
+<li><strong>그래프</strong>: HRV는 하루 단위, 일정 부하는 주 단위라 단위가 다르므로 <strong>X축(날짜)만 공유하고 표현을 다르게</strong> 합니다. 부하가 높은 주에 회복이 떨어졌는지를 한눈에 보기 위한 구성입니다.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>요소</th>
+<th>필드</th>
+<th>표현</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>날짜 축</td>
+<td><code>from</code>·<code>to</code></td>
+<td>서울 날짜, 오늘 포함 <code>days</code>일</td>
+</tr>
+<tr>
+<td>HRV 점</td>
+<td><code>points</code></td>
+<td>날마다 점(하루 대표값). <code>excluded: true</code>(교란일)는 회색. 측정 없는 날은 항목 없음</td>
+</tr>
+<tr>
+<td>7일 평균선</td>
+<td><code>trend</code></td>
+<td>exp(<code>trend_ln</code>). 추세가 없는 날은 항목 없음</td>
+</tr>
+<tr>
+<td>정상 범위 띠</td>
+<td><code>normalBand</code></td>
+<td>날짜별 기준선 평균 ± 1SD(ms 변환). 기준선이 매일 갱신되므로 날짜별 값</td>
+</tr>
+<tr>
+<td>일정 부하 막대</td>
+<td><code>loadWeeks</code></td>
+<td>주 단위 막대를 해당 주 월~일 폭으로 깔기. <code>from</code>~<code>to</code>와 겹치는 모든 주(첫·마지막 주는 범위 밖 날짜 포함)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>두 그래프를 겹쳐 그리거나 위아래로 나눠 X축만 맞추는 것은 프론트 선택입니다. <code>normalRange</code>는 오늘 기준 정상 범위(요약 표시용)입니다. <code>loadWeeks</code>는 캘린더 미연결이면 빈 배열입니다.</li>
 <li><code>rangePosition</code>(dayIndex ≥ 28이면서 7일 추세 값이 20개 이상일 때): <code>recovery</code>·<code>load</code> 각각 <code>{ &quot;position&quot;: 35, &quot;low&quot;: 33.2, &quot;high&quot;: 55.0 }</code>. <code>position</code> = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + <code>INSUFFICIENT_DATA</code>. 회복과 부하는 따로 계산합니다(<a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a> 6절).</li>
 <li><code>days</code>는 7~90.</li>
 </ul>

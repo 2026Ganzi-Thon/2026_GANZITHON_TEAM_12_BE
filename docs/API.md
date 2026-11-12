@@ -451,9 +451,16 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
   "locked": false,
   "unlock": { "requiredDays": 7, "validDays": 9 },
   "graph": {
+    "from": "2026-10-30", "to": "2026-11-12",
     "points": [{ "date": "2026-11-05", "rmssdMs": 44.1, "excluded": false, "qualityLevel": "GOOD" }],
     "trend": [{ "date": "2026-11-05", "rmssdMs": 43.0 }],
-    "normalRange": { "lowerMs": 38.1, "upperMs": 51.6 }
+    "normalBand": [{ "date": "2026-11-05", "lowerMs": 38.3, "upperMs": 51.2 }],
+    "normalRange": { "lowerMs": 38.1, "upperMs": 51.6 },
+    "loadWeeks": [
+      { "weekStart": "2026-10-26", "weekEnd": "2026-11-01", "loadScore": 41.0, "vsUsualPct": -5.0, "riskLevel": "NONE" },
+      { "weekStart": "2026-11-02", "weekEnd": "2026-11-08", "loadScore": 52.0, "vsUsualPct": 25.0, "riskLevel": "WATCH" },
+      { "weekStart": "2026-11-09", "weekEnd": "2026-11-15", "loadScore": 48.5, "vsUsualPct": 12.0, "riskLevel": "NONE" }
+    ]
   },
   "hrvVsUsualPct": -6.0,
   "latestQuality": "GOOD",
@@ -467,6 +474,17 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 }
 ```
 - 기준선 확정 전이면 200 + `locked: true` → "유효 측정 7일이 모이면 공개돼요 · {validDays}/7". 원칙적으로 7일차 체크 완료 후 공개되며 달력 일수만으로 잠금을 풀지 않습니다.
+- **그래프**: HRV는 하루 단위, 일정 부하는 주 단위라 단위가 다르므로 **X축(날짜)만 공유하고 표현을 다르게** 합니다. 부하가 높은 주에 회복이 떨어졌는지를 한눈에 보기 위한 구성입니다.
+
+| 요소 | 필드 | 표현 |
+|---|---|---|
+| 날짜 축 | `from`·`to` | 서울 날짜, 오늘 포함 `days`일 |
+| HRV 점 | `points` | 날마다 점(하루 대표값). `excluded: true`(교란일)는 회색. 측정 없는 날은 항목 없음 |
+| 7일 평균선 | `trend` | exp(`trend_ln`). 추세가 없는 날은 항목 없음 |
+| 정상 범위 띠 | `normalBand` | 날짜별 기준선 평균 ± 1SD(ms 변환). 기준선이 매일 갱신되므로 날짜별 값 |
+| 일정 부하 막대 | `loadWeeks` | 주 단위 막대를 해당 주 월~일 폭으로 깔기. `from`~`to`와 겹치는 모든 주(첫·마지막 주는 범위 밖 날짜 포함) |
+
+- 두 그래프를 겹쳐 그리거나 위아래로 나눠 X축만 맞추는 것은 프론트 선택입니다. `normalRange`는 오늘 기준 정상 범위(요약 표시용)입니다. `loadWeeks`는 캘린더 미연결이면 빈 배열입니다.
 - `rangePosition`(dayIndex ≥ 28이면서 7일 추세 값이 20개 이상일 때): `recovery`·`load` 각각 `{ "position": 35, "low": 33.2, "high": 55.0 }`. `position` = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + `INSUFFICIENT_DATA`. 회복과 부하는 따로 계산합니다([계산_정책.md](계산_정책.md) 6절).
 - `days`는 7~90.
 
