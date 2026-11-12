@@ -32,6 +32,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(code.status()).body(ErrorResponse.of(code, ex.getMessage()));
     }
 
+    @ExceptionHandler(FieldValidationException.class)
+    public ResponseEntity<ErrorResponse> handleFieldValidation(FieldValidationException ex) {
+        return ResponseEntity.badRequest().body(ErrorResponse.validation(ex.fieldErrors()));
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
         List<ErrorResponse.FieldError> errors = ex.getConstraintViolations().stream()
