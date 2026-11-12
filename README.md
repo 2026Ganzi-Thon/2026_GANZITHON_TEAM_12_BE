@@ -184,6 +184,8 @@ docker compose up -d        # MySQL 8.4 → localhost:3307
 
 실행하면 Flyway가 기준선 스키마를 자동으로 만듭니다.
 
+Google 로그인 없이 API를 시험할 때는 local 전용 테스트 로그인을 씁니다(운영 프로필에는 없음). `GET /api/auth/csrf`로 받은 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더에 넣어 `POST /api/dev/login` `{ "userId": 1 }`을 보내면 그 사용자로 세션이 생깁니다. 사용자 행은 만들지 않으므로 해당 `users` 행이 로컬 DB에 있어야 합니다.
+
 ### 테스트·검증
 
 ```powershell
@@ -230,7 +232,7 @@ python docs/build_spec_html.py                            # 문서 HTML 재생�
 - [x] HRV 측정 계산 참고 구현(`HrvAnalyzer`) · 합성 신호 테스트
 - [x] CI(GitHub Actions): 빌드·테스트·문서 동기화 자동 검사
 - [ ] CD: 배포 대상 결정 후 자동 배포
-- [ ] 재시도 키 처리(`shared.idempotency`) · local 전용 테스트 로그인
+- [x] 재시도 키 처리(`shared.idempotency`) · local 전용 테스트 로그인
 - [ ] 일정축: Google 로그인·캘린더 동기화·분류·주간 부하·미리 시작하기·추천 승인
 - [ ] HRV축: CBI·아침 체크·회복 계산·회복 추천·홈·리포트·안전 안내
 - [ ] AI 연동(일정 분류·문구·리포트 해석)
