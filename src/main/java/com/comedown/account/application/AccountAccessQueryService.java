@@ -23,4 +23,9 @@ public class AccountAccessQueryService implements AccountAccessQuery {
     public Optional<HealthDataAccess> findHealthDataAccess(long userId) {
         return reader.find(userId);
     }
+
+    @Override
+    public Optional<String> findNickname(long userId) {
+        return reader.findNickname(userId);
+    }
 }

@@ -10,4 +10,7 @@ public interface AccountAccessQuery {
 
     /** 사용자가 없으면 비어 있다. */
     Optional<HealthDataAccess> findHealthDataAccess(long userId);
+
+    /** 화면 표시용 닉네임. 사용자가 없거나 닉네임을 정하기 전이면 비어 있다. */
+    Optional<String> findNickname(long userId);
 }
