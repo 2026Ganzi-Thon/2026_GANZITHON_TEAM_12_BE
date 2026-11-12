@@ -62,6 +62,13 @@ public class RecoveryService implements RecoveryCommands, RecoveryQuery {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<DailyRecoverySnapshot> findLatestOnOrBefore(long userId, LocalDate date) {
+        return states.findFirstByUserIdAndStateDateLessThanEqualOrderByStateDateDesc(userId, date)
+                .map(RecoveryService::toSnapshot);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<Long> findRepresentativeMeasurementId(long userId, LocalDate date) {
         return checkinQuery.findDay(userId, date)
                 .flatMap(day -> RecoveryDayInput.representative(samples(day)))

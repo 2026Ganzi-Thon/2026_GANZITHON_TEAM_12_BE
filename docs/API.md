@@ -364,6 +364,9 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 }
 ```
 - 컨디션까지 끝났으면 `result`에 아래 TodayResult가 들어옵니다(다시 들어와도 결과 화면). `steps`는 화면 순서대로 measurement → condition → breathing입니다. GET은 체크 행을 만들지 않습니다. 측정·컨디션·호흡 중 첫 저장에서 생성합니다. `DONE`은 completed_at 기준이며 측정·호흡을 못 한 날도 컨디션 완료로 마칠 수 있습니다.
+- 접근 조건은 온보딩 완료(403)만 봅니다. 건강정보 동의·측정 켜짐이 없어도 조회할 수 있습니다(저장된 기록이 없을 뿐). 조회는 회복 상태를 계산하지 않습니다.
+- `dayIndex`는 현재 n일차(온보딩 완료 서울 날짜 = 1일차)입니다. `phase`·`baseline.validDays`는 오늘 이하의 가장 최근 회복 상태 기준이며, 기록이 없으면 `BUILDING`·0입니다.
+- **구현 해석(확인 필요)** `steps.measurement`: 보여줄 측정은 하루 대표 측정(첫 GOOD·FAIR) → 가장 최근 수동 입력(`UNVERIFIED`) → 가장 최근 측정(`RETRY`) 순입니다. `done`은 그 측정이 GOOD·FAIR·UNVERIFIED일 때 true이고, RETRY만 있으면 false + `qualityLevel: RETRY`(재측정 안내)입니다. 측정이 없으면 `measurementId`·`qualityLevel`은 null입니다.
 
 ### `POST /api/hrv/measurements` → 201 — ① 손가락 측정 저장
 **CAMERA**: 프론트는 약 70초(준비 10초 포함) 동안 수집한 프레임별 밝기 배열을 그대로 보내고, **백엔드가 RMSSD와 품질을 계산**합니다. 원신호(t·r·g)는 계산에만 쓰고 DB에 저장하지 않습니다(최소 수집).

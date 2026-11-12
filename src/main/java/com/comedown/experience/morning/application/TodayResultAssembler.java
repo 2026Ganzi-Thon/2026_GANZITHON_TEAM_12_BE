@@ -34,15 +34,31 @@ public class TodayResultAssembler {
     public TodayResult assemble(long userId, LocalDate date) {
         CheckinDay day = checkinQuery.findDay(userId, date)
                 .orElseThrow(() -> new IllegalStateException("아침 체크가 없습니다: " + date));
-        DailyRecoverySnapshot state = recoveryQuery.findDay(userId, date)
+        return assemble(userId, day)
                 .orElseThrow(() -> new IllegalStateException("회복 상태가 계산되지 않았습니다: " + date));
+    }
+
+    /**
+     * 이미 읽은 체크로 결과를 조합한다. 컨디션까지 끝나지 않았거나 회복 상태가 아직 없으면 비어 있다(조회는 계산하지 않음).
+     */
+    public Optional<TodayResult> assembleIfCompleted(long userId, CheckinDay day) {
+        return day.conditionCompleted() ? assemble(userId, day) : Optional.empty();
+    }
+
+    private Optional<TodayResult> assemble(long userId, CheckinDay day) {
+        LocalDate date = day.date();
+        Optional<DailyRecoverySnapshot> found = recoveryQuery.findDay(userId, date);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        DailyRecoverySnapshot state = found.get();
         Optional<MeasurementSnapshot> representative = recoveryQuery
                 .findRepresentativeMeasurementId(userId, date)
                 .flatMap(id -> day.measurements().stream().filter(m -> m.id() == id).findFirst());
 
         boolean established = state.baselineEstablished();
         boolean eligible = state.dailyLnRmssd() != null && day.conditionCompleted() && !state.confounded();
-        return new TodayResult(
+        return Optional.of(new TodayResult(
                 date,
                 established ? ESTABLISHED : BUILDING,
                 recovery(state),
@@ -53,7 +69,7 @@ public class TodayResultAssembler {
                         state.baselineFrozen()),
                 day.conditionScore(),
                 null,
-                List.of());
+                List.of()));
     }
 
     private static TodayResult.Recovery recovery(DailyRecoverySnapshot state) {
