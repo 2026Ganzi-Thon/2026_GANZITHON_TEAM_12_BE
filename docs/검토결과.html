@@ -1,0 +1,428 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Come-down · 설계 검토 결과</title><style>
+:root{--ink:#18312c;--muted:#61716d;--line:#dce5df;--green:#206b53;--bg:#f4f6f1;--paper:#fff;--soft:#e9f0e9}*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 'Segoe UI','Malgun Gothic',sans-serif}a{color:var(--green);text-underline-offset:3px}button,input,select{font:inherit}button{cursor:pointer}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #cf8d39;outline-offset:3px}header{padding:42px max(28px,calc((100vw - 1400px)/2));background:#183b30;color:white}header .eyebrow{font-size:12px;letter-spacing:.16em;color:#bed8c8}header h1{font-size:40px;letter-spacing:-.04em;line-height:1.2;margin:12px 0}header p{color:#c9ddd2;max-width:850px;margin:0}nav{display:flex;gap:10px;flex-wrap:wrap;margin-top:25px}nav a,nav button{border:1px solid #ffffff42;border-radius:8px;padding:7px 14px;text-decoration:none;background:transparent;color:white}nav .current{background:white;color:#183b30}main{max-width:1456px;margin:auto;padding:28px}h2{font-size:25px;letter-spacing:-.025em;margin:36px 0 16px}h3{font-size:18px;margin:22px 0 12px}h4{font-size:16px}p{margin:10px 0}.intro{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.tile{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px}.tile strong{display:block;font-size:22px}.tile span,.muted{color:var(--muted);font-size:13px}.notice{border-left:3px solid #bd8a36;background:#fcf5e7;padding:14px 18px;margin:20px 0;font-size:14px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:24px 0 16px}.toolbar input{flex:1;min-width:200px}.toolbar input,.toolbar select,.toolbar button{padding:11px 14px;border:1px solid #bfcfc4;border-radius:8px;background:white;color:var(--ink)}.toolbar label{font-size:13px}#count{font-size:13px;color:var(--muted)}.layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:28px}.sidebar{position:sticky;top:20px;align-self:start;padding:8px}.sidebar a{display:block;padding:7px 10px;text-decoration:none;font-size:13px;border-radius:6px}.sidebar a:hover{background:var(--soft)}.endpoint{background:white;border:1px solid var(--line);border-radius:10px;margin:9px 0;overflow:hidden}.endpoint summary{list-style:none;display:grid;grid-template-columns:69px minmax(0,1fr) 26px;align-items:center;gap:12px;padding:15px 18px;cursor:pointer}.endpoint summary::-webkit-details-marker{display:none}.endpoint summary:after{content:'+';font-size:23px;color:#82938b}.endpoint[open] summary:after{content:'−'}.method{font-size:11px;font-weight:800;text-align:center;border-radius:5px;padding:4px;background:#e3efe8;color:#216547}.POST{background:#e8edf9;color:#405daa}.PUT,.PATCH{background:#fff0d9;color:#8b601f}.DELETE{background:#f9e6e4;color:#a0443c}.path{font:13px/1.5 Consolas,monospace;overflow-wrap:anywhere;color:#244c3c}.description{font-size:14px;margin-top:3px}.detail-body{padding:0 20px 20px;border-top:1px solid var(--line);overflow-wrap:anywhere}.detail-body>h3:first-child{margin-top:15px}code{font:12px/1.6 Consolas,monospace;overflow-wrap:anywhere;background:#edf2ee;padding:2px 4px;border-radius:4px}pre{background:#122d25;color:#e3f0e8;padding:18px;border-radius:8px;overflow:auto;font-size:12px;white-space:pre}pre code{background:transparent;color:inherit;padding:0}table{border-collapse:collapse;width:100%;font-size:13px;background:white;margin:16px 0}th,td{text-align:left;vertical-align:top;padding:11px 13px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:#e8eee7;color:#315043}li{margin:5px 0}details.block{background:white;border:1px solid var(--line);border-radius:10px;margin:13px 0}details.block>summary{padding:17px 20px;cursor:pointer;font-weight:600}.content{padding:0 20px 20px;min-width:0;overflow-x:auto}.table-card{margin:12px 0;background:white;border:1px solid var(--line);border-radius:10px;overflow:hidden}.table-card>summary{padding:18px;cursor:pointer;overflow-wrap:anywhere}.table-card .content h4{display:none}.empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed #bfcfc4;border-radius:10px}.diagram-frame{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:auto}.diagram-frame svg{display:block;min-width:1150px;width:100%;height:auto}.diagram-frame .edge{stroke:#abc0b3;stroke-width:1.2;fill:none}.diagram-frame .node:hover rect{fill:#e7f2e9;stroke:#206b53}.diagram-frame text{font-family:Consolas,'Malgun Gothic',monospace}.legend{font-size:12px;color:var(--muted);margin:12px 0}footer{max-width:1400px;margin:24px auto;padding:22px 28px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}[hidden]{display:none!important}@media(max-width:800px){header{padding:30px 20px}header h1{font-size:32px}main{padding:18px}.intro{grid-template-columns:1fr}.layout{grid-template-columns:1fr}.sidebar{position:static;display:flex;flex-wrap:wrap;gap:3px}.sidebar a{padding:5px 8px}.endpoint summary{padding:12px;gap:8px;grid-template-columns:60px minmax(0,1fr) 20px}table{min-width:580px}.tile{padding:15px}.toolbar input{min-width:100%;width:100%}.content,.detail-body{overflow-x:auto}}@media print{body{background:white;font-size:11px}header{background:white;color:#183b30;padding:10px}header p,header .eyebrow{color:#52685e}nav,.toolbar,.sidebar,.print-button{display:none!important}main{padding:0}.layout{display:block}.intro{display:none}details{break-inside:avoid}details:not([open])>*:not(summary){display:block!important}.diagram-frame{overflow:visible}.diagram-frame svg{min-width:0}pre{white-space:pre-wrap}.endpoint summary{padding:8px}h2{break-after:avoid}.detail-body,.content{overflow:visible}table{min-width:0}}
+.layout>*{min-width:0} .toolbar>*{max-width:100%}article.tile strong{display:inline;font-size:inherit} article.tile p,article.tile li{max-width:100ch} article.tile pre{font-size:13px} article.tile{overflow-x:auto;min-width:0}</style></head><body><header><div class="eyebrow">COME-DOWN / PRODUCT & ENGINEERING</div><h1>설계 검토 결과</h1><p>기획과 IA에 대조해 바로잡은 내용과, 팀에서 결정해야 할 항목을 구분했습니다.</p><nav aria-label="문서 이동"><a class="" href="API.html">API 명세</a><a class="" href="ERD.html">ERD · 데이터 구조</a><a class="current" href="검토결과.html">검토 결과</a><a class="" href="계산_정책.html">계산 정책</a><a class="" href="백엔드_구조설계.html">백엔드 구조</a><a class="" href="책임_매핑.html">책임 매핑</a><a class="" href="백엔드_협업가이드.html">협업 가이드</a><button class="print-button" type="button" onclick="window.print()">인쇄 / PDF</button></nav></header><main><article class="tile"><h1>API · ERD 검토 결과</h1>
+<p>검토일: 2026-11-11 · 명세 v0.2</p>
+<h2>검토 기준과 범위</h2>
+<ul>
+<li>최초 검토(2026-11-11) 기준: 기획 1차 수정본 MD와 사용자가 첨부한 IA 차트 이미지. 이번 공유본의 <code>서비스_요구사항.md</code>는 그 기획의 제품 흐름을 2026-11-12에 재구성한 요약입니다.</li>
+<li>저장소에서 원본 기획 PDF는 찾지 못했습니다. 기획 MD에 기록된 요약과 첨부 IA를 기준으로 대조했습니다.</li>
+<li>API·ERD의 설계를 수정했으며 백엔드 코드·DB 마이그레이션은 변경하지 않았습니다. 기획 MD도 원문을 유지했습니다.</li>
+<li>기획의 통계·연구·의료/법률 근거 자체의 검증은 이번 설계 검토 범위에 포함하지 않았습니다. 기존 수치 기준은 프로젝트 정책으로만 표기했습니다.</li>
+</ul>
+<h2>IA와 기능 대응</h2>
+<table>
+<thead>
+<tr>
+<th>IA 영역</th>
+<th>API / 테이블</th>
+<th>검토 결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>가입·닉네임·14세·캘린더 동의</td>
+<td>onboarding/profile · users, user_consents</td>
+<td>반영됨. 온보딩 선행 조건 검사 추가</td>
+</tr>
+<tr>
+<td>CBI → 생활 정보 → 일정 리포트</td>
+<td>cbi, me/settings, schedule/report</td>
+<td>반영됨. 분석/제안 API를 온보딩 중 허용</td>
+</tr>
+<tr>
+<td>홈의 회복·이번 주 부하·추천</td>
+<td>home · daily_states, weekly_loads, suggestions</td>
+<td>반영됨. 자료 부족 시 상태 구분</td>
+</tr>
+<tr>
+<td>캘린더 분류 직접 수정·4주 위험·대비 제안</td>
+<td>category, schedule/weeks, PRE_START</td>
+<td>반영됨. 마감 여부 수정·규칙 보존 보완</td>
+</tr>
+<tr>
+<td>측정 → 컨디션 → 호흡 → 결과 (v0.3)</td>
+<td>measurements, morning-checks</td>
+<td>반영됨. 결과·완료는 컨디션 저장 기준, 호흡 건너뛰기 가능</td>
+</tr>
+<tr>
+<td>추천 동의 후 캘린더 반영</td>
+<td>suggestions/approve</td>
+<td>반영됨. 중복 등록·상태 전이 보완</td>
+</tr>
+<tr>
+<td>7일차 회복 리포트</td>
+<td>reports/recovery</td>
+<td>유효한 7일 확보와 달력 7일을 구분하도록 수정</td>
+</tr>
+<tr>
+<td>내 범위 중 현재 위치</td>
+<td>reports/recovery.rangePosition</td>
+<td>28일 이후 + 충분한 표본 조건 명시</td>
+</tr>
+<tr>
+<td>마이페이지·용어 사전·도움</td>
+<td>me/settings, safety · 정적 용어 사전</td>
+<td>반영됨. 건강 기록 삭제·연결 해제 범위 보완</td>
+</tr>
+</tbody>
+</table>
+<h2>수정한 API 명세</h2>
+<table>
+<thead>
+<tr>
+<th>문제</th>
+<th>수정 내용</th>
+<th>이유</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>온보딩 완료 전 일정 분석·제안 사용 불가</td>
+<td>A5에 필요한 동기화·일정 분석·PRE_START와 안전 안내는 온보딩 중 허용</td>
+<td>가입 과정 자체가 막히는 순환 의존 제거</td>
+</tr>
+<tr>
+<td>현재 단계와 선행 조건 불명확</td>
+<td>서버가 단계 전진, 완료 시 다시 검사</td>
+<td>초기 CBI·생활 정보 누락 방지</td>
+</tr>
+<tr>
+<td>자료 부족·분모 0 처리 누락</td>
+<td>null + unavailableReason, INSUFFICIENT 상태</td>
+<td>무한대·가짜 정상 상태 방지</td>
+</tr>
+<tr>
+<td>7일차와 기준선 7개 표본 혼용</td>
+<td>유효 측정 7일 확보 후 공개</td>
+<td>결측·교란일이 있는 사용자도 정확한 안내</td>
+</tr>
+<tr>
+<td>분류 수정에 마감 여부 누락</td>
+<td>isDeadline 추가, THIS &gt; SERIES &gt; TITLE 우선순위</td>
+<td>위험 주차·마감 몰림 계산과 일치</td>
+</tr>
+<tr>
+<td>승인·측정·CBI 재시도의 중복 가능성</td>
+<td>Idempotency-Key, 상태 전이, 외부 결과 확인</td>
+<td>중복 측정·캘린더 일정 중복 등록 방지</td>
+</tr>
+<tr>
+<td>추천 승인 후 실패/되돌리기 모호</td>
+<td>APPROVING·FAILED의 차이, 완료·되돌림 선행 조건 명시</td>
+<td>타임아웃 후 이중 등록과 잘못된 상태 변경 방지</td>
+</tr>
+<tr>
+<td>재측정·컨디션 변경 후 파생 결과 갱신 불명확</td>
+<td>같은 날짜 체크에 연결하고 상태·캐시·미승인 제안 재계산</td>
+<td>화면과 리포트의 불일치 방지</td>
+</tr>
+<tr>
+<td>CBI 제출 버전·중복 문항 누락</td>
+<td>questionnaireVersion 필수, 13개 고유 문항 검증</td>
+<td>버전별 역문항 처리·정확한 점수 재현</td>
+</tr>
+<tr>
+<td>날짜·종일·복수 주 조회 모호</td>
+<td>반열린 시각 범위, 종일 날짜, 복수 주 week:null</td>
+<td>날짜 경계 오류 방지</td>
+</tr>
+<tr>
+<td>탈퇴·동의 철회·연결 해제 범위 부족</td>
+<td>파생 데이터·세션·캐시 정리와 외부 재시도 명시</td>
+<td>삭제 뒤 데이터 재출현 방지</td>
+</tr>
+<tr>
+<td>안전 안내 재노출 7일이 확정값처럼 표시</td>
+<td>미확정으로 환원</td>
+<td>기획에 없는 정책을 확정하지 않음</td>
+</tr>
+</tbody>
+</table>
+<h2>수정한 ERD</h2>
+<table>
+<thead>
+<tr>
+<th>문제</th>
+<th>수정 내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CBI 중복 회차가 앱 검사에만 의존</td>
+<td>MVP UK(user_id, round), 13문항 저장은 한 트랜잭션</td>
+</tr>
+<tr>
+<td>원래 선택지 저장 누락</td>
+<td>answer_option 추가, 환산 answer_value와 함께 보존</td>
+</tr>
+<tr>
+<td>THIS 수정이 일정 재동기화 때 소실될 가능성</td>
+<td>override에 THIS 포함, calendar_id·is_deadline 반영</td>
+</tr>
+<tr>
+<td>다른 사용자 측정/일정 참조 가능</td>
+<td>user_id 포함 복합 FK·소유권 검증</td>
+</tr>
+<tr>
+<td>복합 FK에서 SET NULL이 user_id와 충돌</td>
+<td>RESTRICT 후 참조 id만 null로 해제하는 삭제 순서</td>
+</tr>
+<tr>
+<td>API fallback을 저장할 컬럼 없음</td>
+<td>suggestions.is_fallback 추가</td>
+</tr>
+<tr>
+<td>구글 일정 등록 재시도 근거 없음</td>
+<td>registration_key 고유키 + api_idempotency_keys 신설</td>
+</tr>
+<tr>
+<td>일정 id의 캘린더 범위 누락</td>
+<td>UK(user_id, calendar_id, google_event_id)</td>
+</tr>
+<tr>
+<td>그래프·체크에 측정 없는 날 표현 불가</td>
+<td>일별 값 nullable, measurement_count=0 허용</td>
+</tr>
+<tr>
+<td>사용자별 Google 토큰 1개 제약 누락</td>
+<td>UK(user_id, provider)</td>
+</tr>
+<tr>
+<td>장기간 사용 시 일차/재측정 수 타입 부족</td>
+<td>day_index·measurement_count를 INT로 보완</td>
+</tr>
+<tr>
+<td>탈퇴 진행·계산 규칙 버전 추적 없음</td>
+<td>삭제 진행 상태·요청 시각과 calculation_version 보완</td>
+</tr>
+</tbody>
+</table>
+<h2>검토 과정에서 제안한 보완 정책</h2>
+<p>아래는 기존 기획을 그대로 옮긴 확정 요구사항이 아니라, 빠진 예외 흐름을 연결하기 위한 <strong>v0.2 설계 제안</strong>입니다. 팀 합의 후 구현하세요.</p>
+<ul>
+<li>건강정보 동의를 선택으로 유지하는 기존 명세에 맞춰, 비동의자는 CBI 건너뛰기 후 일정 기능을 사용하도록 제안했습니다. CBI·컨디션도 해당 동의의 보호 범위에 포함하고 건강 기록 삭제 API의 범위를 명확히 했습니다. 약관·동의 문구 검토는 별도로 필요합니다.</li>
+<li>수동 입력은 RMSSD만 받고 UNVERIFIED 참고값으로 표시하며 자동 기준선에는 넣지 않도록 제안했습니다. 수동값을 자동 계산에 넣으려면 기기·지표·품질 확인 정책을 추가해야 합니다.</li>
+<li>Idempotency-Key 최소 24시간, 건강 기록 전체 삭제 범위, 완료한 제안의 undo 금지, 현재 날짜 측정만 허용은 구현을 위한 제안 규칙입니다.</li>
+<li>계산 정책 미확정인 결과는 POLICY_PENDING으로 표시하고 해당 생성 작업은 422로 반환하도록 제안했습니다. 화면에 가짜 점수를 채우지 않기 위한 임시 계약입니다. (v0.3: 일정 부하·회복·2주 연속 낮음·범위 위치는 <a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a>로 확정)</li>
+</ul>
+<h2>팀에서 정해야 할 항목</h2>
+<table>
+<thead>
+<tr>
+<th>우선순위</th>
+<th>결정 항목</th>
+<th>현재 문서 처리</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>~~구현 전~~</td>
+<td>기준선 초기 7일과 최근 7일 제외의 적용 시점</td>
+<td>v0.3 확정: 초기 기준선에는 미적용</td>
+</tr>
+<tr>
+<td>~~구현 전~~</td>
+<td>회복 추세의 산술/기하 평균, LOW 판정 단위</td>
+<td>v0.3 확정: ln 단위, recovery-v1</td>
+</tr>
+<tr>
+<td>~~구현 전~~</td>
+<td>일정 가중치·위험 임계값·종일/겹친 일정·미분류 처리</td>
+<td>v0.3 확정: load-v1</td>
+</tr>
+<tr>
+<td>구현 전</td>
+<td>1~7일 컨디션 기반 추천 임계값</td>
+<td>일반 추천 흐름 유지, 규칙 합의 필요</td>
+</tr>
+<tr>
+<td>구현 전</td>
+<td>건강정보 동의를 필수로 할지 선택으로 할지</td>
+<td>현재 명세의 선택을 유지한 보완 흐름 제안</td>
+</tr>
+<tr>
+<td>~~출시 전~~</td>
+<td>LOW 2주 연속의 의미·결측일·재노출 주기</td>
+<td>v0.3 확정: 14일 중 대표값 7일 이상 모두 LOW, 해제 후 재충족 시 재노출</td>
+</tr>
+<tr>
+<td>~~출시 전~~</td>
+<td>회복 점수 0~100 산식</td>
+<td>v0.3 확정: 점수 미사용(평소 대비 % + 상태)</td>
+</tr>
+<tr>
+<td>~~출시 전~~</td>
+<td>4주 범위 위치 최소 표본·백분위 계산법</td>
+<td>v0.3 확정: 7일 추세 값 20개 이상, 5~95 백분위</td>
+</tr>
+<tr>
+<td>출시 전</td>
+<td>측정 알림 방식·탈퇴 시 Google 일정 삭제 여부</td>
+<td>열린 항목 유지</td>
+</tr>
+<tr>
+<td>출시 전</td>
+<td>공식 지원 기관 연락처·CBI 번역/역문항 버전</td>
+<td>연락처 예시는 placeholder로 교체, 공식 확인 후 등록</td>
+</tr>
+</tbody>
+</table>
+<h2>산출물</h2>
+<ul>
+<li><a href="API.html">API.html</a>: 메서드·주소·역할 중심. 검색·기능 필터·요청/응답 펼치기.</li>
+<li><a href="ERD.html">ERD.html</a>: 오프라인 SVG 관계도·테이블 검색·전체 컬럼·관계 표.</li>
+<li><a href="API.html">API.md</a>, <a href="ERD.html">ERD.md</a>: 상세 설계 원본 수정본.</li>
+<li>이 문서의 HTML은 <a href="%EA%B2%80%ED%86%A0%EA%B2%B0%EA%B3%BC.html">검토결과.html</a>입니다.</li>
+<li>HTML 재생성: 저장소 루트에서 <code>python docs/build_spec_html.py</code> (Python markdown-it-py 필요). 완성된 HTML 열람에는 Python·인터넷 연결이 필요 없습니다.</li>
+</ul>
+<h2>HTML 검증</h2>
+<p>Chrome에서 검색·기능 필터·빈 상태·펼치기/접기·ERD 노드 이동·데스크톱/모바일 레이아웃 등 16개 검사를 통과했습니다. API 39개, 테이블 18개, 관계선 19개의 표시를 확인했습니다. 세 HTML의 로컬 파일 링크·앵커 오류는 0개이며 외부 자산 요청이 없습니다. 실제 백엔드 API 실행이나 DB 마이그레이션 검증은 수행하지 않았습니다.</p>
+<h2>Come-down 구조 설계 추가 (2026-11-12)</h2>
+<p>서비스명을 Come-down(캄다운)으로 반영했습니다. 신규 구조는 API·ERD·IA·서비스 요구사항에서 설계했으며 기존 소스 구조를 기준으로 하지 않았습니다. <a href="%EB%B0%B1%EC%97%94%EB%93%9C_%EA%B5%AC%EC%A1%B0%EC%84%A4%EA%B3%84.html">구조 설계</a>와 <a href="%EC%B1%85%EC%9E%84_%EB%A7%A4%ED%95%91.html">책임 매핑</a>을 추가했습니다. 이전 브라우저 검증 기록은 해당 시점 명세 HTML에 대한 기록이며 신규 구조의 서버 구현 검증을 의미하지 않습니다.</p>
+<p>당시 공유본의 HTML 7개를 Chrome의 PC·390px 모바일 화면에서 검증했습니다. 이름 표기·가로 넘침·책임 매핑 개수·API 검색·안내 링크·JavaScript 오류 등 27개 검사가 통과했습니다. API 39개·테이블 18개의 책임 매핑을 명세와 대조했고, 공유 ZIP 내부 링크와 기존 구현 클래스/패키지 참조 유입도 검사했습니다. 실제 서버 구조를 생성하거나 실행한 검증은 아닙니다.</p>
+<h2>팀장 수정 요청 1 반영 (2026-11-12, 명세 v0.3)</h2>
+<p>&quot;백엔드 설계 수정 요청 1&quot;의 1장(필수 수정)·2장(정책 확정 값)을 API·ERD·기준선 migration·<a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a>에 반영했습니다. 참고 구현 <code>HrvAnalyzer</code>는 <code>checkin.domain.measurement</code>에 그대로 옮기고(패키지·버전 상수만 추가) 합성 신호 테스트를 붙였습니다.</p>
+<table>
+<thead>
+<tr>
+<th>요청</th>
+<th>반영 위치</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1-1 측정: 밝기 배열 전송, 서버 RMSSD 계산</td>
+<td>API 6절 요청·검증, ERD·migration <code>hrv_measurements</code>(noise_ratio·retry_reason·algorithm_version·time_source·frame_count·channel, RETRY 행은 rmssd null)</td>
+</tr>
+<tr>
+<td>1-2 측정 → 컨디션 → 호흡 → 결과</td>
+<td>API 6절·10절, ERD <code>morning_checks</code>, 서비스 요구사항</td>
+</tr>
+<tr>
+<td>1-3 retryReason</td>
+<td>API 측정 응답, ERD <code>retry_reason</code>, enum RetryReason</td>
+</tr>
+<tr>
+<td>1-4 CBI 보기·문항</td>
+<td>API 2절(13문항 표), 계산 정책 2절, <code>cbi-ko-2026.11.2</code></td>
+</tr>
+<tr>
+<td>1-5 하루 대표값 = 첫 적격 측정</td>
+<td>ERD <code>hrv_daily_states</code>, 계산 정책 4절</td>
+</tr>
+<tr>
+<td>1-6 GOOD → NORMAL</td>
+<td>API·ERD RecoveryStatus</td>
+</tr>
+<tr>
+<td>1-7 AI_NOTICE 필수</td>
+<td>API <code>PUT /api/onboarding/profile</code> 검증, ERD consent 설명</td>
+</tr>
+<tr>
+<td>2-1 ~ 2-5</td>
+<td>계산 정책 1·4·5·6절, API WeekLoad·안전 안내·범위 위치</td>
+</tr>
+</tbody>
+</table>
+<p>요청에 없던 보완:</p>
+<ul>
+<li><code>weekly_loads.vs_usual_unavailable_reason</code> 컬럼과 WeekLoad <code>vsUsualUnavailableReason</code> 필드를 추가했습니다. <code>ZERO_BASELINE</code>과 <code>INSUFFICIENT_DATA</code>를 저장값만으로 구분하기 위해서입니다.</li>
+<li><code>hrv_measurements</code>에 CHECK 2개를 추가했습니다. RETRY가 아니면 RMSSD 필수, RETRY일 때만 retry_reason이 있어야 합니다.</li>
+<li>MANUAL 측정의 <code>algorithm_version</code>은 <code>manual-v1</code>로 둡니다(컬럼이 NOT NULL).</li>
+</ul>
+<h3>확인이 필요한 항목</h3>
+<p>문서만으로 하나로 정해지지 않아 <a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a>에 <strong>구현 해석</strong>으로 임시 기록한 항목입니다.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>담당</th>
+<th>항목</th>
+<th>임시 해석</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>~~Q1~~</td>
+<td>HRV</td>
+<td>측정 날짜 기준</td>
+<td><strong>확정(2026-11-12)</strong>: 측정 시작 시각의 서울 날짜. 서버 수신 시각과 5분 넘게 차이 나면 400(폰 시계 오류·조작 방지)</td>
+</tr>
+<tr>
+<td>Q2</td>
+<td>HRV</td>
+<td>하루 대표값 &quot;첫 적격 측정&quot;에 시간대 제한이 있는지(저녁에 처음 잰 값도 대표값인지)</td>
+<td>시간대 제한 없음</td>
+</tr>
+<tr>
+<td>Q3</td>
+<td>HRV</td>
+<td>기준선 갱신 정지(LOW) 동안 &quot;8일 이전&quot;이 된 값을 버리는지, 해제 후 반영하는지</td>
+<td>버림</td>
+</tr>
+<tr>
+<td>Q4</td>
+<td>HRV</td>
+<td>초기 기준선 표준편차: 표본(n−1) / 모집단(n)</td>
+<td>표본(n−1)</td>
+</tr>
+<tr>
+<td>Q5</td>
+<td>HRV</td>
+<td>&quot;최근 대표값 3개 연속&quot;이 달력 3일 연속인지, 측정일만 이어 본 3개인지</td>
+<td>결측·교란일을 건너뛴 최근 3개</td>
+</tr>
+<tr>
+<td>Q6</td>
+<td>HRV</td>
+<td>2주 연속 낮음 판정에 교란일을 포함하는지</td>
+<td>포함(대표값이 있으면 셈)</td>
+</tr>
+<tr>
+<td>Q7</td>
+<td>HRV·일정</td>
+<td>내 범위 위치의 부하 표본 &quot;7일 추세 값 20개&quot;가 주간 부하 20주를 뜻하면 28일차 공개 불가</td>
+<td>기준 확인 필요(일별 7일 롤링 부하를 쓸지, 부하는 표본 수를 따로 둘지)</td>
+</tr>
+<tr>
+<td>Q8</td>
+<td>일정</td>
+<td>vs_usual의 &quot;직전 데이터 2주 미만&quot; 기준(일정이 있는 주 수인지, 동기화된 주 수인지)과 평균 분모</td>
+<td>직전 4주 중 집계 대상 일정이 있는 주가 2주 미만이면 INSUFFICIENT_DATA, 평균은 4주 전체</td>
+</tr>
+<tr>
+<td>Q9</td>
+<td>일정</td>
+<td>종일 일정이 있는 날을 쉬는 날·연속 일정일에서 일정 있는 날로 보는지</td>
+<td>시간에 넣지 않으므로 일정 없는 날로 봄</td>
+</tr>
+<tr>
+<td>Q10</td>
+<td>일정</td>
+<td><code>vs_usual_pct</code>가 null일 때 위험 점수</td>
+<td>LOAD_HIGH 0점</td>
+</tr>
+<tr>
+<td>Q11</td>
+<td>공통</td>
+<td>원신호를 서버로 보내 계산하므로 개인정보 처리방침·<code>SENSITIVE_HRV</code> 동의 문구에 &quot;서버 계산 후 즉시 폐기&quot; 명시</td>
+<td><strong>필요 확인(2026-11-12)</strong>: 문구 반영은 기획·팀장 작업. 백엔드는 원신호를 DB·로그·오류 메시지에 남기지 않음</td>
+</tr>
+<tr>
+<td>Q12</td>
+<td>일정</td>
+<td>AI_NOTICE가 필수가 되면 마이페이지에서 철회할 수 있는지, 철회 시 처리</td>
+<td>철회 API 미제공(고지 확인 기록만)</td>
+</tr>
+</tbody>
+</table>
+</article></main><footer>명세 v0.2 / 구조 v1.0 · 2026.11.12 · 서비스 요구사항·API·ERD·IA 기준 · 구현 완료를 의미하지 않는 설계 명세 · 외부 라이브러리/네트워크 요청 없는 HTML</footer><script>
+const q=document.querySelector('#search'), filter=document.querySelector('#filter');
+function apply(){const query=(q?.value||'').toLowerCase().trim(), group=filter?.value||'';let n=0;document.querySelectorAll('[data-search]').forEach(el=>{let yes=(!group||el.dataset.group===group)&&(!query||el.dataset.search.includes(query));el.hidden=!yes;if(yes)n++});document.querySelectorAll('.api-group').forEach(g=>g.hidden=![...g.querySelectorAll('[data-search]')].some(el=>!el.hidden));let c=document.querySelector('#count');if(c)c.textContent=n+'개 표시';let e=document.querySelector('#empty');if(e)e.hidden=n>0;}
+q?.addEventListener('input',apply);filter?.addEventListener('change',apply);apply();
+document.querySelector('#expand')?.addEventListener('click',()=>{document.querySelectorAll('details[data-search]:not([hidden])').forEach(d=>d.open=true)});
+document.querySelector('#collapse')?.addEventListener('click',()=>{document.querySelectorAll('details[data-search]').forEach(d=>d.open=false)});
+function expandHash(){let id=decodeURIComponent(location.hash.slice(1));let el=document.getElementById(id);if(el?.matches('details')){if(q)q.value='';if(filter)filter.value='';apply();el.open=true;el.scrollIntoView()}}
+window.addEventListener('hashchange',expandHash);expandHash();
+let saved;window.addEventListener('beforeprint',()=>{saved=[...document.querySelectorAll('details')].map(d=>d.open);document.querySelectorAll('details').forEach(d=>d.open=true)});window.addEventListener('afterprint',()=>{document.querySelectorAll('details').forEach((d,i)=>d.open=saved?.[i]??false)});
+</script></body></html>

@@ -1,0 +1,120 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Come-down · 백엔드 2인 협업 가이드</title><style>
+:root{--ink:#18312c;--muted:#61716d;--line:#dce5df;--green:#206b53;--bg:#f4f6f1;--paper:#fff;--soft:#e9f0e9}*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 'Segoe UI','Malgun Gothic',sans-serif}a{color:var(--green);text-underline-offset:3px}button,input,select{font:inherit}button{cursor:pointer}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #cf8d39;outline-offset:3px}header{padding:42px max(28px,calc((100vw - 1400px)/2));background:#183b30;color:white}header .eyebrow{font-size:12px;letter-spacing:.16em;color:#bed8c8}header h1{font-size:40px;letter-spacing:-.04em;line-height:1.2;margin:12px 0}header p{color:#c9ddd2;max-width:850px;margin:0}nav{display:flex;gap:10px;flex-wrap:wrap;margin-top:25px}nav a,nav button{border:1px solid #ffffff42;border-radius:8px;padding:7px 14px;text-decoration:none;background:transparent;color:white}nav .current{background:white;color:#183b30}main{max-width:1456px;margin:auto;padding:28px}h2{font-size:25px;letter-spacing:-.025em;margin:36px 0 16px}h3{font-size:18px;margin:22px 0 12px}h4{font-size:16px}p{margin:10px 0}.intro{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.tile{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px}.tile strong{display:block;font-size:22px}.tile span,.muted{color:var(--muted);font-size:13px}.notice{border-left:3px solid #bd8a36;background:#fcf5e7;padding:14px 18px;margin:20px 0;font-size:14px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:24px 0 16px}.toolbar input{flex:1;min-width:200px}.toolbar input,.toolbar select,.toolbar button{padding:11px 14px;border:1px solid #bfcfc4;border-radius:8px;background:white;color:var(--ink)}.toolbar label{font-size:13px}#count{font-size:13px;color:var(--muted)}.layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:28px}.sidebar{position:sticky;top:20px;align-self:start;padding:8px}.sidebar a{display:block;padding:7px 10px;text-decoration:none;font-size:13px;border-radius:6px}.sidebar a:hover{background:var(--soft)}.endpoint{background:white;border:1px solid var(--line);border-radius:10px;margin:9px 0;overflow:hidden}.endpoint summary{list-style:none;display:grid;grid-template-columns:69px minmax(0,1fr) 26px;align-items:center;gap:12px;padding:15px 18px;cursor:pointer}.endpoint summary::-webkit-details-marker{display:none}.endpoint summary:after{content:'+';font-size:23px;color:#82938b}.endpoint[open] summary:after{content:'−'}.method{font-size:11px;font-weight:800;text-align:center;border-radius:5px;padding:4px;background:#e3efe8;color:#216547}.POST{background:#e8edf9;color:#405daa}.PUT,.PATCH{background:#fff0d9;color:#8b601f}.DELETE{background:#f9e6e4;color:#a0443c}.path{font:13px/1.5 Consolas,monospace;overflow-wrap:anywhere;color:#244c3c}.description{font-size:14px;margin-top:3px}.detail-body{padding:0 20px 20px;border-top:1px solid var(--line);overflow-wrap:anywhere}.detail-body>h3:first-child{margin-top:15px}code{font:12px/1.6 Consolas,monospace;overflow-wrap:anywhere;background:#edf2ee;padding:2px 4px;border-radius:4px}pre{background:#122d25;color:#e3f0e8;padding:18px;border-radius:8px;overflow:auto;font-size:12px;white-space:pre}pre code{background:transparent;color:inherit;padding:0}table{border-collapse:collapse;width:100%;font-size:13px;background:white;margin:16px 0}th,td{text-align:left;vertical-align:top;padding:11px 13px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:#e8eee7;color:#315043}li{margin:5px 0}details.block{background:white;border:1px solid var(--line);border-radius:10px;margin:13px 0}details.block>summary{padding:17px 20px;cursor:pointer;font-weight:600}.content{padding:0 20px 20px;min-width:0;overflow-x:auto}.table-card{margin:12px 0;background:white;border:1px solid var(--line);border-radius:10px;overflow:hidden}.table-card>summary{padding:18px;cursor:pointer;overflow-wrap:anywhere}.table-card .content h4{display:none}.empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed #bfcfc4;border-radius:10px}.diagram-frame{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:auto}.diagram-frame svg{display:block;min-width:1150px;width:100%;height:auto}.diagram-frame .edge{stroke:#abc0b3;stroke-width:1.2;fill:none}.diagram-frame .node:hover rect{fill:#e7f2e9;stroke:#206b53}.diagram-frame text{font-family:Consolas,'Malgun Gothic',monospace}.legend{font-size:12px;color:var(--muted);margin:12px 0}footer{max-width:1400px;margin:24px auto;padding:22px 28px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}[hidden]{display:none!important}@media(max-width:800px){header{padding:30px 20px}header h1{font-size:32px}main{padding:18px}.intro{grid-template-columns:1fr}.layout{grid-template-columns:1fr}.sidebar{position:static;display:flex;flex-wrap:wrap;gap:3px}.sidebar a{padding:5px 8px}.endpoint summary{padding:12px;gap:8px;grid-template-columns:60px minmax(0,1fr) 20px}table{min-width:580px}.tile{padding:15px}.toolbar input{min-width:100%;width:100%}.content,.detail-body{overflow-x:auto}}@media print{body{background:white;font-size:11px}header{background:white;color:#183b30;padding:10px}header p,header .eyebrow{color:#52685e}nav,.toolbar,.sidebar,.print-button{display:none!important}main{padding:0}.layout{display:block}.intro{display:none}details{break-inside:avoid}details:not([open])>*:not(summary){display:block!important}.diagram-frame{overflow:visible}.diagram-frame svg{min-width:0}pre{white-space:pre-wrap}.endpoint summary{padding:8px}h2{break-after:avoid}.detail-body,.content{overflow:visible}table{min-width:0}}
+.layout>*{min-width:0} .toolbar>*{max-width:100%}article.tile strong{display:inline;font-size:inherit} article.tile p,article.tile li{max-width:100ch} article.tile pre{font-size:13px} article.tile{overflow-x:auto;min-width:0}</style></head><body><header><div class="eyebrow">COME-DOWN / PRODUCT & ENGINEERING</div><h1>백엔드 2인 협업 가이드</h1><p>구조의 경계와 환경·작업·리뷰·DB 규칙을 함께 맞춥니다.</p><nav aria-label="문서 이동"><a class="" href="API.html">API 명세</a><a class="" href="ERD.html">ERD · 데이터 구조</a><a class="" href="검토결과.html">검토 결과</a><a class="" href="계산_정책.html">계산 정책</a><a class="" href="백엔드_구조설계.html">백엔드 구조</a><a class="" href="책임_매핑.html">책임 매핑</a><a class="current" href="백엔드_협업가이드.html">협업 가이드</a><button class="print-button" type="button" onclick="window.print()">인쇄 / PDF</button></nav></header><main><article class="tile"><h1>Come-down(캄다운) 백엔드 협업 가이드</h1>
+<p>2026-11-12 · API/ERD/서비스 요구사항에서 설계한 신규 목표 구조를 기준으로 한다.</p>
+<h2>먼저 읽을 순서</h2>
+<ol>
+<li><a href="%EC%84%9C%EB%B9%84%EC%8A%A4_%EC%9A%94%EA%B5%AC%EC%82%AC%ED%95%AD.md">서비스 요구사항</a></li>
+<li><a href="%EB%B0%B1%EC%97%94%EB%93%9C_%EA%B5%AC%EC%A1%B0%EC%84%A4%EA%B3%84.html">구조 설계</a>와 <a href="%EC%B1%85%EC%9E%84_%EB%A7%A4%ED%95%91.html">API/테이블 책임 매핑</a></li>
+<li><a href="API.html">API</a>·<a href="ERD.html">ERD</a>·<a href="%EA%B2%80%ED%86%A0%EA%B2%B0%EA%B3%BC.html">미확정 정책</a></li>
+<li>저장소 루트 AGENTS.md</li>
+</ol>
+<h2>환경 제안 기준</h2>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>제안 기준</th>
+<th>적용 규칙</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Java</td>
+<td>21</td>
+<td>두 사람의 JDK 공급사·패치·IDE SDK·Gradle JVM도 비교해 기록</td>
+</tr>
+<tr>
+<td>Spring Boot</td>
+<td>4.1.2</td>
+<td>팀 레포 기준과 비교 후 고정</td>
+</tr>
+<tr>
+<td>dependency-management plugin</td>
+<td>1.1.7</td>
+<td>빌드 설정과 함께 관리</td>
+</tr>
+<tr>
+<td>Gradle</td>
+<td>Wrapper 9.8.2</td>
+<td>전역 gradle 대신 저장소 Wrapper 사용</td>
+</tr>
+<tr>
+<td>MySQL</td>
+<td>8.4 계열</td>
+<td>로컬·통합 테스트 이미지 일치, digest는 별도 확정</td>
+</tr>
+<tr>
+<td>Flyway/JPA/JDBC/JUnit/Testcontainers</td>
+<td>Spring Boot 관리 결과</td>
+<td>필요 없이 개별 버전 override하지 않음</td>
+</tr>
+<tr>
+<td>저장소/Java 이름</td>
+<td>come-down-backend / com.comedown</td>
+<td>Java 식별자에는 하이픈 미사용</td>
+</tr>
+<tr>
+<td>파일 형식</td>
+<td>UTF-8·LF, bat는 CRLF</td>
+<td>EditorConfig/Git attributes</td>
+</tr>
+</tbody>
+</table>
+<p>이 버전표는 기존 협업 논의에서 가져온 제안이며 최신 버전 추천이나 신규 구조 구현 결과가 아니다. 구조 설계는 이 버전/기존 구현과 독립적으로 API·ERD·제품 흐름으로 결정했다. Java 패치/공급사와 MySQL 이미지 digest는 팀에서 확정해야 한다. 버전 변경은 기능 PR과 분리해 두 개발자가 함께 갱신한다. Node/npm·프론트 폴더는 백엔드 구조에 포함하지 않는다.</p>
+<h2>두 사람의 담당 (2026-11-12 확정)</h2>
+<table>
+<thead>
+<tr>
+<th>담당</th>
+<th>기능</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HRV축</td>
+<td>cbi, checkin, recovery, safety, recommendation(상태·조회·RECOVERY 규칙) / experience의 assessments·morning·home·reports(회복·4주)</td>
+</tr>
+<tr>
+<td>일정축</td>
+<td>account, calendar, schedule, subscription, PRE_START 규칙, integration.google / experience의 onboarding·calendarflow·accountlifecycle·suggestions·reports(일정 리포트)</td>
+</tr>
+<tr>
+<td>공통 (편집: HRV축, 리뷰: 일정축)</td>
+<td>shared, DB 마이그레이션, 빌드·CI, local 전용 개발 API</td>
+</tr>
+</tbody>
+</table>
+<p>ai·integration.openai는 핵심 기능 완성 후 AI 도입 단계에서 담당을 정한다. 상세 경계는 <a href="%EB%B0%B1%EC%97%94%EB%93%9C_%EA%B5%AC%EC%A1%B0%EC%84%A4%EA%B3%84.html">구조 설계</a> 8절을 따른다. 초기 CBI 제출과 온보딩 상태 전진, 캘린더 쓰기와 제안 상태 전이는 인터페이스 PR을 먼저 만든다.</p>
+<h2>작업과 리뷰</h2>
+<ul>
+<li>이슈에 담당·수정 패키지·입출력 계약·API/DB 영향을 남긴다. 계약은 구조 문서의 contract 경계를 따른다.</li>
+<li>feat/이슈-기능, fix/이슈-수정, docs/주제 브랜치. AI가 새로 만들면 codex/주제.</li>
+<li>main 직접 push·공유 브랜치 force push 금지. 기능별 작은 PR, 상대 1인 리뷰 후 squash merge.</li>
+<li>공통 설정·보안·외부 어댑터·migration·명세는 수정할 사람이 먼저 알리고 같은 파일의 중복 편집을 피한다.</li>
+<li>기능 간 Repository/Entity import, feature→experience, shared→기능, integration→기능 application 의존을 리뷰에서 확인한다.</li>
+<li>테이블 쓰기 소유권과 HTTP 책임이 바뀌면 architecture-map.json과 API/ERD를 같은 PR에서 갱신한다.</li>
+<li>MD/JSON이 원본이다. <code>python docs/build_spec_html.py</code>로 HTML과 책임 매핑을 재생성한다(Python/markdown-it-py는 문서 생성에만 필요).</li>
+</ul>
+<h2>DB와 검증</h2>
+<p>새 migration은 VYYYY_MM_DD_HHmmssSSS__description.sql(UTC 시각). 버전 중복·병합 순서를 확인한다. 아직 공유/적용하지 않은 새 파일만 main 이후 버전으로 조정할 수 있다. 공유/적용한 파일은 보정 migration으로 변경한다. JPA ddl-auto=validate, DB 초기화나 repair로 충돌을 숨기지 않는다.</p>
+<p>신규 프로젝트 골격과 테스트 구성을 만든 뒤 저장소 루트에서 실행할 명령:</p>
+<pre><code class="language-powershell">.\scripts\check-backend-env.ps1 -RequireDocker -RunGradle
+.\gradlew.bat test
+.\gradlew.bat check bootJar
+python docs/build_spec_html.py
+</code></pre>
+<p>순수 계산·API 동의/소유권·MySQL 제약·복합 흐름 실패/재시도·탈퇴/삭제를 검증한다. 테스트 패키지는 main 기능 구조와 맞추고 공통 fixture는 test/support에 둔다. 외부 호출은 대체 응답, 시간은 고정 Clock, DB는 동일한 MySQL 이미지로 검증한다. Docker 미가동·skip과 실제 실패를 PR에서 구분한다.</p>
+<p>CI·main 보호·승인 1인 규칙은 실제 레포에서 설정한다. 문서나 PR 템플릿만으로 자동 강제되는 것은 아니다.</p>
+<h2>비밀값과 서비스 식별자</h2>
+<p><code>.env</code>, 토큰, 키, 원신호, 실사용자 일정/건강정보는 공유 묶음과 Git에서 제외한다. 환경변수 실제 값과 OAuth 테스트 사용자 등록·콜백 URL은 별도로 안전하게 전달한다. 서비스명을 바꿨다고 기존 DB명·키·OAuth 설정을 조용히 바꾸지 않는다. 신규 설정 예시는 Come-down 기준으로 제공하며 기존 환경 전환은 별도 PR로 검토한다.</p>
+</article></main><footer>명세 v0.2 / 구조 v1.0 · 2026.11.12 · 서비스 요구사항·API·ERD·IA 기준 · 구현 완료를 의미하지 않는 설계 명세 · 외부 라이브러리/네트워크 요청 없는 HTML</footer><script>
+const q=document.querySelector('#search'), filter=document.querySelector('#filter');
+function apply(){const query=(q?.value||'').toLowerCase().trim(), group=filter?.value||'';let n=0;document.querySelectorAll('[data-search]').forEach(el=>{let yes=(!group||el.dataset.group===group)&&(!query||el.dataset.search.includes(query));el.hidden=!yes;if(yes)n++});document.querySelectorAll('.api-group').forEach(g=>g.hidden=![...g.querySelectorAll('[data-search]')].some(el=>!el.hidden));let c=document.querySelector('#count');if(c)c.textContent=n+'개 표시';let e=document.querySelector('#empty');if(e)e.hidden=n>0;}
+q?.addEventListener('input',apply);filter?.addEventListener('change',apply);apply();
+document.querySelector('#expand')?.addEventListener('click',()=>{document.querySelectorAll('details[data-search]:not([hidden])').forEach(d=>d.open=true)});
+document.querySelector('#collapse')?.addEventListener('click',()=>{document.querySelectorAll('details[data-search]').forEach(d=>d.open=false)});
+function expandHash(){let id=decodeURIComponent(location.hash.slice(1));let el=document.getElementById(id);if(el?.matches('details')){if(q)q.value='';if(filter)filter.value='';apply();el.open=true;el.scrollIntoView()}}
+window.addEventListener('hashchange',expandHash);expandHash();
+let saved;window.addEventListener('beforeprint',()=>{saved=[...document.querySelectorAll('details')].map(d=>d.open);document.querySelectorAll('details').forEach(d=>d.open=true)});window.addEventListener('afterprint',()=>{document.querySelectorAll('details').forEach((d,i)=>d.open=saved?.[i]??false)});
+</script></body></html>

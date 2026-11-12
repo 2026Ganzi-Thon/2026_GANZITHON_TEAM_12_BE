@@ -1,0 +1,30 @@
+# 공통 설정. 환경별 값(DB 접속 등)은 application-{profile}.yml 또는 환경 변수로 둔다.
+spring:
+  application:
+    name: come-down
+  config:
+    import: optional:file:.env[.properties]
+  jackson:
+    # 응답 시각은 서울 오프셋(+09:00)을 붙인 ISO 8601. 서비스 시간 규칙은 shared.time.ServiceTime 참고.
+    time-zone: Asia/Seoul
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  session:
+    jdbc:
+      initialize-schema: never
+server:
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+# OAuth 등록, CSRF, 토큰 암호화, AI 클라이언트는 shared.security / account / integration 구현 PR에서 추가한다.
+# Spring Session 테이블도 Flyway migration으로 만든다(initialize-schema: never).

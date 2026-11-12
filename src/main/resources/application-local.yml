@@ -1,0 +1,6 @@
+# 로컬 전용 설정. docker-compose.yml의 MySQL(3307)과 맞춘다. 운영 비밀값이 아니다.
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3307/comedown
+    username: comedown
+    password: comedown-local

@@ -1,0 +1,327 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Come-down · 백엔드 구조 설계</title><style>
+:root{--ink:#18312c;--muted:#61716d;--line:#dce5df;--green:#206b53;--bg:#f4f6f1;--paper:#fff;--soft:#e9f0e9}*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 'Segoe UI','Malgun Gothic',sans-serif}a{color:var(--green);text-underline-offset:3px}button,input,select{font:inherit}button{cursor:pointer}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #cf8d39;outline-offset:3px}header{padding:42px max(28px,calc((100vw - 1400px)/2));background:#183b30;color:white}header .eyebrow{font-size:12px;letter-spacing:.16em;color:#bed8c8}header h1{font-size:40px;letter-spacing:-.04em;line-height:1.2;margin:12px 0}header p{color:#c9ddd2;max-width:850px;margin:0}nav{display:flex;gap:10px;flex-wrap:wrap;margin-top:25px}nav a,nav button{border:1px solid #ffffff42;border-radius:8px;padding:7px 14px;text-decoration:none;background:transparent;color:white}nav .current{background:white;color:#183b30}main{max-width:1456px;margin:auto;padding:28px}h2{font-size:25px;letter-spacing:-.025em;margin:36px 0 16px}h3{font-size:18px;margin:22px 0 12px}h4{font-size:16px}p{margin:10px 0}.intro{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.tile{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px}.tile strong{display:block;font-size:22px}.tile span,.muted{color:var(--muted);font-size:13px}.notice{border-left:3px solid #bd8a36;background:#fcf5e7;padding:14px 18px;margin:20px 0;font-size:14px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:24px 0 16px}.toolbar input{flex:1;min-width:200px}.toolbar input,.toolbar select,.toolbar button{padding:11px 14px;border:1px solid #bfcfc4;border-radius:8px;background:white;color:var(--ink)}.toolbar label{font-size:13px}#count{font-size:13px;color:var(--muted)}.layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:28px}.sidebar{position:sticky;top:20px;align-self:start;padding:8px}.sidebar a{display:block;padding:7px 10px;text-decoration:none;font-size:13px;border-radius:6px}.sidebar a:hover{background:var(--soft)}.endpoint{background:white;border:1px solid var(--line);border-radius:10px;margin:9px 0;overflow:hidden}.endpoint summary{list-style:none;display:grid;grid-template-columns:69px minmax(0,1fr) 26px;align-items:center;gap:12px;padding:15px 18px;cursor:pointer}.endpoint summary::-webkit-details-marker{display:none}.endpoint summary:after{content:'+';font-size:23px;color:#82938b}.endpoint[open] summary:after{content:'−'}.method{font-size:11px;font-weight:800;text-align:center;border-radius:5px;padding:4px;background:#e3efe8;color:#216547}.POST{background:#e8edf9;color:#405daa}.PUT,.PATCH{background:#fff0d9;color:#8b601f}.DELETE{background:#f9e6e4;color:#a0443c}.path{font:13px/1.5 Consolas,monospace;overflow-wrap:anywhere;color:#244c3c}.description{font-size:14px;margin-top:3px}.detail-body{padding:0 20px 20px;border-top:1px solid var(--line);overflow-wrap:anywhere}.detail-body>h3:first-child{margin-top:15px}code{font:12px/1.6 Consolas,monospace;overflow-wrap:anywhere;background:#edf2ee;padding:2px 4px;border-radius:4px}pre{background:#122d25;color:#e3f0e8;padding:18px;border-radius:8px;overflow:auto;font-size:12px;white-space:pre}pre code{background:transparent;color:inherit;padding:0}table{border-collapse:collapse;width:100%;font-size:13px;background:white;margin:16px 0}th,td{text-align:left;vertical-align:top;padding:11px 13px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:#e8eee7;color:#315043}li{margin:5px 0}details.block{background:white;border:1px solid var(--line);border-radius:10px;margin:13px 0}details.block>summary{padding:17px 20px;cursor:pointer;font-weight:600}.content{padding:0 20px 20px;min-width:0;overflow-x:auto}.table-card{margin:12px 0;background:white;border:1px solid var(--line);border-radius:10px;overflow:hidden}.table-card>summary{padding:18px;cursor:pointer;overflow-wrap:anywhere}.table-card .content h4{display:none}.empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed #bfcfc4;border-radius:10px}.diagram-frame{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:auto}.diagram-frame svg{display:block;min-width:1150px;width:100%;height:auto}.diagram-frame .edge{stroke:#abc0b3;stroke-width:1.2;fill:none}.diagram-frame .node:hover rect{fill:#e7f2e9;stroke:#206b53}.diagram-frame text{font-family:Consolas,'Malgun Gothic',monospace}.legend{font-size:12px;color:var(--muted);margin:12px 0}footer{max-width:1400px;margin:24px auto;padding:22px 28px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}[hidden]{display:none!important}@media(max-width:800px){header{padding:30px 20px}header h1{font-size:32px}main{padding:18px}.intro{grid-template-columns:1fr}.layout{grid-template-columns:1fr}.sidebar{position:static;display:flex;flex-wrap:wrap;gap:3px}.sidebar a{padding:5px 8px}.endpoint summary{padding:12px;gap:8px;grid-template-columns:60px minmax(0,1fr) 20px}table{min-width:580px}.tile{padding:15px}.toolbar input{min-width:100%;width:100%}.content,.detail-body{overflow-x:auto}}@media print{body{background:white;font-size:11px}header{background:white;color:#183b30;padding:10px}header p,header .eyebrow{color:#52685e}nav,.toolbar,.sidebar,.print-button{display:none!important}main{padding:0}.layout{display:block}.intro{display:none}details{break-inside:avoid}details:not([open])>*:not(summary){display:block!important}.diagram-frame{overflow:visible}.diagram-frame svg{min-width:0}pre{white-space:pre-wrap}.endpoint summary{padding:8px}h2{break-after:avoid}.detail-body,.content{overflow:visible}table{min-width:0}}
+.layout>*{min-width:0} .toolbar>*{max-width:100%}article.tile strong{display:inline;font-size:inherit} article.tile p,article.tile li{max-width:100ch} article.tile pre{font-size:13px} article.tile{overflow-x:auto;min-width:0}</style></head><body><header><div class="eyebrow">COME-DOWN / PRODUCT & ENGINEERING</div><h1>백엔드 구조 설계</h1><p>서비스 전체·API·ERD에서 도출한 Come-down의 신규 목표 구조입니다.</p><nav aria-label="문서 이동"><a class="" href="API.html">API 명세</a><a class="" href="ERD.html">ERD · 데이터 구조</a><a class="" href="검토결과.html">검토 결과</a><a class="" href="계산_정책.html">계산 정책</a><a class="current" href="백엔드_구조설계.html">백엔드 구조</a><a class="" href="책임_매핑.html">책임 매핑</a><a class="" href="백엔드_협업가이드.html">협업 가이드</a><button class="print-button" type="button" onclick="window.print()">인쇄 / PDF</button></nav></header><main><article class="tile"><h1>Come-down(캄다운) 백엔드 구조 설계</h1>
+<p>설계일: 2026-11-12 · 제안 v1.0 · 범위: 독립 백엔드 저장소</p>
+<h2>1. 설계 출발점</h2>
+<p>기준은 <a href="%EC%84%9C%EB%B9%84%EC%8A%A4_%EC%9A%94%EA%B5%AC%EC%82%AC%ED%95%AD.md">서비스 요구사항</a>, <a href="API.html">API 명세</a>, <a href="ERD.html">ERD</a>, <a href="IA_%EC%B4%88%EC%95%88.png">IA 차트</a>다. 기존 Java 소스의 패키지·클래스·구현 상태를 설계 근거로 사용하지 않았다. 아래 디렉터리는 <strong>새로 개발할 목표 구조</strong>이며, 실제 소스를 이 구조로 이동한 결과가 아니다.</p>
+<p>Come-down의 핵심은 <strong>캘린더 연결 → 일정 부하 파악 → 아침 체크 → 개인 기준선과 회복 판단 → 빈 시간의 회복/대비 행동 추천 → 승인 시 캘린더 반영</strong>이다. 가입 시 CBI, 초기 적격 측정 7일, 28일차 비교, 안전 안내가 이 흐름에 연결된다.</p>
+<p><strong>단일 Spring Boot 애플리케이션·단일 Gradle 프로젝트·단일 MySQL</strong>로 시작한다. 기능별 패키지에 데이터와 규칙을 모으는 모듈형 모놀리스다. 두 개발자가 기능 단위로 나눠 작업할 수 있도록 하되 마이크로서비스·다중 Gradle 모듈·메시지 브로커를 선행 도입하지 않는다.</p>
+<h2>2. 저장소 전체 구조</h2>
+<p>프로젝트/레포 이름은 <code>come-down-backend</code>, Java 패키지는 하이픈을 쓸 수 없으므로 <code>com.comedown</code>을 제안한다. 회사 소유 도메인 규칙이 있으면 최초 프로젝트 생성 시 그 규칙으로 한 번 정한다.</p>
+<pre><code class="language-text">come-down-backend/
+├── AGENTS.md
+├── README.md
+├── build.gradle
+├── settings.gradle
+├── gradlew / gradlew.bat
+├── gradle/wrapper/
+├── docker-compose.yml
+├── .env.example
+├── .editorconfig / .gitattributes / .gitignore
+├── .github/
+│   ├── pull_request_template.md
+│   └── workflows/                         # CI를 구성할 때 추가
+├── docs/
+│   ├── 서비스_요구사항.md
+│   ├── API.md / API.html
+│   ├── ERD.md / ERD.html
+│   ├── 백엔드_구조설계.md / 백엔드_구조설계.html
+│   ├── 책임_매핑.md / architecture-map.json
+│   └── 백엔드_협업가이드.md
+├── scripts/
+│   └── check-backend-env.ps1
+└── src/
+    ├── main/
+    │   ├── java/com/comedown/
+    │   │   ├── ComeDownApplication.java
+    │   │   ├── account/                   # 회원·설정·동의·로그인 자격정보
+    │   │   ├── cbi/                       # 설문 버전·응답·채점
+    │   │   ├── calendar/                  # 외부 일정 동기화·분류·빈 시간·쓰기
+    │   │   ├── schedule/                  # 일정 부하·위험 주차 계산
+    │   │   ├── checkin/                   # 아침 체크·측정·호흡·컨디션 기록
+    │   │   ├── recovery/                  # 기준선·추세·일별 회복 판정
+    │   │   ├── recommendation/            # PRE_START·RECOVERY 제안 생명주기
+    │   │   ├── safety/                    # 도움 안내 조건·노출/확인 기록
+    │   │   ├── subscription/              # 무료 체험·이용 자격
+    │   │   ├── ai/                        # AI 문구 캐시·생성 표시·대체 문구
+    │   │   ├── experience/                # 여러 도메인을 묶는 API·업무 흐름
+    │   │   │   ├── onboarding/
+    │   │   │   ├── assessments/              # CBI 제출·안전 평가·초기 단계 전진
+    │   │   │   ├── home/
+    │   │   │   ├── morning/
+    │   │   │   ├── calendarflow/
+    │   │   │   ├── reports/
+    │   │   │   ├── suggestions/
+    │   │   │   └── accountlifecycle/
+    │   │   ├── integration/               # Google/OpenAI 전송·직렬화·SDK
+    │   │   │   ├── google/
+    │   │   │   └── openai/
+    │   │   └── shared/                    # 기술 공통 코드만
+    │   │       ├── config/
+    │   │       ├── security/
+    │   │       ├── error/
+    │   │       ├── time/
+    │   │       └── idempotency/
+    │   └── resources/
+    │       ├── application.yml
+    │       ├── application-local.yml
+    │       └── db/migration/
+    └── test/
+        ├── java/com/comedown/              # main의 기능 패키지를 동일하게 반영
+        │   ├── account/ ... recommendation/ ... experience/
+        │   └── support/                   # 고정 시계·DB 컨테이너·외부 응답 fixture
+        └── resources/
+            ├── application-test.yml
+            └── fixtures/
+</code></pre>
+<p>이 트리는 저장 위치 규칙이다. 클래스·빈 디렉터리를 한꺼번에 만들지 않는다. 해당 기능을 구현하는 PR에서 필요한 파일만 추가한다. 신규 기준선의 Flyway 스키마는 ERD를 기준으로 설계하며 기존 구현의 migration을 그대로 출발점으로 삼지 않는다. 이미 운영/공유 DB에 적용된 migration이 있다면 별도 전환 계획을 먼저 세운다.</p>
+<h2>3. 기능 패키지 안의 규칙</h2>
+<p>직접 HTTP API가 있는 기능의 예시다. 파일명은 설계 예시이며 기존 클래스 재사용 지시가 아니다.</p>
+<pre><code class="language-text">recommendation/
+├── api/
+│   ├── SuggestionQueryController.java
+│   └── dto/
+├── contract/                              # 다른 기능에 공개할 요청/결과 record·서비스
+│   ├── SuggestionQuery.java
+│   └── SuggestionCommands.java
+├── application/
+│   ├── SuggestionCommandService.java
+│   ├── SuggestionQueryService.java
+│   └── port/                              # 외부 자원이 필요한 기능에만 추가
+├── domain/
+│   ├── Suggestion.java
+│   ├── SuggestionStatus.java
+│   └── policy/
+│       ├── RecoverySuggestionPolicy.java
+│       └── PrepareAheadPolicy.java
+└── infrastructure/
+    └── persistence/
+        ├── SuggestionJpaRepository.java
+        └── SuggestionQueryRepository.java
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>위치</th>
+<th>책임</th>
+<th>두지 않을 것</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api</td>
+<td>HTTP 바인딩·검증·응답 변환</td>
+<td>점수 계산·Repository 직접 호출</td>
+</tr>
+<tr>
+<td>contract</td>
+<td>기능 간 공개 서비스 계약과 불변 데이터</td>
+<td>JPA Entity·프록시·토큰 원문</td>
+</tr>
+<tr>
+<td>application</td>
+<td>소유 데이터의 유스케이스·트랜잭션</td>
+<td>다른 기능의 테이블 직접 갱신</td>
+</tr>
+<tr>
+<td>domain / policy</td>
+<td>엔티티·상태 전이·계산 규칙</td>
+<td>Controller·HTTP/외부 SDK 호출</td>
+</tr>
+<tr>
+<td>infrastructure / persistence</td>
+<td>해당 기능의 JPA·쿼리</td>
+<td>다른 기능 소유 테이블의 쓰기 우회</td>
+</tr>
+<tr>
+<td>application / port</td>
+<td>Google·AI처럼 필요한 외부 기능의 좁은 인터페이스</td>
+<td>모든 메서드를 담는 범용 거대 인터페이스</td>
+</tr>
+</tbody>
+</table>
+<p>단순 CRUD의 Repository는 JPA 인터페이스 하나로 충분하다. 모든 저장소에 인터페이스+어댑터+도메인 모델+JPA Entity를 중복 생성하지 않는다. JPA Entity를 domain에 둘 수 있지만 외부 계약으로 노출하지 않는다. 다른 기능의 id는 값으로 보관하고 기능 간 Entity 연관관계로 내부를 연결하지 않는다. DB FK는 ERD에 맞게 유지한다.</p>
+<p><code>checkin</code>, <code>recovery</code>, <code>schedule</code>처럼 복합 응답의 내부 계산·저장을 담당하는 기능은 HTTP Controller가 없어도 된다. 브라우저에 결과를 묶어 내려주는 책임은 <code>experience</code>에 둔다.</p>
+<h2>4. 기능별 데이터와 규칙 책임</h2>
+<table>
+<thead>
+<tr>
+<th>기능</th>
+<th>책임</th>
+<th>쓰기 소유 테이블</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>account</td>
+<td>회원·닉네임·생활 정보·동의 이력·Google 자격정보·온보딩 진행 상태 저장</td>
+<td>users, user_consents, user_settings, user_preferred_activities, oauth_tokens</td>
+</tr>
+<tr>
+<td>cbi</td>
+<td>버전별 13문항·역문항·채점·INITIAL/DAY28 회차</td>
+<td>cbi_assessments, cbi_answers</td>
+</tr>
+<tr>
+<td>calendar</td>
+<td>Google 일정·직접 수정 규칙·분류·빈 시간·앱 일정 생성/삭제</td>
+<td>calendar_events, event_category_overrides</td>
+</tr>
+<tr>
+<td>schedule</td>
+<td>지난달/주간 부하·마감 몰림·위험한 주 계산</td>
+<td>weekly_loads</td>
+</tr>
+<tr>
+<td>checkin</td>
+<td>하루 체크·재측정·호흡 완료·컨디션·품질 판정</td>
+<td>morning_checks, hrv_measurements</td>
+</tr>
+<tr>
+<td>recovery</td>
+<td>적격 측정일·기준선·추세·회복·정상 범위·내 범위 계산</td>
+<td>hrv_daily_states</td>
+</tr>
+<tr>
+<td>recommendation</td>
+<td>제안 생성·승인/거절/만료/되돌림·수행 이력</td>
+<td>suggestions</td>
+</tr>
+<tr>
+<td>safety</td>
+<td>CBI/회복 결과에 따른 안내 판단·확인/해제</td>
+<td>safety_alerts</td>
+</tr>
+<tr>
+<td>subscription</td>
+<td>28일 체험·FREE/TRIAL/PREMIUM 자격. 결제 연동은 별도 범위</td>
+<td>subscriptions</td>
+</tr>
+<tr>
+<td>ai</td>
+<td>해석 문구 캐시·생성/대체 여부·입력 hash·모델 메타데이터</td>
+<td>ai_outputs</td>
+</tr>
+<tr>
+<td>shared.idempotency</td>
+<td>사용자·작업·키 기준 재시도 결과 및 진행 상태</td>
+<td>api_idempotency_keys</td>
+</tr>
+<tr>
+<td>experience</td>
+<td>온보딩·홈·아침 결과·캘린더 갱신·리포트·탈퇴 흐름 조합</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>integration</td>
+<td>Google/OpenAI 요청 전송·타임아웃·응답 형식 처리</td>
+<td>없음</td>
+</tr>
+</tbody>
+</table>
+<p>ERD의 <strong>18개 테이블에 각각 쓰기 소유자가 하나씩</strong> 존재한다. <code>subscriptions</code>가 있어도 현재 API에는 결제 엔드포인트가 없으므로 결제 Controller를 임의로 추가하지 않는다. 용어 사전은 IA/명세대로 정적 콘텐츠이며 테이블/API를 새로 만들지 않는다. Spring Session 테이블은 shared.security의 기술 저장소이며 도메인 테이블 18개에 포함하지 않는다.</p>
+<p>ai_outputs는 공통 AI 결과 전부를 저장하는 만능 테이블이 아니다. 일정 분류는 calendar_events, 추천 카드 문구는 suggestions의 소유자가 저장한다. ai는 그 외 리포트/요약 문구 캐시를 소유한다.</p>
+<h2>5. 참조 방향과 순환 의존 방지</h2>
+<pre><code class="language-text">HTTP
+ ├─ 단일 기능 API ─────────→ 그 기능의 application
+ └─ 복합 API → experience ─→ 각 기능의 contract → 각 기능 application
+
+기능 application → 자기 domain/persistence
+외부 기능이 필요한 application → 자신이 정의한 port
+integration의 adapter → 그 port를 구현 + Google/OpenAI SDK
+모든 기능 → 필요한 shared 기술 코드
+</code></pre>
+<ul>
+<li>experience만 여러 기능을 조합한다. account↔cbi, calendar↔recommendation 같은 기능 간 양방향 호출을 만들지 않는다. feature→experience 의존도 금지한다.</li>
+<li>기능 간 읽기/명령은 contract로 요청한다. Repository/Entity를 import하지 않는다. 홈·리포트도 테이블을 직접 join하는 새 Repository를 만들지 않고 기능별 읽기 계약의 스냅샷을 조합한다. 성능 근거가 생기면 명시적인 읽기 전용 projection을 별도 ADR로 추가한다.</li>
+<li>shared는 어느 비즈니스 기능에도 의존하지 않는다. 회복 산식·CBI 점수·일정 가중치·추천 기준을 shared/util에 넣지 않는다.</li>
+<li>integration은 전송 어댑터다. 일정 부하·추천·회복 정책을 갖지 않으며 비즈니스 application을 호출하지 않는다. 전송 어댑터가 계약의 port 타입을 참조하는 것은 허용한다.</li>
+<li>Google 자격정보는 account가 암호화 저장한다. experience가 account의 토큰 접근 경계를 거쳐 calendar 작업을 연결하며, 토큰은 로그/HTTP/일반 contract DTO에 넣지 않는다. 요청 수명 내 전용 credential handle을 포트에 전달하고 토큰 복호화는 제한된 어댑터 경계에서 수행한다. 공유 DTO로 토큰을 돌려주지 않는다.</li>
+<li>OAuth 등록·성공/실패 처리·자격정보 저장 어댑터는 account.infrastructure.security에 둔다. shared.security는 인증 주체/CSRF/세션 같은 공통 기술 타입과 필터만 제공한다. 필터 체인 조립 시 account의 핸들러를 프레임워크 인터페이스로 주입하고 shared가 account의 application을 import하게 만들지 않는다.</li>
+<li>규칙 기반 분류/문구 대체는 calendar·recommendation·ai 등 해당 소유 기능의 정책이다. OpenAI 전송 어댑터에 제품 규칙을 넣지 않는다.</li>
+</ul>
+<h2>6. API 주소와 내부 패키지는 다르다</h2>
+<p><code>/api/hrv/measurements</code>라는 주소가 있다는 이유로 전체 서비스를 hrv 패키지 아래에 넣지 않는다. 측정 기록은 checkin, 회복 계산은 recovery, 여러 결과를 돌려주는 저장 흐름은 experience.morning에 배치한다.</p>
+<p>API 39개의 HTTP 책임과 테이블 18개의 소유권 전체 목록은 <a href="%EC%B1%85%EC%9E%84_%EB%A7%A4%ED%95%91.html">책임 매핑</a>에 둔다. OAuth 로그인/캘린더 권한 부여 경로와 local 전용 API도 별도로 표시한다. 같은 HTTP 경로에 기능 Controller와 experience Controller를 중복 등록하지 않는다.</p>
+<h2>7. 핵심 업무 흐름</h2>
+<h3>가입·온보딩</h3>
+<p>experience.onboarding이 profile → CBI 또는 비동의 건너뛰기 → 생활 정보 → 캘린더 분석 → 완료를 제어한다. account가 users의 단계만 저장하고, CBI는 cbi가 저장한다. 완료 시 account의 완료일과 subscription의 체험 시작은 같은 DB 트랜잭션에서 반영한다. account가 cbi/recovery를 직접 호출하지 않는다.</p>
+<h3>캘린더 동기화·분류 수정</h3>
+<p>experience.calendarflow가 자격정보 확인 → Google 조회 → calendar 저장/분류 → schedule 재계산 → PRE_START 갱신을 조합한다. 외부 조회·AI 처리는 긴 DB 트랜잭션 밖에서 하고 저장/파생 갱신에 실패하면 결과를 정상이라고 반환하지 않는다. API의 200 완료 응답은 명세상 필요한 갱신까지 끝난 상태다. 나중에 202 작업 방식으로 바꾸려면 먼저 API 계약을 변경한다.</p>
+<h3>측정·컨디션 완료</h3>
+<p>experience.morning이 checkin 저장 → recovery 재계산 → schedule 읽기 → 추천 갱신 → safety 평가 → TodayResult 조합을 맡는다. 재측정/컨디션 변경은 해당 날짜 이후 파생 상태를 다시 계산한다. 체감 컨디션을 입력하기 전을 '교란 없음'으로 간주하지 않는다. 초기 7일·LOW 산식은 확정 정책 버전을 받은 뒤 구현한다.</p>
+<h3>추천 승인·되돌리기</h3>
+<p>experience.suggestions가 recommendation의 상태/등록 키 확보 → calendar 빈 시간 확인·외부 등록 → recommendation 확정을 조합한다. recommendation은 상태와 중복 키를 소유하며 calendar는 Google 쓰기를 소유한다. APPROVING 저장은 짧은 트랜잭션, Google 호출은 밖에서, 결과 확정은 새 트랜잭션이다. 타임아웃은 등록 키로 조회해 확인하며 바로 FAILED로 확정하지 않는다. 재시도 작업은 MVP에서 같은 애플리케이션의 scheduler로 시작할 수 있고 메시지 브로커는 필수가 아니다.</p>
+<p>APPROVING으로 전환할 때 사용자별 경합 제어 안에서 다른 APPROVING/APPROVED 시간 예약도 검사해 다른 승인 요청이 같은 구간을 가져가지 않게 한다. 외부 호출 동안 긴 DB 트랜잭션을 유지하는 방식으로 해결하지 않는다. Google의 다른 앱이 동시에 일정을 추가하는 경합은 최신 빈 시간 재확인으로 줄일 수 있지만 완전히 차단할 수는 없다.</p>
+<h3>홈·리포트·안전 안내</h3>
+<p>experience.home/reports가 account·checkin·recovery·schedule·recommendation·cbi·subscription의 읽기 계약과 ai 해석을 조합한다. cbi/recovery는 safety를 호출하지 않고 해당 결과로 experience가 safety 평가 명령을 보낸다. 자료 부족·비동의·아직 28일 전인 상태는 명세의 null/잠금 사유로 반환한다. 범위 위치의 회복 값과 일정 부하 값은 각각 recovery와 schedule이 계산한다.</p>
+<h3>연결 해제·건강 기록 삭제·탈퇴</h3>
+<p>experience.accountlifecycle이 각 기능의 삭제 계약을 순서대로 호출한다. account가 전체 Repository를 가져와 일괄 삭제하지 않는다. 잠금/삭제 진행 상태로 새 입력을 막고 Google 정리 → 관련 참조 해제 → 파생 데이터·건강 응답 캐시 → 원본 데이터 → 세션/사용자 순서를 명세에 맞춰 조율한다. 캘린더만 해제하는 경우와 건강 기록만 삭제하는 경우, 탈퇴는 서로 다른 유스케이스다. 외부 정리 실패는 재시도하며 민감정보가 캐시에서 복원되지 않게 한다.</p>
+<h2>8. 두 개발자의 작업 경계</h2>
+<p>2026-11-12 팀 합의로 확정한 분담이다. <strong>HRV축(신체)</strong> 과 <strong>일정축(Google 캘린더 연동)</strong> 으로 나눈다. 패키지 구조·HTTP 책임·테이블 소유권(<a href="%EC%B1%85%EC%9E%84_%EB%A7%A4%ED%95%91.html">책임 매핑</a>)은 바뀌지 않으며, 아래는 각 패키지·파일을 누가 주로 작성하고 리뷰하는지에 대한 분담이다.</p>
+<table>
+<thead>
+<tr>
+<th>담당</th>
+<th>기능 패키지</th>
+<th>experience 흐름</th>
+<th>상대에게 제공할 계약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HRV축</strong></td>
+<td>cbi, checkin, recovery, safety, recommendation(제안 상태·조회·건너뛰기·했어요, RecoverySuggestionPolicy)</td>
+<td>assessments, morning, home, reports(<code>/api/reports/recovery</code>, <code>/api/reports/four-week</code>)</td>
+<td>CBI 결과·회복 스냅샷·제안 상태 전이(생성/APPROVING/APPROVED/FAILED/되돌림)·안전 평가</td>
+</tr>
+<tr>
+<td><strong>일정축</strong></td>
+<td>account, calendar, schedule, subscription, recommendation.domain.policy.PrepareAheadPolicy(PRE_START 규칙)</td>
+<td>onboarding, calendarflow, accountlifecycle, suggestions(생성·다른 시간·승인·되돌리기), reports(<code>/api/schedule/report</code>)</td>
+<td>동의·측정 켜짐·온보딩 상태, 주간 부하 스냅샷, 빈 시간 조회, 캘린더 일정 등록/삭제, Google 자격정보 handle</td>
+</tr>
+<tr>
+<td><strong>공통 (편집 담당: HRV축)</strong></td>
+<td>shared(config·security·error·time·idempotency), DB 마이그레이션, build.gradle·CI, local 전용 개발 API</td>
+<td>—</td>
+<td>오류 형식·현재 사용자·시간·재시도 키·테스트 지원</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>integration.google</strong>은 일정축이 작성한다. <strong>ai·integration.openai</strong>는 핵심 기능 완성 후 AI 도입 단계에서 담당을 정한다. 그 전까지 문구는 각 소유 기능의 규칙 기반 문구(<code>fallback: true</code>)로 내려준다.</li>
+<li><strong>PRE_START 규칙</strong>은 일정축이 작성하지만 파일 위치는 <code>recommendation/domain/policy/</code>다. 제안 저장·상태 전이는 recommendation의 계약을 통해서만 한다.</li>
+<li><strong>제안 승인 흐름</strong>(experience.suggestions)은 일정축이 Google 등록·타임아웃 재확인·재시도를 조합하고, recommendation의 상태 전이 계약(HRV축)을 호출한다. 상태 전이 계약은 승인 흐름 구현 전에 인터페이스 PR로 먼저 합의한다.</li>
+<li><strong>홈</strong>(experience.home)은 HRV축이 조합하고 일정축은 주간 부하·PRE_START 제안 읽기 계약을 제공한다.</li>
+<li>공통 영역은 HRV축이 편집하고 일정축이 리뷰한다. 일정축이 공통 코드를 바꿔야 하면 이슈로 요청하거나 같은 PR에서 리뷰를 받는다. OAuth 로그인 설정은 <code>SecurityFilterChainContributor</code>로 account(일정축)에서 덧붙이므로 shared.security 파일을 동시에 고치지 않는다.</li>
+<li>Google 로그인 완성 전에도 HRV축이 로컬에서 API를 시험할 수 있도록 local 전용 테스트 로그인을 공통 작업으로 둔다.</li>
+</ul>
+<h2>9. 구현 순서와 미확정 사항</h2>
+<ol>
+<li>API/ERD 책임 매핑·오류/인증 사용자/시계·외부 포트 계약을 합의하고 신규 프로젝트 골격을 생성한다.</li>
+<li>account·cbi·onboarding과 calendar·schedule을 연결한다. 온보딩 중 분석 허용 조건을 먼저 테스트한다.</li>
+<li>checkin·recovery를 완성하고 적격 7일·결측일·컨디션 변경을 검증한다.</li>
+<li>recommendation·캘린더 승인/되돌림·재시도를 연결한다.</li>
+<li>home·reports·safety·subscription 체험 표시·탈퇴를 완성한다. 삭제 경계는 마지막까지 미루지 말고 각 기능 PR부터 계약과 테스트를 둔다.</li>
+</ol>
+<p>미확정인 회복 산식/초기 7일 제외 규칙·일정 가중치/종일 일정·컨디션 추천 임계값·LOW 2주 연속/재노출·4주 백분위 최소 표본·동의 선택 정책은 <a href="%EA%B2%80%ED%86%A0%EA%B2%B0%EA%B3%BC.md">검토 결과</a>와 API의 결정 항목을 따른다. 폴더 구조 설계가 이 정책들을 확정한 것은 아니다.</p>
+<h2>10. 검증 기준</h2>
+<ul>
+<li>순수 domain/policy 테스트: 계산 경계·결측일·서울 날짜·교란 요인·상태 전이.</li>
+<li>기능 application/API 테스트: 소유권·동의·응답 형식·재시도·버전 검증.</li>
+<li>MySQL 통합 테스트: ERD의 FK/UK/CHECK·Flyway·JPA validate·트랜잭션·동시 승인.</li>
+<li>experience 흐름 테스트: 중간 실패·부분 성공·온보딩 순서·건강 삭제/탈퇴·외부 타임아웃 복구.</li>
+<li>구조 테스트: feature→experience, 기능 간 Repository/Entity import, shared→기능, integration→기능 application을 금지한다. ArchUnit 같은 검사 도구는 실제 개발 시작 시 별도 도입 검토하며 이번 설계에 의존성을 추가하지 않았다.</li>
+</ul>
+<p>문서 검증은 모든 API/테이블이 빠짐없이 책임에 매핑됐는지 확인하는 것이며, 실제 서버 테스트 통과나 새 구조 구현 완료를 의미하지 않는다.</p>
+</article></main><footer>명세 v0.2 / 구조 v1.0 · 2026.11.12 · 서비스 요구사항·API·ERD·IA 기준 · 구현 완료를 의미하지 않는 설계 명세 · 외부 라이브러리/네트워크 요청 없는 HTML</footer><script>
+const q=document.querySelector('#search'), filter=document.querySelector('#filter');
+function apply(){const query=(q?.value||'').toLowerCase().trim(), group=filter?.value||'';let n=0;document.querySelectorAll('[data-search]').forEach(el=>{let yes=(!group||el.dataset.group===group)&&(!query||el.dataset.search.includes(query));el.hidden=!yes;if(yes)n++});document.querySelectorAll('.api-group').forEach(g=>g.hidden=![...g.querySelectorAll('[data-search]')].some(el=>!el.hidden));let c=document.querySelector('#count');if(c)c.textContent=n+'개 표시';let e=document.querySelector('#empty');if(e)e.hidden=n>0;}
+q?.addEventListener('input',apply);filter?.addEventListener('change',apply);apply();
+document.querySelector('#expand')?.addEventListener('click',()=>{document.querySelectorAll('details[data-search]:not([hidden])').forEach(d=>d.open=true)});
+document.querySelector('#collapse')?.addEventListener('click',()=>{document.querySelectorAll('details[data-search]').forEach(d=>d.open=false)});
+function expandHash(){let id=decodeURIComponent(location.hash.slice(1));let el=document.getElementById(id);if(el?.matches('details')){if(q)q.value='';if(filter)filter.value='';apply();el.open=true;el.scrollIntoView()}}
+window.addEventListener('hashchange',expandHash);expandHash();
+let saved;window.addEventListener('beforeprint',()=>{saved=[...document.querySelectorAll('details')].map(d=>d.open);document.querySelectorAll('details').forEach(d=>d.open=true)});window.addEventListener('afterprint',()=>{document.querySelectorAll('details').forEach((d,i)=>d.open=saved?.[i]??false)});
+</script></body></html>

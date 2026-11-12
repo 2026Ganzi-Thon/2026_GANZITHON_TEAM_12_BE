@@ -1,0 +1,24 @@
+# Come-down 신규 프로젝트용 로컬 예시. 실제 운영 비밀값이 아님.
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: comedown
+      MYSQL_USER: comedown
+      MYSQL_PASSWORD: comedown-local
+      MYSQL_ROOT_PASSWORD: comedown-local-root
+      TZ: UTC
+    ports:
+      - "3307:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - comedown-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ucomedown", "-pcomedown-local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  comedown-mysql-data:
