@@ -1,0 +1,71 @@
+name: CI
+
+# PR을 올리거나 main이 바뀔 때마다 빌드·테스트와 문서 동기화를 자동으로 검사한다.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 같은 PR에 새 커밋이 오면 이전 실행은 취소한다.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 빌드·테스트
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 21 설치
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gradle 설정(캐시)
+        uses: gradle/actions/setup-gradle@v4
+
+      # 단위 테스트 + MySQL 8.4(Testcontainers) 통합 테스트 + 실행 파일 빌드
+      - name: 빌드·테스트
+        run: ./gradlew check bootJar --no-daemon
+
+      - name: 테스트 리포트 업로드(실패 시)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: build/reports/tests/test
+          retention-days: 7
+
+  docs:
+    name: 문서 HTML 동기화
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: 문서 생성기 의존성 설치
+        run: pip install "markdown-it-py==4.0.0"
+
+      # API·ERD 등 MD를 고치고 HTML을 다시 만들지 않았으면 실패한다.
+      - name: HTML 재생성 후 차이 확인
+        run: |
+          python docs/build_spec_html.py
+          if ! git diff --quiet -- docs; then
+            echo "::error::docs의 MD와 HTML이 맞지 않습니다. 'python docs/build_spec_html.py'를 실행하고 결과를 함께 커밋하세요."
+            git diff --stat -- docs
+            exit 1
+          fi

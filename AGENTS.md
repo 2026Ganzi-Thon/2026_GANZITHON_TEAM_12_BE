@@ -59,6 +59,7 @@ python docs/build_spec_html.py
 ```
 
 - 규칙 테스트는 계산 경계/결측/교란, API는 상태/동의/소유권, MySQL은 FK/UK/Flyway, experience는 중간 실패/재시도/삭제 경계를 검증한다.
+- PR·main 변경마다 GitHub Actions CI(`.github/workflows/ci.yml`)가 `./gradlew check bootJar`와 문서 HTML 동기화를 검사한다. CI가 실패한 PR은 merge하지 않으며, CI를 통과시키려고 테스트를 끄거나 워크플로를 약화하지 않는다.
 - Docker가 없거나 테스트가 skip됐으면 통합 검증 완료라고 쓰지 않는다. 기능 패키지와 같은 테스트 위치 및 test/support를 목표로 사용한다. 테스트 구조도 현재 구현을 그대로 복제하지 않는다.
 - 실제 Google/OpenAI 대신 대체 응답과 고정 Clock을 사용한다. 실패를 피하려고 테스트를 끄거나 운영 인증/동의를 우회하지 않는다.
 - 문서만 바꾸면 매핑·링크·생성 결과를 확인하고 불필요한 서버 테스트를 돌리지 않아도 된다. 설계 문서 검증과 실제 구현 검증을 구분해서 보고한다.

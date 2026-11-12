@@ -1,5 +1,7 @@
 # Come-down(캄다운) Backend
 
+[![CI](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_12_BE/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_12_BE/actions/workflows/ci.yml)
+
 > 2026 간지톤 TEAM 12 · 백엔드 저장소
 
 **Come-down(캄다운)** 은 수업·과제·시험·동아리·아르바이트로 일정이 몰릴 때 번아웃을 미리 막도록 돕는 서비스입니다.
@@ -61,6 +63,7 @@
 | 빌드 | Gradle Wrapper 9.8.2 |
 | 테스트 | JUnit, Spring Boot Test(MockMvc), Testcontainers(MySQL 8.4) |
 | 로컬 환경 | Docker Compose(MySQL) |
+| CI | GitHub Actions (PR·main마다 빌드·테스트·문서 동기화 검사) |
 | 문서 | Markdown 명세 → `docs/build_spec_html.py`로 오프라인 HTML 생성 |
 
 ## 4. AI 활용
@@ -110,7 +113,9 @@ HTTP 요청
 ├── docker-compose.yml                # 로컬 MySQL 8.4 (localhost:3307)
 ├── .env.example                      # 환경 변수 예시 (실제 .env는 커밋 금지)
 ├── .editorconfig / .gitattributes / .gitignore
-├── .github/pull_request_template.md
+├── .github/
+│   ├── pull_request_template.md
+│   └── workflows/ci.yml              # GitHub Actions CI
 ├── scripts/
 │   └── check-backend-env.ps1         # JDK·Gradle·Docker 등 개발 환경 점검
 ├── docs/                             # 설계 문서 (MD가 원본, HTML은 생성물)
@@ -198,6 +203,7 @@ python docs/build_spec_html.py                            # 문서 HTML 재생�
 | 일정축 (구글 캘린더) | account, calendar, schedule, subscription, 미리 시작하기 규칙, Google 연동 · 온보딩·캘린더 동기화·추천 승인·탈퇴 흐름 · 일정 리포트 |
 
 - 브랜치: `feat/이슈-기능`, `fix/이슈-수정`, `docs/주제`. **main 직접 push 금지**, PR + 상대 1명 리뷰 후 squash merge.
+- PR을 올리면 **CI가 자동으로** 빌드·전체 테스트(MySQL 포함)·문서 HTML 동기화를 검사합니다. ❌가 뜨면 PR의 Checks 탭에서 원인을 보고 같은 브랜치에서 고쳐 다시 올립니다. CI가 통과한 PR만 merge합니다.
 - API·스키마를 바꾸면 같은 PR에서 명세(MD)와 HTML을 함께 갱신합니다.
 - Flyway 파일명은 `VYYYY_MM_DD_HHmmssSSS__설명.sql`(UTC). **공유된 migration은 수정하지 않고** 새 파일로 보정합니다.
 - `.env`, 토큰, 키, 실사용자 건강정보·일정 제목, 측정 원신호는 커밋·로그에 남기지 않습니다.
@@ -222,6 +228,8 @@ python docs/build_spec_html.py                            # 문서 HTML 재생�
 - [x] 공통 기반: 오류 응답 형식, 서울 기준 시간, 로그인 사용자·CSRF·로그아웃
 - [x] 기준선 DB 스키마(18개 테이블 + 세션) · MySQL 제약 검증 테스트
 - [x] HRV 측정 계산 참고 구현(`HrvAnalyzer`) · 합성 신호 테스트
+- [x] CI(GitHub Actions): 빌드·테스트·문서 동기화 자동 검사
+- [ ] CD: 배포 대상 결정 후 자동 배포
 - [ ] 재시도 키 처리(`shared.idempotency`) · local 전용 테스트 로그인
 - [ ] 일정축: Google 로그인·캘린더 동기화·분류·주간 부하·미리 시작하기·추천 승인
 - [ ] HRV축: CBI·아침 체크·회복 계산·회복 추천·홈·리포트·안전 안내
