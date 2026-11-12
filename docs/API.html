@@ -902,6 +902,9 @@
 ```
 - resources 예시는 구조용 placeholder입니다. 실제 연락처·링크는 출시 전에 공식 기관 정보로 확인하고 verifiedat을 기록해야 하며 미확인 항목에는 전화 버튼을 노출하지 않습니다.
 - 조건: 회복 낮음 2주 연속(`low_recovery_2w`) 또는 cbi 75점 이상(`cbi_high`). 마이페이지 메뉴에서는 `show`와 상관없이 언제든 볼 수 있습니다.
+- 로그인만 필요합니다(온보딩 중·건강정보 동의 없이도 조회). `alerts`는 조건이 아직 풀리지 않은 안내(최신순, 닫은 안내 포함)이고, `show`는 그중 닫지 않은 안내가 있을 때 true입니다.
+- 평가 시점: `low_recovery_2w`는 측정 저장·컨디션 저장으로 회복 상태를 다시 계산할 때마다, `cbi_high`는 cbi 제출 때 평가합니다.
+- **구현 해석(확인 필요)** `cbi_high`의 `message`는 기획 확정 전 임시 문구(&quot;번아웃 체크에서 피로 점수가 높게 나왔어요.&quot;)입니다. `resources`는 공식 확인 전까지 위 placeholder 1건(전화·링크 없음)을 그대로 내려줍니다.
 
 " data-group="g8"><summary><span class="method GET">GET</span><div><div class="path">/api/safety</div><div class="description">도움 받을 수 있는 곳 · 안전 안내</div></div></summary><div class="detail-body"><pre><code class="language-json">{
   &quot;show&quot;: true,
@@ -915,15 +918,20 @@
 <ul>
 <li>resources 예시는 구조용 placeholder입니다. 실제 연락처·링크는 출시 전에 공식 기관 정보로 확인하고 verifiedAt을 기록해야 하며 미확인 항목에는 전화 버튼을 노출하지 않습니다.</li>
 <li>조건: 회복 낮음 2주 연속(<code>LOW_RECOVERY_2W</code>) 또는 CBI 75점 이상(<code>CBI_HIGH</code>). 마이페이지 메뉴에서는 <code>show</code>와 상관없이 언제든 볼 수 있습니다.</li>
+<li>로그인만 필요합니다(온보딩 중·건강정보 동의 없이도 조회). <code>alerts</code>는 조건이 아직 풀리지 않은 안내(최신순, 닫은 안내 포함)이고, <code>show</code>는 그중 닫지 않은 안내가 있을 때 true입니다.</li>
+<li>평가 시점: <code>LOW_RECOVERY_2W</code>는 측정 저장·컨디션 저장으로 회복 상태를 다시 계산할 때마다, <code>CBI_HIGH</code>는 CBI 제출 때 평가합니다.</li>
+<li><strong>구현 해석(확인 필요)</strong> <code>CBI_HIGH</code>의 <code>message</code>는 기획 확정 전 임시 문구(&quot;번아웃 체크에서 피로 점수가 높게 나왔어요.&quot;)입니다. <code>resources</code>는 공식 확인 전까지 위 placeholder 1건(전화·링크 없음)을 그대로 내려줍니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="post /api/safety/alerts/{id}/acknowledge 안전 안내 닫기 - `low_recovery_2w`: 최근 14일 중 대표값이 있는 날이 7일 이상이고 그 날들의 회복 상태가 모두 `low`. 측정하지 않은 날은 판정에서 빠집니다(낮음으로도 정상으로도 세지 않음).
 - 단순 acknowledge는 조건 해제와 다릅니다. 닫은 안내는 같은 연속 구간에서는 다시 띄우지 않고, 조건이 해제(`resolved_at`)됐다가 다시 충족되면 새 안내로 노출합니다([계산_정책.md](계산_정책.md) 5절).
+- 다시 불러도 204(처음 닫은 시각 유지). 다른 사용자의 안내 id는 404 `not_found`입니다. `low_recovery_2w`의 `source_ref`는 낮음 구간 첫 날짜(창 안에서 대표값이 있는 가장 이른 날)입니다.
 
 ---
 
 " data-group="g8"><summary><span class="method POST">POST</span><div><div class="path">/api/safety/alerts/{id}/acknowledge</div><div class="description">안전 안내 닫기</div></div></summary><div class="detail-body"><ul>
 <li><code>LOW_RECOVERY_2W</code>: 최근 14일 중 대표값이 있는 날이 7일 이상이고 그 날들의 회복 상태가 모두 <code>LOW</code>. 측정하지 않은 날은 판정에서 빠집니다(낮음으로도 정상으로도 세지 않음).</li>
 <li>단순 acknowledge는 조건 해제와 다릅니다. 닫은 안내는 같은 연속 구간에서는 다시 띄우지 않고, 조건이 해제(<code>resolved_at</code>)됐다가 다시 충족되면 새 안내로 노출합니다(<a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a> 5절).</li>
+<li>다시 불러도 204(처음 닫은 시각 유지). 다른 사용자의 안내 id는 404 <code>NOT_FOUND</code>입니다. <code>LOW_RECOVERY_2W</code>의 <code>source_ref</code>는 낮음 구간 첫 날짜(창 안에서 대표값이 있는 가장 이른 날)입니다.</li>
 </ul>
 <hr />
 </div></details></section><div id="empty" class="empty" hidden>검색 결과가 없습니다. 검색어나 분류를 바꿔 주세요.</div><section id="common"><h2>공통 규칙 · 객체</h2><details class="block"><summary>인증 · 오류 · 재시도 · 공통 데이터</summary><div class="content"><h3>주소·형식</h3>

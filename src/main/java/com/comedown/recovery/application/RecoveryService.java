@@ -62,6 +62,14 @@ public class RecoveryService implements RecoveryCommands, RecoveryQuery {
 
     @Override
     @Transactional(readOnly = true)
+    public List<DailyRecoverySnapshot> findRange(long userId, LocalDate from, LocalDate to) {
+        return states.findByUserIdAndStateDateBetweenOrderByStateDateAsc(userId, from, to).stream()
+                .map(RecoveryService::toSnapshot)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<DailyRecoverySnapshot> findLatestOnOrBefore(long userId, LocalDate date) {
         return states.findFirstByUserIdAndStateDateLessThanEqualOrderByStateDateDesc(userId, date)
                 .map(RecoveryService::toSnapshot);
