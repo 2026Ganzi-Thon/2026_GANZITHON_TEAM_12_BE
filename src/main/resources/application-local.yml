@@ -4,3 +4,9 @@ spring:
     url: jdbc:mysql://localhost:3307/comedown
     username: comedown
     password: comedown-local
+comedown:
+  hrv:
+    # 측정 원신호를 임계값 조정용 파일로 남긴다(local 전용, 기본 꺼짐). 위치는 Git 제외 경로.
+    signal-recording:
+      enabled: false
+      dir: recordings
