@@ -215,8 +215,17 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```
 - `level`: `LOW`(50 미만) `HIGH`(50 이상 75 미만) `VERY_HIGH`(75 이상). 이는 프로젝트 표시 기준이며 진단을 뜻하지 않습니다. `highRisk`(어느 하나 75 이상)면 `safety.show: true` → C3 안전 안내를 띄웁니다.
 
+- 검사 순서: 로그인(401) → 건강정보 동의(403 `HRV_CONSENT_REQUIRED`) → 형식 검증(400) → 회차 조건(409) → 재시도 키. INITIAL은 프로필 단계를 마친 뒤(`onboardingStep`이 `PROFILE`이면 409 `ONBOARDING_STEP_INVALID`) 제출하며, 현재 단계가 `CBI`일 때만 `LIFESTYLE`로 전진합니다(이미 지난 단계는 되돌리지 않음). DAY28의 응답 `onboardingStep`은 현재 단계(`DONE`)입니다.
+- 점수는 DB에 소수 둘째 자리(DECIMAL 5,2)로 저장하고, 응답은 소수 첫째 자리로 반올림합니다. `level`은 저장값으로 판정합니다.
+- **구현 해석(확인 필요)** `CBI_HIGH` 안내는 가장 최근 CBI 기준입니다. high_risk인 응답마다 새 안내를 만들고(같은 사용자의 열린 `CBI_HIGH`는 해제 후 대체), high_risk가 아닌 응답은 열린 `CBI_HIGH`를 해제(`resolved_at`)합니다.
+
 ### `GET /api/cbi/assessments` → 200
 내 응답 이력(최신순). 원점수 없이 점수·level만.
+```json
+{ "assessments": [{ "id": 5, "round": "INITIAL", "takenAt": "2026-11-03T21:02:00+09:00",
+    "personal": { "score": 62.5, "level": "HIGH" }, "work": { "score": 55.4, "level": "HIGH" }, "highRisk": false }] }
+```
+- 로그인만 필요합니다(온보딩 중 허용). 응답한 적이 없으면 빈 배열입니다.
 
 ### `PUT /api/me/settings` — A4 생활 정보 (마이페이지 수정과 공용)
 ```json
