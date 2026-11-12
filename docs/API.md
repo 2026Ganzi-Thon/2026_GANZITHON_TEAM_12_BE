@@ -439,6 +439,11 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - `excludedFromBaseline: true` → "오늘은 계산에서 빠졌어요". `phase: BUILDING`이면 `recovery`는 `status: BUILDING`이고 나머지는 null, `baseline.validDays`로 "n/7".
 - `recovery.status`: `BUILDING` `NORMAL` `LOW` `INSUFFICIENT`. `trendRmssdMs`·`normalRange`는 ln 단위 계산값을 exp로 변환한 표시값입니다([계산_정책.md](계산_정책.md) 4절).
 - 추천 문구는 AI가 5초 안에 응답하지 않으면 규칙 기반 문구로 대체합니다(측정 후 5초 안에 결과 표시).
+- 검증·접근: `score` 1~5, `alcohol`·`sick`·`caffeine`은 모두 필수(400). 접근 조건은 온보딩 → 건강정보 동의 순서(403)이며 측정 꺼짐(`hrvEnabled: false`)이어도 컨디션은 저장할 수 있습니다. 접근 조건을 요청 검증보다 먼저 봅니다.
+- 다시 저장하면 값을 바꾸고 결과를 다시 계산합니다. `completed_at`(DONE 기준)은 처음 완료한 시각을 유지합니다. 측정 저장도 그 날짜부터 회복 상태를 다시 계산하므로, 컨디션 저장 뒤 재측정하면 결과가 바뀝니다.
+- 표시값 반올림: `trendRmssdMs`·`normalRange`·`heartRateBpm`은 소수 첫째 자리, `changePct`는 저장값(소수 첫째 자리) 그대로입니다.
+- `qualityLevel`·`heartRateBpm`은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. `excludedFromBaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
+- **현재 구현 범위**: `judgment`는 null, `suggestions`는 빈 배열입니다. 2축 판단과 RECOVERY 추천은 "1~7일 컨디션 기반 추천 임계값"(14절 남은 항목)과 추천 기능이 정해진 뒤 채웁니다. 2주 연속 낮음 안전 평가도 safety 구현 후 연결합니다.
 
 ### `POST /api/morning-checks/today/breathing` → 204 — ③ 호흡 1분 완료 (건너뛰기 가능)
 ```json

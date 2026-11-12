@@ -4,6 +4,7 @@ import com.comedown.checkin.domain.MorningCheck;
 import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -27,6 +28,10 @@ public interface MorningCheckRepository extends JpaRepository<MorningCheck, Long
             """, nativeQuery = true)
     int insertIfAbsent(@Param("userId") long userId, @Param("checkDate") LocalDate checkDate,
             @Param("dayIndex") int dayIndex, @Param("createdAt") LocalDateTime createdAtUtc);
+
+    Optional<MorningCheck> findByUserIdAndCheckDate(long userId, LocalDate checkDate);
+
+    List<MorningCheck> findByUserIdAndCheckDateLessThanEqualOrderByCheckDateAsc(long userId, LocalDate through);
 
     /** 최신 커밋 값을 잠금 읽기로 가져온다(동시 생성 직후에도 보이도록). */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

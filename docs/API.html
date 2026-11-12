@@ -643,6 +643,11 @@
 - `excludedfrombaseline: true` → &quot;오늘은 계산에서 빠졌어요&quot;. `phase: building`이면 `recovery`는 `status: building`이고 나머지는 null, `baseline.validdays`로 &quot;n/7&quot;.
 - `recovery.status`: `building` `normal` `low` `insufficient`. `trendrmssdms`·`normalrange`는 ln 단위 계산값을 exp로 변환한 표시값입니다([계산_정책.md](계산_정책.md) 4절).
 - 추천 문구는 ai가 5초 안에 응답하지 않으면 규칙 기반 문구로 대체합니다(측정 후 5초 안에 결과 표시).
+- 검증·접근: `score` 1~5, `alcohol`·`sick`·`caffeine`은 모두 필수(400). 접근 조건은 온보딩 → 건강정보 동의 순서(403)이며 측정 꺼짐(`hrvenabled: false`)이어도 컨디션은 저장할 수 있습니다. 접근 조건을 요청 검증보다 먼저 봅니다.
+- 다시 저장하면 값을 바꾸고 결과를 다시 계산합니다. `completed_at`(done 기준)은 처음 완료한 시각을 유지합니다. 측정 저장도 그 날짜부터 회복 상태를 다시 계산하므로, 컨디션 저장 뒤 재측정하면 결과가 바뀝니다.
+- 표시값 반올림: `trendrmssdms`·`normalrange`·`heartratebpm`은 소수 첫째 자리, `changepct`는 저장값(소수 첫째 자리) 그대로입니다.
+- `qualitylevel`·`heartratebpm`은 하루 대표 측정(그날 첫 good·fair 측정)의 값이며, 대표값이 없으면 null입니다. `excludedfrombaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
+- **현재 구현 범위**: `judgment`는 null, `suggestions`는 빈 배열입니다. 2축 판단과 recovery 추천은 &quot;1~7일 컨디션 기반 추천 임계값&quot;(14절 남은 항목)과 추천 기능이 정해진 뒤 채웁니다. 2주 연속 낮음 안전 평가도 safety 구현 후 연결합니다.
 
 " data-group="g5"><summary><span class="method PUT">PUT</span><div><div class="path">/api/morning-checks/today/condition</div><div class="description">컨디션 저장 · 오늘 결과와 추천</div></div></summary><div class="detail-body"><pre><code class="language-json">{ &quot;score&quot;: 3, &quot;alcohol&quot;: false, &quot;sick&quot;: false, &quot;caffeine&quot;: true }
 </code></pre>
@@ -669,6 +674,11 @@
 <li><code>excludedFromBaseline: true</code> → &quot;오늘은 계산에서 빠졌어요&quot;. <code>phase: BUILDING</code>이면 <code>recovery</code>는 <code>status: BUILDING</code>이고 나머지는 null, <code>baseline.validDays</code>로 &quot;n/7&quot;.</li>
 <li><code>recovery.status</code>: <code>BUILDING</code> <code>NORMAL</code> <code>LOW</code> <code>INSUFFICIENT</code>. <code>trendRmssdMs</code>·<code>normalRange</code>는 ln 단위 계산값을 exp로 변환한 표시값입니다(<a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a> 4절).</li>
 <li>추천 문구는 AI가 5초 안에 응답하지 않으면 규칙 기반 문구로 대체합니다(측정 후 5초 안에 결과 표시).</li>
+<li>검증·접근: <code>score</code> 1~5, <code>alcohol</code>·<code>sick</code>·<code>caffeine</code>은 모두 필수(400). 접근 조건은 온보딩 → 건강정보 동의 순서(403)이며 측정 꺼짐(<code>hrvEnabled: false</code>)이어도 컨디션은 저장할 수 있습니다. 접근 조건을 요청 검증보다 먼저 봅니다.</li>
+<li>다시 저장하면 값을 바꾸고 결과를 다시 계산합니다. <code>completed_at</code>(DONE 기준)은 처음 완료한 시각을 유지합니다. 측정 저장도 그 날짜부터 회복 상태를 다시 계산하므로, 컨디션 저장 뒤 재측정하면 결과가 바뀝니다.</li>
+<li>표시값 반올림: <code>trendRmssdMs</code>·<code>normalRange</code>·<code>heartRateBpm</code>은 소수 첫째 자리, <code>changePct</code>는 저장값(소수 첫째 자리) 그대로입니다.</li>
+<li><code>qualityLevel</code>·<code>heartRateBpm</code>은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. <code>excludedFromBaseline</code>은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.</li>
+<li><strong>현재 구현 범위</strong>: <code>judgment</code>는 null, <code>suggestions</code>는 빈 배열입니다. 2축 판단과 RECOVERY 추천은 &quot;1~7일 컨디션 기반 추천 임계값&quot;(14절 남은 항목)과 추천 기능이 정해진 뒤 채웁니다. 2주 연속 낮음 안전 평가도 safety 구현 후 연결합니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="post /api/morning-checks/today/breathing 호흡 훈련 1분 완료 ```json
 { &quot;durationsec&quot;: 60 }

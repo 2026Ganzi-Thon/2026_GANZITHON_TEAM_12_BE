@@ -179,6 +179,14 @@ public class HrvMeasurement {
         return meanHrBpm;
     }
 
+    public Instant getMeasuredAt() {
+        return measuredAt;
+    }
+
+    public Double getLnRmssd() {
+        return lnRmssd;
+    }
+
     public String getChannel() {
         return channel;
     }

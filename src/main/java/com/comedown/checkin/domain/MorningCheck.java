@@ -78,8 +78,49 @@ public class MorningCheck {
         return completedAt;
     }
 
+    public Integer getConditionScore() {
+        return conditionScore;
+    }
+
+    public Boolean getAlcohol() {
+        return alcohol;
+    }
+
+    public Boolean getSick() {
+        return sick;
+    }
+
+    public Boolean getCaffeine() {
+        return caffeine;
+    }
+
+    public Instant getBreathingCompletedAt() {
+        return breathingCompletedAt;
+    }
+
     /** 컨디션·교란 요인 입력까지 끝났는지. */
     public boolean isConditionCompleted() {
         return completedAt != null;
+    }
+
+    /** 음주·아픔·카페인 중 하나라도 있으면 그날은 '내 평소' 계산에서 제외한다. 입력 전이면 false. */
+    public boolean isConfounded() {
+        return Boolean.TRUE.equals(alcohol) || Boolean.TRUE.equals(sick) || Boolean.TRUE.equals(caffeine);
+    }
+
+    /**
+     * 컨디션·교란 요인을 저장한다. 다시 저장하면 값을 바꾸고, 완료 시각은 처음 완료한 시각을 유지한다.
+     */
+    public void saveCondition(int score, boolean alcohol, boolean sick, boolean caffeine, Instant now) {
+        if (score < 1 || score > 5) {
+            throw new IllegalArgumentException("컨디션은 1~5여야 합니다: " + score);
+        }
+        this.conditionScore = score;
+        this.alcohol = alcohol;
+        this.sick = sick;
+        this.caffeine = caffeine;
+        if (this.completedAt == null) {
+            this.completedAt = now;
+        }
     }
 }
