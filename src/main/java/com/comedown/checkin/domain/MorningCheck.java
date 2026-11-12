@@ -108,6 +108,13 @@ public class MorningCheck {
         return Boolean.TRUE.equals(alcohol) || Boolean.TRUE.equals(sick) || Boolean.TRUE.equals(caffeine);
     }
 
+    /** 호흡 1분 완료를 기록한다. 다시 불러도 처음 완료한 시각을 유지한다. */
+    public void completeBreathing(Instant now) {
+        if (this.breathingCompletedAt == null) {
+            this.breathingCompletedAt = now;
+        }
+    }
+
     /**
      * 컨디션·교란 요인을 저장한다. 다시 저장하면 값을 바꾸고, 완료 시각은 처음 완료한 시각을 유지한다.
      */
