@@ -386,9 +386,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 | t | 시작 = 0 기준 ms, 증가 순서. 준비 10초 포함 총 약 70초 |
 | r, g | 프레임별 빨강·초록 평균 밝기(0~255) |
 
-- 검증(400): t·r·g 길이 동일, 각 배열 최대 10,000개, 모든 값 유한수, r·g는 0~255. 요청 본문 상한 512KB(60fps 기준 약 100KB). **측정 시간 부족·프레임 부족은 400이 아니라 품질 판정(`RETRY`)으로 처리**합니다.
+- 검증(400): t·r·g 길이 동일, 각 배열 최대 10,000개, 모든 값 유한수, r·g는 0~255. 요청 본문 상한 512KB(60fps 기준 약 100KB, 넘으면 400 `VALIDATION_FAILED` "요청 본문이 너무 커요."). **측정 시간 부족·프레임 부족은 400이 아니라 품질 판정(`RETRY`)으로 처리**합니다.
+- 검사 순서: 로그인(401) → 접근 조건(403: 온보딩 → 건강정보 동의 → 측정 켜짐) → 요청 검증(400) → 재시도 키(409). 건강정보 동의는 `SENSITIVE_HRV`의 가장 최근 동의가 철회되지 않았을 때 유효하고, 생활 정보 설정이 없으면 측정 꺼짐으로 봅니다.
 - 계산 순서·품질 기준은 [계산_정책.md](계산_정책.md) 3절(참고 구현 `checkin.domain.measurement.HrvAnalyzer`, `algorithm_version: hrv-cam-v1`). 프레임 수·길이·fps·유효/제외 박동 간격·잡음비·채널은 서버 계산값으로 저장합니다.
-- local 프로필에서만 임계값 조정용으로 원신호를 파일로 남기는 설정 플래그를 둡니다(기본 꺼짐, Git 제외 경로). 운영에서는 켤 수 없습니다.
+- local 프로필에서만 임계값 조정용으로 원신호를 파일로 남기는 설정 플래그를 둡니다(기본 꺼짐, Git 제외 경로). 운영에서는 켤 수 없습니다. 설정: `comedown.hrv.signal-recording.enabled=true`, 위치 `comedown.hrv.signal-recording.dir`(기본 `recordings/`). 파일에는 사용자 식별자를 넣지 않습니다.
 - **MANUAL**(카메라를 못 쓰는 기기에서 워치 값 입력): 기존대로 `{ "source": "MANUAL", "measuredAt": "...", "rmssdMs": 42.5 }`. **RMSSD(ms)**만 허용(SDNN 불가), qualityLevel `UNVERIFIED`, 기준선·자동 회복 판정에서 제외하고 참고용으로만 표시합니다.
 - 공통: **측정 날짜는 측정 시작 시각(CAMERA `startedAt`, MANUAL `measuredAt`)의 서울 날짜**로 정합니다(자정 직전에 시작해 자정 뒤에 저장돼도 시작한 날의 체크). 시작 시각은 오늘 또는 어제여야 하고 미래 시각은 허용하지 않으며, 폰 시계 오류·조작을 막기 위해 서버 수신 시각과 5분 넘게 차이 나면 400입니다. 운영에서 과거 측정 입력은 지원하지 않습니다.
 - 응답:
@@ -408,6 +409,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 | `TOO_NOISY` | 유효 간격 쌍·유효 비율·잡음비 기준 미달 |
 - `BUILDING`에도 적격 측정은 기준선 구축에 씁니다. 7일 확보 전 HRV를 회복 판정·추천 근거로 쓰지 않습니다(IA "반영은 X"). 재측정은 컨디션 저장 후에도 같은 아침 체크에 연결하고 결과·리포트·미승인 추천을 다시 계산합니다.
 - 그날 컨디션·교란 요인을 아직 입력하지 않았다면 무교란으로 간주하지 않습니다. 컨디션 저장 전 측정은 기준선 적격일에 포함하지 않습니다.
+- **구현 해석(확인 필요)**
+  - 탈퇴 처리 중(`deletion_status ≠ ACTIVE`)인 계정의 측정 저장은 409 `INVALID_STATE`("탈퇴를 처리하고 있어요.")입니다.
+  - "미래 시각 불가"는 서버 시각보다 1초라도 늦으면 400입니다(폰 시계가 앞서면 거절될 수 있음). 정확히 5분 전까지 허용합니다.
+  - 아침 체크의 `dayIndex`는 온보딩 완료 서울 날짜를 1일차로 셉니다. 완료일 이전 날짜의 측정(자정 직전 측정 등)은 1일차로 둡니다.
 
 ### `PUT /api/morning-checks/today/condition` → 200 — ② 컨디션 체크 → 오늘 결과 계산
 ```json
@@ -434,6 +439,11 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - `excludedFromBaseline: true` → "오늘은 계산에서 빠졌어요". `phase: BUILDING`이면 `recovery`는 `status: BUILDING`이고 나머지는 null, `baseline.validDays`로 "n/7".
 - `recovery.status`: `BUILDING` `NORMAL` `LOW` `INSUFFICIENT`. `trendRmssdMs`·`normalRange`는 ln 단위 계산값을 exp로 변환한 표시값입니다([계산_정책.md](계산_정책.md) 4절).
 - 추천 문구는 AI가 5초 안에 응답하지 않으면 규칙 기반 문구로 대체합니다(측정 후 5초 안에 결과 표시).
+- 검증·접근: `score` 1~5, `alcohol`·`sick`·`caffeine`은 모두 필수(400). 접근 조건은 온보딩 → 건강정보 동의 순서(403)이며 측정 꺼짐(`hrvEnabled: false`)이어도 컨디션은 저장할 수 있습니다. 접근 조건을 요청 검증보다 먼저 봅니다.
+- 다시 저장하면 값을 바꾸고 결과를 다시 계산합니다. `completed_at`(DONE 기준)은 처음 완료한 시각을 유지합니다. 측정 저장도 그 날짜부터 회복 상태를 다시 계산하므로, 컨디션 저장 뒤 재측정하면 결과가 바뀝니다.
+- 표시값 반올림: `trendRmssdMs`·`normalRange`·`heartRateBpm`은 소수 첫째 자리, `changePct`는 저장값(소수 첫째 자리) 그대로입니다.
+- `qualityLevel`·`heartRateBpm`은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. `excludedFromBaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
+- **현재 구현 범위**: `judgment`는 null, `suggestions`는 빈 배열입니다. 2축 판단과 RECOVERY 추천은 "1~7일 컨디션 기반 추천 임계값"(14절 남은 항목)과 추천 기능이 정해진 뒤 채웁니다. 2주 연속 낮음 안전 평가도 safety 구현 후 연결합니다.
 
 ### `POST /api/morning-checks/today/breathing` → 204 — ③ 호흡 1분 완료 (건너뛰기 가능)
 ```json
@@ -578,6 +588,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 ## 11. 개발용 (local 프로필에서만)
 | 메서드 | 경로 | 내용 |
 |---|---|---|
+| POST | `/api/dev/login` | 테스트 로그인 → 204 `{ "userId": 1 }`. Google 로그인 없이 그 사용자로 세션을 만듦(로그인 없이 호출 가능, CSRF 필요). 사용자 행은 만들지 않으므로 DB에 있어야 함. 로그인 뒤 `GET /api/auth/csrf` 다시 호출 |
 | POST | `/api/dev/seed` | 4주치 시연 데이터(일정 + HRV + CBI) `{ "scenario": "DEMO_OVERLOAD" }` |
 | POST | `/api/dev/clock` | 서버 기준 날짜 이동(28일차 시연) `{ "date": "2026-12-01" }` |
 | DELETE | `/api/dev/data` | 모든 사용자 데이터 삭제 |
