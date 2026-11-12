@@ -6,8 +6,10 @@ import com.comedown.checkin.contract.MeasurementSnapshot;
 import com.comedown.recovery.contract.DailyRecoverySnapshot;
 import com.comedown.recovery.contract.RecoveryCommands;
 import com.comedown.recovery.contract.RecoveryQuery;
+import com.comedown.recovery.contract.RecoveryRange;
 import com.comedown.recovery.domain.HrvDailyState;
 import com.comedown.recovery.domain.policy.MeasurementSample;
+import com.comedown.recovery.domain.policy.RangePositionPolicy;
 import com.comedown.recovery.domain.policy.RecoveryCalculator;
 import com.comedown.recovery.domain.policy.RecoveryDayInput;
 import com.comedown.recovery.infrastructure.persistence.HrvDailyStateRepository;
@@ -66,6 +68,21 @@ public class RecoveryService implements RecoveryCommands, RecoveryQuery {
         return states.findByUserIdAndStateDateBetweenOrderByStateDateAsc(userId, from, to).stream()
                 .map(RecoveryService::toSnapshot)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RecoveryRange rangePosition(long userId, LocalDate asOf) {
+        List<Double> trends = states
+                .findByUserIdAndStateDateLessThanEqualAndTrendLnIsNotNullOrderByStateDateAsc(userId, asOf).stream()
+                .map(HrvDailyState::getTrendLn)
+                .toList();
+        if (trends.isEmpty()) {
+            return new RecoveryRange(0, null, null, null);
+        }
+        return RangePositionPolicy.evaluate(trends, trends.getLast())
+                .map(p -> new RecoveryRange(trends.size(), p.position(), p.lowLn(), p.highLn()))
+                .orElse(new RecoveryRange(trends.size(), null, null, null));
     }
 
     @Override
