@@ -143,6 +143,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 - `onboardingStep`: `PROFILE` `CBI` `LIFESTYLE` `SCHEDULE_REPORT` `DONE`.
 
 ### `POST /api/auth/logout` → 204
+세션(서버 세션 저장소 행 포함)을 끊고 `SESSION`·`XSRF-TOKEN` 쿠키를 지웁니다. CSRF 헤더가 필요합니다(없으면 403 `CSRF_TOKEN_INVALID`, 세션 유지). 이미 로그아웃된 상태여도 204입니다. 이후 `GET /api/auth/csrf`로 CSRF 쿠키를 다시 받습니다.
 
 ### `DELETE /api/me` → 204 — 회원 탈퇴
 모든 사용자 데이터·로그인 세션 및 CSRF 인증 상태를 제거합니다. 구글 토큰 철회는 실패 시 재시도합니다. 외부 정리가 진행 중이면 202 + `{ "status": "DELETING" }`, 완료 후 204. 새 로그인으로 삭제 작업을 취소하지 않습니다. Come-down이 캘린더에 넣은 일정을 지울지는 열린 항목 4.
