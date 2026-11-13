@@ -13,6 +13,7 @@ import com.comedown.cbi.infrastructure.persistence.CbiAssessmentRepository;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
 import com.comedown.shared.time.ServiceTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -44,9 +45,10 @@ public class CbiService implements CbiCommands, CbiQuery {
             throw new ApiException(ErrorCode.CBI_ALREADY_TAKEN);
         }
         CbiQuestionnaire.Score score = CbiQuestionnaire.score(command.options());
+        Instant takenAt = command.takenAt() != null ? command.takenAt() : serviceTime.now();
         CbiAssessment saved;
         try {
-            saved = assessments.saveAndFlush(CbiAssessment.of(command.userId(), round, score, serviceTime.now()));
+            saved = assessments.saveAndFlush(CbiAssessment.of(command.userId(), round, score, takenAt));
         } catch (DataIntegrityViolationException duplicate) {
             // UK(user_id, round): 동시에 들어온 같은 회차 제출
             throw new ApiException(ErrorCode.CBI_ALREADY_TAKEN);

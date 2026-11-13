@@ -626,8 +626,8 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 | 메서드 | 경로 | 내용 |
 |---|---|---|
 | POST | `/api/dev/login` | 테스트 로그인 → 204 `{ "userId": 1 }`. Google 로그인 없이 그 사용자로 세션을 만듦(로그인 없이 호출 가능, CSRF 필요). 사용자 행은 만들지 않으므로 DB에 있어야 함. 로그인 뒤 `GET /api/auth/csrf` 다시 호출 |
-| POST | `/api/dev/seed` | 4주치 시연 데이터(일정 + HRV + CBI) `{ "scenario": "DEMO_OVERLOAD" }` |
-| POST | `/api/dev/clock` | 서버 기준 날짜 이동(28일차 시연) `{ "date": "2026-12-01" }` |
+| POST | `/api/dev/seed` | 4주치 시연 데이터 → 201. 로그인한 사용자에게 넣음 `{ "scenario": "DEMO_OVERLOAD" }`. 오늘이 28일차가 되도록 온보딩 완료·건강정보 동의·측정 켜짐을 맞추고, 초기 CBI와 1~27일차 카메라 측정(합성 신호를 실제 `hrv-cam-v1`로 계산)·컨디션을 넣은 뒤 회복을 다시 계산(`recovery-v1`). 오늘 아침 체크와 28일차 CBI는 비워 둠(시연에서 직접 입력). 응답 `{ scenario, onboardingDate, today, dayIndex, seededDays, latestRecoveryStatus, cbiRounds, notSeeded }`. 사용자 행이 없거나 탈퇴 중이거나 아침 체크·CBI 기록이 이미 있으면 409 `INVALID_STATE`(기존 기록을 지우거나 덮지 않음). **현재 구현 범위**: 일정(캘린더 일정·주간 부하)은 schedule·calendar 쓰기 계약(일정축) 전까지 넣지 않음(`notSeeded: ["SCHEDULE"]`), 제안도 넣지 않음 |
+| POST | `/api/dev/clock` | 서버 기준 날짜 이동(28일차 시연) → 200 `{ "date": "2026-12-01" }`. 서울 기준 오늘만 옮기고 시각은 실제 시계를 따름. 서버 전체(모든 사용자)에 적용되고, 실제 오늘을 보내거나 서버를 다시 시작하면 원래대로 돌아감. 응답 `{ "today": "2026-12-01", "now": "2026-12-01T07:30:00+09:00", "offsetDays": 19 }`. 날짜가 없거나 형식이 틀리면 400 |
 | DELETE | `/api/dev/data` | 모든 사용자 데이터 삭제 |
 
 ## 12. 백엔드 내부 책임 연결

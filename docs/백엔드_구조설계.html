@@ -52,7 +52,8 @@
     │   │   │   ├── calendarflow/
     │   │   │   ├── reports/
     │   │   │   ├── suggestions/
-    │   │   │   └── accountlifecycle/
+    │   │   │   ├── accountlifecycle/
+    │   │   │   └── devseed/                  # local 전용 시연 데이터(기능 contract로 입력)
     │   │   ├── integration/               # Google/OpenAI 전송·직렬화·SDK
     │   │   │   ├── google/
     │   │   │   └── openai/
@@ -339,6 +340,7 @@ integration의 adapter → 그 port를 구현 + Google/OpenAI SDK
 <li><strong>홈</strong>(experience.home)은 HRV축이 조합하고 일정축은 주간 부하·PRE_START 제안 읽기 계약을 제공한다.</li>
 <li>공통 영역은 HRV축이 편집하고 일정축이 리뷰한다. 일정축이 공통 코드를 바꿔야 하면 이슈로 요청하거나 같은 PR에서 리뷰를 받는다. OAuth 로그인 설정은 <code>SecurityFilterChainContributor</code>로 account(일정축)에서 덧붙이므로 shared.security 파일을 동시에 고치지 않는다.</li>
 <li>Google 로그인 완성 전에도 HRV축이 로컬에서 API를 시험할 수 있도록 local 전용 테스트 로그인을 공통 작업으로 둔다.</li>
+<li>local 전용 시계 이동(<code>shared.time.AdjustableClock</code>)과 시연 시드(<code>experience.devseed</code>)도 공통 작업으로 HRV축이 작성한다. 시드는 각 기능 contract로만 기록을 넣고, 계정 상태는 account의 local 전용 <code>DemoAccountSetup</code> 계약(일정축 리뷰)으로 준비한다. 일정 시드(캘린더 일정·주간 부하)는 schedule·calendar 쓰기 계약이 생기면 그 계약으로 추가한다.</li>
 </ul>
 <h2>9. 구현 순서와 미확정 사항</h2>
 <ol>
