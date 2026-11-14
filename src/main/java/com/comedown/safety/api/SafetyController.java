@@ -26,10 +26,10 @@ public class SafetyController {
 
     static final String DISCLAIMER = "Come-down은 의료 서비스가 아니며 질병 유무를 판단하지 않아요.";
 
-    /** 안내 문구. LOW_RECOVERY_2W는 명세 문구, CBI_HIGH는 기획 확정 전 임시 문구. */
+    /** 안내 문구(와이어프레임 C3 문구). */
     static final Map<String, String> MESSAGES = Map.of(
             "LOW_RECOVERY_2W", "최근 2주 동안 회복이 평소보다 낮게 이어졌어요.",
-            "CBI_HIGH", "번아웃 체크에서 피로 점수가 높게 나왔어요.");
+            "CBI_HIGH", "번아웃 체크에서 많이 지쳐 있는 것으로 나왔어요.");
 
     /**
      * 지원 기관. 명세의 구조용 placeholder다. 실제 연락처·링크는 출시 전 공식 기관 정보로 확인해 verifiedAt을 기록하고,

@@ -69,7 +69,7 @@ class RecoveryReportApiIntegrationTest {
         report("").andExpect(status().isOk())
                 .andExpect(content().json("""
                         {"locked":true,"unavailableReason":null,"unlock":{"requiredDays":7,"validDays":2},
-                         "graph":null,"hrvVsUsualPct":null,"latestQuality":null,"loadVsUsualPct":null,
+                         "graph":null,"hrvVsUsualPct":null,"recoveryStatus":null,"latestQuality":null,"loadVsUsualPct":null,
                          "interpretation":null,"rangePosition":null}
                         """, JsonCompareMode.STRICT));
     }
@@ -114,6 +114,7 @@ class RecoveryReportApiIntegrationTest {
                 .andExpect(jsonPath("$.graph.normalRange.upperMs").value(47.4))
                 .andExpect(jsonPath("$.graph.loadWeeks").isEmpty())
                 .andExpect(jsonPath("$.hrvVsUsualPct").value(0.0))
+                .andExpect(jsonPath("$.recoveryStatus").value("NORMAL"))
                 .andExpect(jsonPath("$.latestQuality").value("GOOD"))
                 .andExpect(jsonPath("$.loadVsUsualPct").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.interpretation.text").value("최근 7일 회복이 평소 범위 안에 있어요. 평소와 비슷해요."))

@@ -450,11 +450,12 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
     "trendRmssdMs": 39.8,
     "normalRange": { "lowerMs": 38.1, "upperMs": 51.6 }
   },
-  "qualityLevel": "GOOD", "heartRateBpm": 61.2,
+  "qualityLevel": "GOOD", "rmssdMs": 41.0, "heartRateBpm": 61.2,
   "excludedFromBaseline": true,
   "baseline": { "validDays": 9, "required": 7, "established": true, "frozen": false },
   "conditionScore": 3,
   "judgment": "OVERLOAD_LOW",
+  "interpretation": { "text": "...", "aiGenerated": true, "fallback": false },
   "suggestions": [ "Suggestion (type RECOVERY)" ]
 }
 ```
@@ -463,9 +464,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 추천 문구는 AI가 5초 안에 응답하지 않으면 규칙 기반 문구로 대체합니다(측정 후 5초 안에 결과 표시).
 - 검증·접근: `score` 1~5, `alcohol`·`sick`·`caffeine`은 모두 필수(400). 접근 조건은 온보딩 → 건강정보 동의 순서(403)이며 측정 꺼짐(`hrvEnabled: false`)이어도 컨디션은 저장할 수 있습니다. 접근 조건을 요청 검증보다 먼저 봅니다.
 - 다시 저장하면 값을 바꾸고 결과를 다시 계산합니다. `completed_at`(DONE 기준)은 처음 완료한 시각을 유지합니다. 측정 저장도 그 날짜부터 회복 상태를 다시 계산하므로, 컨디션 저장 뒤 재측정하면 결과가 바뀝니다.
-- 표시값 반올림: `trendRmssdMs`·`normalRange`·`heartRateBpm`은 소수 첫째 자리, `changePct`는 저장값(소수 첫째 자리) 그대로입니다.
-- `qualityLevel`·`heartRateBpm`은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. `excludedFromBaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
-- **현재 구현 범위**: `judgment`는 null, `suggestions`는 빈 배열입니다. 2축 판단과 RECOVERY 추천은 "1~7일 컨디션 기반 추천 임계값"(14절 남은 항목)과 추천 기능이 정해진 뒤 채웁니다. 2주 연속 낮음 안전 평가도 safety 구현 후 연결합니다.
+- `interpretation`(B6-2 해석 한 줄, 0절 "AI 문구 표시" 모양): 기준선 확정 후(`ESTABLISHED`)에만 주고 `BUILDING`이면 null입니다(7일 확보 전 HRV로 판단하지 않음). 추천 카드의 `message`와 별개입니다.
+- 표시값 반올림: `trendRmssdMs`·`normalRange`·`rmssdMs`·`heartRateBpm`은 소수 첫째 자리, `changePct`는 저장값(소수 첫째 자리) 그대로입니다.
+- `qualityLevel`·`rmssdMs`·`heartRateBpm`은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. B6의 "HRV 41 ms"는 `rmssdMs`(소수 첫째 자리)이며 기준선 만드는 중(`BUILDING`)에도 표시용으로 줍니다(판단·추천 근거로는 쓰지 않음). 재측정해도 결과 화면 값은 마지막 측정이 아니라 대표값입니다. `excludedFromBaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
+- **현재 구현 범위**: `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`, 회복 리포트와 같은 문구)입니다. `judgment`는 null, `suggestions`는 빈 배열입니다. 2축 판단과 RECOVERY 추천은 "1~7일 컨디션 기반 추천 임계값"(14절 남은 항목)과 추천 기능이 정해진 뒤 채웁니다. 2주 연속 낮음 안전 평가도 safety 구현 후 연결합니다.
 
 ### `POST /api/morning-checks/today/breathing` → 204 — ③ 호흡 1분 완료 (건너뛰기 가능)
 ```json
@@ -497,6 +499,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
     ]
   },
   "hrvVsUsualPct": -6.0,
+  "recoveryStatus": "LOW",
   "latestQuality": "GOOD",
   "loadVsUsualPct": 18.0,
   "interpretation": { "text": "...", "aiGenerated": true, "fallback": false },
@@ -521,7 +524,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 두 그래프를 겹쳐 그리거나 위아래로 나눠 X축만 맞추는 것은 프론트 선택입니다. `normalRange`는 오늘 기준 정상 범위(요약 표시용)입니다. `loadWeeks`는 캘린더 미연결이면 빈 배열입니다.
 - `rangePosition`(dayIndex ≥ 28이면서 7일 추세 값이 20개 이상일 때): `recovery`·`load` 각각 `{ "position": 35, "low": 33.2, "high": 55.0 }`. `position` = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + `INSUFFICIENT_DATA`. 회복과 부하는 따로 계산합니다([계산_정책.md](계산_정책.md) 6절).
 - `days`는 7~90(아니면 400). 온보딩 완료 후에만 조회합니다(403). 건강정보 동의가 없으면 200 + `locked: true` + `unavailableReason: "CONSENT_REQUIRED"`이며, 잠금일 때는 `unlock` 외 항목이 null입니다.
-- 그래프 값은 ms 소수 첫째 자리입니다. `points.excluded`는 교란일, `normalRange`·`hrvVsUsualPct`는 오늘 이하 가장 최근 회복 상태 기준, `latestQuality`는 기간 안에서 가장 최근 대표 측정의 품질입니다.
+- 그래프 값은 ms 소수 첫째 자리입니다. `points.excluded`는 교란일, `normalRange`·`hrvVsUsualPct`·`recoveryStatus`는 오늘 이하 가장 최근 회복 상태 기준, `latestQuality`는 기간 안에서 가장 최근 대표 측정의 품질입니다. `recoveryStatus`(`NORMAL` `LOW` `INSUFFICIENT`)는 C1-2의 "낮음" 칩에 씁니다. %가 음수여도 `NORMAL`일 수 있으므로 칩을 %로 추측하지 않습니다.
 - `rangePosition.availableFrom` = 온보딩 완료 서울 날짜 + 27일(28일차). 공개 전이면 `recovery`·`load`가 null입니다. 공개 후 null인 항목은 `recoveryUnavailableReason`·`loadUnavailableReason`(`INSUFFICIENT_DATA`)으로 이유를 줍니다. `position`은 정수로 반올림하고 `low`·`high`는 ms 표시값입니다.
 - **현재 구현 범위**: `loadWeeks`(빈 배열)·`loadVsUsualPct`·`rangePosition.load`(null + `INSUFFICIENT_DATA`)는 schedule 읽기 계약(일정축) 전까지 비어 있습니다. `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
 
@@ -592,7 +595,8 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 조건: 회복 낮음 2주 연속(`LOW_RECOVERY_2W`) 또는 CBI 75점 이상(`CBI_HIGH`). 마이페이지 메뉴에서는 `show`와 상관없이 언제든 볼 수 있습니다.
 - 로그인만 필요합니다(온보딩 중·건강정보 동의 없이도 조회). `alerts`는 조건이 아직 풀리지 않은 안내(최신순, 닫은 안내 포함)이고, `show`는 그중 닫지 않은 안내가 있을 때 true입니다.
 - 평가 시점: `LOW_RECOVERY_2W`는 측정 저장·컨디션 저장으로 회복 상태를 다시 계산할 때마다, `CBI_HIGH`는 CBI 제출 때 평가합니다.
-- **구현 해석(확인 필요)** `CBI_HIGH`의 `message`는 기획 확정 전 임시 문구("번아웃 체크에서 피로 점수가 높게 나왔어요.")입니다. `resources`는 공식 확인 전까지 위 placeholder 1건(전화·링크 없음)을 그대로 내려줍니다.
+- `message`는 와이어프레임 C3 문구입니다: `LOW_RECOVERY_2W` "최근 2주 동안 회복이 평소보다 낮게 이어졌어요.", `CBI_HIGH` "번아웃 체크에서 많이 지쳐 있는 것으로 나왔어요."(세부 점수는 넣지 않음).
+- **구현 해석(확인 필요)** `resources`는 공식 확인 전까지 위 placeholder 1건(전화·링크 없음)을 그대로 내려줍니다.
 
 ### `POST /api/safety/alerts/{id}/acknowledge` → 204 — "닫기"
 - `LOW_RECOVERY_2W`: 최근 14일 중 대표값이 있는 날이 7일 이상이고 그 날들의 회복 상태가 모두 `LOW`. 측정하지 않은 날은 판정에서 빠집니다(낮음으로도 정상으로도 세지 않음).

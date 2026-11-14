@@ -10,9 +10,11 @@ import java.util.List;
  *
  * @param phase                BUILDING(유효 측정 7일 확보 전) / ESTABLISHED
  * @param qualityLevel         하루 대표 측정의 품질. 대표값이 없으면 null
+ * @param rmssdMs              하루 대표 측정의 HRV(RMSSD, ms). 대표값이 없으면 null. 기준선 만드는 중에도 표시용으로 준다
  * @param heartRateBpm         하루 대표 측정의 심박수. 대표값이 없으면 null
  * @param excludedFromBaseline 오늘이 '내 평소' 계산에서 빠졌는지(교란 요인·대표값 없음·컨디션 미입력)
  * @param judgment             2축 판단. 추천 임계값이 확정되기 전까지 null
+ * @param interpretation       회복 해석 한 줄. 기준선 확정 전(BUILDING)이면 null. AI 도입 전까지 규칙 기반 문구(fallback: true)
  * @param suggestions          RECOVERY 추천. 추천 구현 전까지 빈 배열
  */
 public record TodayResult(
@@ -20,11 +22,13 @@ public record TodayResult(
         String phase,
         Recovery recovery,
         String qualityLevel,
+        Double rmssdMs,
         Double heartRateBpm,
         boolean excludedFromBaseline,
         Baseline baseline,
         Integer conditionScore,
         String judgment,
+        Interpretation interpretation,
         List<Object> suggestions) {
 
     /**
@@ -37,6 +41,10 @@ public record TodayResult(
     }
 
     public record NormalRange(double lowerMs, double upperMs) {
+    }
+
+    /** API 공통 AI 문구 모양. */
+    public record Interpretation(String text, boolean aiGenerated, boolean fallback) {
     }
 
     /**

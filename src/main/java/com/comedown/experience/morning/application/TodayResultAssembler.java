@@ -4,6 +4,7 @@ import com.comedown.checkin.contract.CheckinDay;
 import com.comedown.checkin.contract.CheckinQuery;
 import com.comedown.checkin.contract.MeasurementSnapshot;
 import com.comedown.recovery.contract.DailyRecoverySnapshot;
+import com.comedown.recovery.contract.RecoveryFallbackText;
 import com.comedown.recovery.contract.RecoveryQuery;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -63,12 +64,14 @@ public class TodayResultAssembler {
                 established ? ESTABLISHED : BUILDING,
                 recovery(state),
                 state.qualityLevel(),
+                representative.map(MeasurementSnapshot::rmssdMs).map(TodayResultAssembler::round1).orElse(null),
                 representative.map(MeasurementSnapshot::meanHrBpm).map(TodayResultAssembler::round1).orElse(null),
                 !eligible,
                 new TodayResult.Baseline(state.baselineValidDays(), BASELINE_REQUIRED_DAYS, established,
                         state.baselineFrozen()),
                 day.conditionScore(),
                 null,
+                interpretation(state),
                 List.of()));
     }
 
@@ -82,6 +85,15 @@ public class TodayResultAssembler {
                 state.changePct(),
                 trend == null ? null : round1(trend),
                 new TodayResult.NormalRange(round1(state.normalLowerMs()), round1(state.normalUpperMs())));
+    }
+
+    /** 기준선 확정 후에만 회복 해석을 준다(7일 확보 전 HRV로 판단하지 않음). */
+    private static TodayResult.Interpretation interpretation(DailyRecoverySnapshot state) {
+        if (!state.baselineEstablished()) {
+            return null;
+        }
+        return new TodayResult.Interpretation(
+                RecoveryFallbackText.of(state.recoveryStatus(), state.changePct()), false, true);
     }
 
     static Double round1(Double value) {
