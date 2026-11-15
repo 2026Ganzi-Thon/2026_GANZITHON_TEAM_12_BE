@@ -65,7 +65,7 @@
 ### 요청·응답 보완 규칙
 - 모든 리소스는 로그인 사용자 소유인지 확인합니다. 다른 사용자 id는 404. 외부 Google 인증 문제는 앱 로그인 만료와 구분합니다.
 - 아래 상태 코드가 생략된 갱신 요청은 200, 본문 없는 삭제·로그아웃·동의 변경은 204입니다. 컬렉션은 빈 배열, 계산 불가 값은 null. 400의 `fieldErrors` 등 조건부 필드는 예외입니다.
-- 시각 범위는 `[start, end)`이며 start < end. 조회의 날짜 `to`는 포함하되 내부적으로 다음 날 00시 미만으로 변환합니다. 종일 일정은 `startDate`, `endDateExclusive`도 반환합니다(서울 시간 정규화). 종일 일정의 부하 가중치는 미확정이며 임의로 24시간으로 계산하지 않습니다.
+- 시각 범위는 `[start, end)`이며 start < end. 조회의 날짜 `to`는 포함하되 내부적으로 다음 날 00시 미만으로 변환합니다. 종일 일정은 `startDate`, `endDateExclusive`도 반환합니다(서울 시간 정규화). 종일 일정은 부하 시간에 넣지 않고 마감 수에만 더합니다([계산 정책](계산_정책.md) 1절).
 - `vsUsualPct`와 내 범위 위치는 분모가 0이거나 표본이 부족하면 null + `unavailableReason`(`NO_BASELINE`, `ZERO_BASELINE`, `INSUFFICIENT_DATA`, `POLICY_PENDING`)입니다. 내 범위 최고=최저인 경우도 null(`INSUFFICIENT_DATA`). 위치는 유효할 때 0~100으로 제한합니다.
 - 일정 부하(`load-v1`)·회복 계산(`recovery-v1`)·2주 연속 낮음·내 범위 위치의 산식은 [계산_정책.md](계산_정책.md)로 확정했습니다. 모든 수치는 초기값이며 결과 행의 `calculation_version`으로 버전을 남기고 실제 데이터를 보며 조정합니다. `POLICY_PENDING`/422 `CALCULATION_POLICY_PENDING`은 앞으로 새로 추가되는 미확정 정책에만 씁니다.
 - POST 측정 저장·CBI 제출·추천 생성·승인에는 `Idempotency-Key`(UUID)를 필수로 보냅니다. 사용자+작업+키를 고유하게 저장하고 본문 해시와 결과를 비교합니다. 같은 키·같은 본문은 원래 결과, 같은 키·다른 본문은 409. 키 보관은 최소 24시간입니다. 측정 재측정은 새 키입니다.

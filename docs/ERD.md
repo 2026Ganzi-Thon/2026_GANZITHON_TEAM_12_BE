@@ -367,8 +367,8 @@ erDiagram
 | vs_usual_unavailable_reason | VARCHAR(30) | Y | vs_usual_pct가 null인 이유: `ZERO_BASELINE`(직전 4주 평균 0) `INSUFFICIENT_DATA`(직전 데이터 2주 미만) |
 | deadline_count | SMALLINT | | 마감 몰림(과제 마감·시험·발표 수) |
 | late_night_count | SMALLINT | | 22시 이후 끝나거나 07시 이전 시작 |
-| weekend_hours | DECIMAL(5,1) | | |
-| rest_days | TINYINT | | 일 관련 일정이 없는 날 수(0~7) |
+| weekend_hours | DECIMAL(5,1) | | 토·일에 속한 집계 대상 일정 시간 합(겹침은 한 번만, 가중치 미적용) |
+| rest_days | TINYINT | | 집계 대상 일정(일 관련 + OTHER + 미분류, 종일 일정 제외)이 없는 날 수(0~7) |
 | risk_level | VARCHAR(10) | | 조건 점수 합: 0~1 `NONE` / 2~3 `WATCH` / 4 이상 `RISK`(위험한 주) |
 | risk_reasons | JSON | | 배열: LOAD_HIGH, DEADLINES, NO_REST_DAY, LATE_NIGHT, LONG_STREAK. 없으면 [] |
 | calculation_version | VARCHAR(30) | | 계산 정책 버전 |
