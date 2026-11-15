@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,6 +89,52 @@ class DevLoginWebLayerTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"date\":\"2026-12-01\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    // ---- 로그아웃(POST /api/auth/logout, 공통 체인) ----
+
+    @Test
+    void 로그아웃하면_204이고_세션이_끊겨_다시_로그인이_필요하다() throws Exception {
+        MockHttpSession session = login(42, new MockHttpSession());
+
+        mvc.perform(post("/api/auth/logout").session(session).with(csrf()))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().maxAge("SESSION", 0))
+                .andExpect(cookie().maxAge("XSRF-TOKEN", 0));
+
+        assertThat(session.isInvalid()).isTrue();
+        mvc.perform(get("/api/test/me").session(new MockHttpSession()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    void 로그아웃도_CSRF_토큰이_없으면_403이고_세션을_유지한다() throws Exception {
+        MockHttpSession session = login(42, new MockHttpSession());
+
+        mvc.perform(post("/api/auth/logout").session(session))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
+
+        assertThat(session.isInvalid()).isFalse();
+        mvc.perform(get("/api/test/me").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(42));
+    }
+
+    @Test
+    void 로그인하지_않았어도_로그아웃은_204() throws Exception {
+        mvc.perform(post("/api/auth/logout").with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void GET_로그아웃은_로그아웃하지_않는다() throws Exception {
+        MockHttpSession session = login(42, new MockHttpSession());
+
+        mvc.perform(get("/api/auth/logout").session(session));
+
+        assertThat(session.isInvalid()).isFalse();
     }
 
     @Test

@@ -33,8 +33,10 @@
 <li><code>dayIndex</code>: 온보딩 완료일을 1일차로 센 오늘 n일차. 온보딩 전이면 null.</li>
 <li><code>onboardingStep</code>: <code>PROFILE</code> <code>CBI</code> <code>LIFESTYLE</code> <code>SCHEDULE_REPORT</code> <code>DONE</code>.</li>
 </ul>
-</div></details><details class="endpoint" data-search="post /api/auth/logout 로그아웃 
-" data-group="g0"><summary><span class="method POST">POST</span><div><div class="path">/api/auth/logout</div><div class="description">로그아웃</div></div></summary><div class="detail-body"></div></details><details class="endpoint" data-search="delete /api/me 회원 탈퇴 모든 사용자 데이터·로그인 세션 및 csrf 인증 상태를 제거합니다. 구글 토큰 철회는 실패 시 재시도합니다. 외부 정리가 진행 중이면 202 + `{ &quot;status&quot;: &quot;deleting&quot; }`, 완료 후 204. 새 로그인으로 삭제 작업을 취소하지 않습니다. come-down이 캘린더에 넣은 일정을 지울지는 열린 항목 4.
+</div></details><details class="endpoint" data-search="post /api/auth/logout 로그아웃 세션(서버 세션 저장소 행 포함)을 끊고 `session`·`xsrf-token` 쿠키를 지웁니다. csrf 헤더가 필요합니다(없으면 403 `csrf_token_invalid`, 세션 유지). 이미 로그아웃된 상태여도 204입니다. 이후 `get /api/auth/csrf`로 csrf 쿠키를 다시 받습니다.
+
+" data-group="g0"><summary><span class="method POST">POST</span><div><div class="path">/api/auth/logout</div><div class="description">로그아웃</div></div></summary><div class="detail-body"><p>세션(서버 세션 저장소 행 포함)을 끊고 <code>SESSION</code>·<code>XSRF-TOKEN</code> 쿠키를 지웁니다. CSRF 헤더가 필요합니다(없으면 403 <code>CSRF_TOKEN_INVALID</code>, 세션 유지). 이미 로그아웃된 상태여도 204입니다. 이후 <code>GET /api/auth/csrf</code>로 CSRF 쿠키를 다시 받습니다.</p>
+</div></details><details class="endpoint" data-search="delete /api/me 회원 탈퇴 모든 사용자 데이터·로그인 세션 및 csrf 인증 상태를 제거합니다. 구글 토큰 철회는 실패 시 재시도합니다. 외부 정리가 진행 중이면 202 + `{ &quot;status&quot;: &quot;deleting&quot; }`, 완료 후 204. 새 로그인으로 삭제 작업을 취소하지 않습니다. come-down이 캘린더에 넣은 일정을 지울지는 열린 항목 4.
 
 ---
 
