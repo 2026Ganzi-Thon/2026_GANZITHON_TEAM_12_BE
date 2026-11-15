@@ -8,6 +8,7 @@ import java.util.List;
  * {@code GET /api/reports/recovery} 응답(API 명세 7절). 잠금(locked)이면 unlock 외 항목은 null이다.
  *
  * @param unavailableReason 건강정보 동의가 없으면 CONSENT_REQUIRED, 그 외 null
+ * @param recoveryStatus    오늘 이하 가장 최근 회복 상태(NORMAL·LOW·INSUFFICIENT). "낮음" 칩은 %가 아니라 이 값으로 정한다
  * @param loadVsUsualPct    이번 주 일정 부하 평소 대비. schedule 읽기 계약(일정축) 전까지 null
  * @param interpretation    회복 해석 문구. AI 도입 전까지 규칙 기반 문구(fallback: true)
  */
@@ -17,6 +18,7 @@ public record RecoveryReport(
         Unlock unlock,
         Graph graph,
         BigDecimal hrvVsUsualPct,
+        String recoveryStatus,
         String latestQuality,
         BigDecimal loadVsUsualPct,
         Interpretation interpretation,

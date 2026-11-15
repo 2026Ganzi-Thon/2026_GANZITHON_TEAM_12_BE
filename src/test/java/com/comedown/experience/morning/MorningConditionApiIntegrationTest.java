@@ -90,9 +90,9 @@ class MorningConditionApiIntegrationTest {
                 .andExpect(content().json("""
                         {"date":"2026-11-12","phase":"BUILDING",
                          "recovery":{"status":"BUILDING","changePct":null,"trendRmssdMs":null,"normalRange":null},
-                         "qualityLevel":null,"heartRateBpm":null,"excludedFromBaseline":true,
+                         "qualityLevel":null,"rmssdMs":null,"heartRateBpm":null,"excludedFromBaseline":true,
                          "baseline":{"validDays":0,"required":7,"established":false,"frozen":false},
-                         "conditionScore":3,"judgment":null,"suggestions":[]}
+                         "conditionScore":3,"judgment":null,"interpretation":null,"suggestions":[]}
                         """, JsonCompareMode.STRICT));
 
         Map<String, Object> check = jdbc.queryForMap("SELECT day_index, condition_score, alcohol, completed_at "
@@ -114,7 +114,10 @@ class MorningConditionApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.phase").value("BUILDING"))
                 .andExpect(jsonPath("$.qualityLevel").value("GOOD"))
+                // 기준선 만드는 중에도 오늘 HRV 값은 표시용으로 준다(B6-1)
+                .andExpect(jsonPath("$.rmssdMs").isNumber())
                 .andExpect(jsonPath("$.heartRateBpm").value(Matchers.closeTo(66.7, 3.0)))
+                .andExpect(jsonPath("$.interpretation").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.excludedFromBaseline").value(false))
                 .andExpect(jsonPath("$.baseline.validDays").value(1))
                 .andExpect(jsonPath("$.conditionScore").value(4));
@@ -150,9 +153,12 @@ class MorningConditionApiIntegrationTest {
                         {"date":"2026-11-12","phase":"ESTABLISHED",
                          "recovery":{"status":"NORMAL","changePct":0.0,"trendRmssdMs":42.5,
                                      "normalRange":{"lowerMs":38.2,"upperMs":47.4}},
-                         "qualityLevel":"GOOD","heartRateBpm":60.0,"excludedFromBaseline":false,
+                         "qualityLevel":"GOOD","rmssdMs":42.5,"heartRateBpm":60.0,"excludedFromBaseline":false,
                          "baseline":{"validDays":7,"required":7,"established":true,"frozen":false},
-                         "conditionScore":3,"judgment":null,"suggestions":[]}
+                         "conditionScore":3,"judgment":null,
+                         "interpretation":{"text":"최근 7일 회복이 평소 범위 안에 있어요. 평소와 비슷해요.",
+                                           "aiGenerated":false,"fallback":true},
+                         "suggestions":[]}
                         """, JsonCompareMode.STRICT));
     }
 

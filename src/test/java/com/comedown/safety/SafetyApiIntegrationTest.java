@@ -98,6 +98,16 @@ class SafetyApiIntegrationTest {
     }
 
     @Test
+    void 번아웃_고위험_안내는_C3_문구로_보여준다() throws Exception {
+        insertAlert(userId, "CBI_HIGH", null);
+
+        mvc.perform(get("/api/safety").with(loginAs(userId)))
+                .andExpect(jsonPath("$.show").value(true))
+                .andExpect(jsonPath("$.alerts[0].triggerType").value("CBI_HIGH"))
+                .andExpect(jsonPath("$.alerts[0].message").value("번아웃 체크에서 많이 지쳐 있는 것으로 나왔어요."));
+    }
+
+    @Test
     void 조건이_풀린_안내는_목록에_없다() throws Exception {
         insertAlert(userId, "CBI_HIGH", "'2026-11-11 00:00:00'");
 

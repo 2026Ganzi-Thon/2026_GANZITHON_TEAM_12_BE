@@ -4,6 +4,7 @@ import com.comedown.account.contract.AccountAccessQuery;
 import com.comedown.account.contract.HealthDataAccess;
 import com.comedown.checkin.contract.DayIndex;
 import com.comedown.recovery.contract.DailyRecoverySnapshot;
+import com.comedown.recovery.contract.RecoveryFallbackText;
 import com.comedown.recovery.contract.RecoveryQuery;
 import com.comedown.recovery.contract.RecoveryRange;
 import com.comedown.shared.error.ApiException;
@@ -91,7 +92,8 @@ public class RecoveryReportQuery {
                 .map(DailyRecoverySnapshot::qualityLevel)
                 .orElse(null);
 
-        return new RecoveryReport(false, null, unlock, graph, current.changePct(), latestQuality, null,
+        return new RecoveryReport(false, null, unlock, graph, current.changePct(), current.recoveryStatus(),
+                latestQuality, null,
                 interpretation(current), rangePosition(access, userId, today));
     }
 
@@ -109,28 +111,14 @@ public class RecoveryReportQuery {
                 recovery == null ? INSUFFICIENT_DATA : null, INSUFFICIENT_DATA);
     }
 
-    /** AI 도입 전 규칙 기반 해석 문구(사실만 전달, 진단·권고 없음). */
+    /** AI 도입 전 규칙 기반 해석 문구(recovery 소유 문구). */
     static RecoveryReport.Interpretation interpretation(DailyRecoverySnapshot current) {
-        String status = switch (current.recoveryStatus()) {
-            case "LOW" -> "최근 7일 회복이 평소 범위보다 낮아요.";
-            case "NORMAL" -> "최근 7일 회복이 평소 범위 안에 있어요.";
-            default -> "최근 7일 측정이 적어 평소와 비교하기 어려워요.";
-        };
-        BigDecimal pct = current.changePct();
-        String change = "";
-        if (pct != null) {
-            if (pct.signum() == 0) {
-                change = " 평소와 비슷해요.";
-            } else {
-                change = " 평소보다 " + pct.abs().stripTrailingZeros().toPlainString() + "% "
-                        + (pct.signum() > 0 ? "높아요." : "낮아요.");
-            }
-        }
-        return new RecoveryReport.Interpretation(status + change, false, true);
+        return new RecoveryReport.Interpretation(
+                RecoveryFallbackText.of(current.recoveryStatus(), current.changePct()), false, true);
     }
 
     private static RecoveryReport locked(String reason, RecoveryReport.Unlock unlock) {
-        return new RecoveryReport(true, reason, unlock, null, null, null, null, null, null);
+        return new RecoveryReport(true, reason, unlock, null, null, null, null, null, null, null);
     }
 
     static double round1(double value) {
