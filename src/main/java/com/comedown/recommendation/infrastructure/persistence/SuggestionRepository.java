@@ -44,6 +44,10 @@ public interface SuggestionRepository extends JpaRepository<Suggestion, Long> {
     int deleteByTypeExceptStatuses(@Param("userId") long userId, @Param("type") SuggestionType type,
             @Param("kept") Collection<SuggestionStatus> kept);
 
+    /** 제안이 참조하는 일정 id. */
+    @Query("SELECT DISTINCT s.relatedEventId FROM Suggestion s WHERE s.userId = :userId AND s.relatedEventId IS NOT NULL")
+    List<Long> findRelatedEventIds(@Param("userId") long userId);
+
     /** 일정 참조를 끊는다(캘린더 연결 해제·탈퇴: 일정을 지우기 전에). */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Suggestion s SET s.relatedEventId = NULL, s.updatedAt = :now "
@@ -73,6 +77,11 @@ public interface SuggestionRepository extends JpaRepository<Suggestion, Long> {
     /** 만료 시각이 지난 PROPOSED 제안. */
     @Query("SELECT s FROM Suggestion s WHERE s.status = :status AND s.expiresAt <= :now")
     List<Suggestion> findDue(@Param("status") SuggestionStatus status, @Param("now") Instant now);
+
+    /** 갱신된 지 오래된 승인 중 제안(오래된 순). 외부 등록 결과를 다시 확인할 대상. */
+    @Query("SELECT s FROM Suggestion s WHERE s.status = :status AND s.updatedAt <= :cutoff ORDER BY s.updatedAt, s.id")
+    List<Suggestion> findStale(@Param("status") SuggestionStatus status, @Param("cutoff") Instant cutoff,
+            org.springframework.data.domain.Pageable page);
 
     /** 같은 사용자의 [start, end)와 겹치는 다른 예약(APPROVING·APPROVED). */
     @Query("""

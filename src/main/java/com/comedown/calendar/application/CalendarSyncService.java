@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +48,8 @@ public class CalendarSyncService implements CalendarEventSync {
 
     @Override
     @Transactional
-    public SyncResult apply(long userId, InstantRange range, List<SyncedEvent> events) {
+    public SyncResult apply(long userId, InstantRange range, List<SyncedEvent> events,
+            Set<Long> referencedEventIds) {
         Instant now = time.now();
         List<CategoryOverride> rules = overrides.findAll(userId);
         Map<String, Incoming> incoming = normalize(userId, events);
@@ -90,7 +92,7 @@ public class CalendarSyncService implements CalendarEventSync {
                 .filter(e -> !incoming.containsKey(e.googleEventId()))
                 .map(StoredEvent::id).toList();
         if (!gone.isEmpty()) {
-            store.removeOrCancel(userId, gone);
+            store.removeOrCancel(userId, gone, referencedEventIds);
         }
         return new SyncResult(incoming.size(), created, updated, gone.size(), classified);
     }

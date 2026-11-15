@@ -11,8 +11,10 @@ public class ExternalServiceException extends RuntimeException {
         UNAUTHORIZED,
         /** 권한 범위가 부족하다(403 insufficient scope). */
         INSUFFICIENT_SCOPE,
-        /** 그 외 실패(네트워크, 429, 5xx 등). 재시도할 수 있다. */
-        FAILURE
+        /** 요청이 거절됐거나 실패했다고 확정된 경우(4xx 등). 재시도해도 같은 결과일 수 있다. */
+        FAILURE,
+        /** 결과를 알 수 없다(타임아웃·네트워크 오류·5xx). 쓰기 요청은 반영됐을 수 있으므로 실패로 확정하지 않는다. */
+        UNCERTAIN
     }
 
     private final Kind kind;

@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -136,6 +137,14 @@ public class SuggestionService implements SuggestionCommands, SuggestionApproval
         return toView(s);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<SuggestionView> findStaleApproving(Instant cutoff, int limit) {
+        return suggestions.findStale(SuggestionStatus.APPROVING, cutoff,
+                org.springframework.data.domain.PageRequest.of(0, limit))
+                .stream().map(SuggestionService::toView).toList();
+    }
+
     // ---------- 조회 ----------
 
     @Override
@@ -152,6 +161,12 @@ public class SuggestionService implements SuggestionCommands, SuggestionApproval
     @Transactional(readOnly = true)
     public Optional<SuggestionView> find(long userId, long suggestionId) {
         return suggestions.findByIdAndUserId(suggestionId, userId).map(SuggestionService::toView);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<Long> referencedEventIds(long userId) {
+        return Set.copyOf(suggestions.findRelatedEventIds(userId));
     }
 
     private Suggestion owned(long userId, long suggestionId) {

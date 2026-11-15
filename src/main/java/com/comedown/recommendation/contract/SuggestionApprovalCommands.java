@@ -38,4 +38,7 @@ public interface SuggestionApprovalCommands {
 
     /** Google 일정 삭제(이미 삭제된 404 포함) 후 UNDONE. */
     SuggestionView confirmUndone(long userId, long suggestionId);
+
+    /** 승인 중(APPROVING)인 채 {@code cutoff} 이전에 갱신돼 외부 결과를 다시 확인해야 하는 제안(모든 사용자, 오래된 순). */
+    java.util.List<SuggestionView> findStaleApproving(Instant cutoff, int limit);
 }

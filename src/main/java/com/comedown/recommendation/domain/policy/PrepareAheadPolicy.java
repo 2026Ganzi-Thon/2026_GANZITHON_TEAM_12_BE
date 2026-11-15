@@ -1,0 +1,75 @@
+package com.comedown.recommendation.domain.policy;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * PRE_START("미리 시작하기") 규칙. 순수 계산이며 값은 설정으로 바꿀 수 있다.
+ * <ul>
+ *   <li>대상: 위험(RISK) 주에 마감이 있는 <b>과제</b>(ASSIGNMENT) 일정. 지난 마감은 제외한다.</li>
+ *   <li>제안: 마감 일정 하나당 하나. 마감 전날부터 하루씩 거슬러 올라가며(최대 {@link #LOOKBACK_DAYS}일, 오늘까지) 빈 시간이
+ *       있는 첫 날에 {@code blockLength} 길이의 블록을 만든다.</li>
+ *   <li>하루 제안(승인 예약 포함)은 최대 {@code maxPerDay}개.</li>
+ *   <li>유효 기간: 제안 날짜가 지나기 전까지(다음 날 00:00 서울에 만료).</li>
+ * </ul>
+ */
+public final class PrepareAheadPolicy {
+
+    public static final String ASSIGNMENT_CATEGORY = "ASSIGNMENT";
+    public static final String RISK_LEVEL = "RISK";
+    public static final String REASON_CODE = "RISK_WEEK";
+    public static final String CALCULATION_VERSION = "load-v1";
+    public static final int LOOKBACK_DAYS = 7;
+    public static final Duration MIN_GAP = Duration.ofMinutes(10);
+
+    private final Duration blockLength;
+    private final int maxPerDay;
+    private final ZoneId zone;
+
+    public PrepareAheadPolicy(Duration blockLength, int maxPerDay, ZoneId zone) {
+        if (blockLength.isNegative() || blockLength.isZero() || maxPerDay < 1) {
+            throw new IllegalArgumentException("blockLength and maxPerDay must be positive");
+        }
+        this.blockLength = blockLength;
+        this.maxPerDay = maxPerDay;
+        this.zone = zone;
+    }
+
+    public Duration blockLength() {
+        return blockLength;
+    }
+
+    public int maxPerDay() {
+        return maxPerDay;
+    }
+
+    /** 제안 블록을 찾아볼 날들: 마감 전날부터 오늘까지 거슬러 올라가는 순서(최대 7일). 마감이 오늘 이전이면 비어 있다. */
+    public List<LocalDate> candidateDays(LocalDate today, LocalDate deadlineDate) {
+        List<LocalDate> days = new ArrayList<>();
+        LocalDate earliest = deadlineDate.minusDays(LOOKBACK_DAYS);
+        if (earliest.isBefore(today)) {
+            earliest = today;
+        }
+        for (LocalDate day = deadlineDate.minusDays(1); !day.isBefore(earliest); day = day.minusDays(1)) {
+            days.add(day);
+        }
+        return days;
+    }
+
+    /** 제안은 그 날짜가 지나면(다음 날 00:00 서울) 만료된다. */
+    public Instant expiresAt(LocalDate targetDate) {
+        return targetDate.plusDays(1).atStartOfDay(zone).toInstant();
+    }
+
+    public boolean isTarget(String category) {
+        return ASSIGNMENT_CATEGORY.equals(category);
+    }
+
+    public boolean isRiskWeek(String riskLevel) {
+        return RISK_LEVEL.equals(riskLevel);
+    }
+}

@@ -5,6 +5,7 @@ import com.comedown.account.contract.CalendarConnectionQuery;
 import com.comedown.calendar.contract.CalendarEventSync;
 import com.comedown.calendar.contract.SyncResult;
 import com.comedown.calendar.contract.SyncedEvent;
+import com.comedown.recommendation.contract.SuggestionQuery;
 import com.comedown.schedule.contract.WeekLoads;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
@@ -25,13 +26,15 @@ class CalendarSyncCommit {
     private final CalendarConnectionQuery connection;
     private final CalendarEventSync sync;
     private final WeekLoads weekLoads;
+    private final SuggestionQuery suggestions;
 
     CalendarSyncCommit(AccountDeletion lock, CalendarConnectionQuery connection, CalendarEventSync sync,
-            WeekLoads weekLoads) {
+            WeekLoads weekLoads, SuggestionQuery suggestions) {
         this.lock = lock;
         this.connection = connection;
         this.sync = sync;
         this.weekLoads = weekLoads;
+        this.suggestions = suggestions;
     }
 
     @Transactional
@@ -40,7 +43,8 @@ class CalendarSyncCommit {
         if (!connection.isConnected(userId)) {
             throw new ApiException(ErrorCode.CALENDAR_NOT_CONNECTED);
         }
-        SyncResult saved = sync.apply(userId, range, fetched);
+        // 제안 생성도 같은 사용자 잠금을 쓰므로, 잠금 안에서 읽은 참조 목록은 저장이 끝날 때까지 바뀌지 않는다.
+        SyncResult saved = sync.apply(userId, range, fetched, suggestions.referencedEventIds(userId));
         weekLoads.recalculate(userId, weekStarts);
         return saved;
     }

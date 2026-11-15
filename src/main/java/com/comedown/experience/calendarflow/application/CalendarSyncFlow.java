@@ -3,6 +3,7 @@ package com.comedown.experience.calendarflow.application;
 import com.comedown.account.contract.CalendarCredential;
 import com.comedown.account.contract.CalendarCredentialProvider;
 import com.comedown.calendar.contract.CalendarEventSource;
+import com.comedown.experience.suggestions.application.PreStartGenerationFlow;
 import com.comedown.calendar.contract.SyncResult;
 import com.comedown.calendar.contract.SyncedEvent;
 import com.comedown.shared.error.ApiException;
@@ -14,6 +15,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,19 +26,23 @@ import org.springframework.stereotype.Service;
 @Service
 public class CalendarSyncFlow {
 
+    private static final Logger log = LoggerFactory.getLogger(CalendarSyncFlow.class);
+
     public record Result(Instant from, Instant to, int fetched, SyncResult saved) {
     }
 
     private final CalendarCredentialProvider credentials;
     private final CalendarEventSource source;
     private final CalendarSyncCommit commit;
+    private final PreStartGenerationFlow preStart;
     private final ServiceTime time;
 
     public CalendarSyncFlow(CalendarCredentialProvider credentials, CalendarEventSource source,
-            CalendarSyncCommit commit, ServiceTime time) {
+            CalendarSyncCommit commit, PreStartGenerationFlow preStart, ServiceTime time) {
         this.credentials = credentials;
         this.source = source;
         this.commit = commit;
+        this.preStart = preStart;
         this.time = time;
     }
 
@@ -53,11 +60,24 @@ public class CalendarSyncFlow {
             throw switch (e.kind()) {
                 case UNAUTHORIZED -> new ApiException(ErrorCode.CALENDAR_REAUTH_REQUIRED);
                 case INSUFFICIENT_SCOPE -> new ApiException(ErrorCode.CALENDAR_SCOPE_MISSING);
-                case FAILURE -> new ApiException(ErrorCode.CALENDAR_API_ERROR);
+                case FAILURE, UNCERTAIN -> new ApiException(ErrorCode.CALENDAR_API_ERROR);
             };
         }
         SyncResult saved = commit.commit(userId, range, fetched, mondaysBetween(fromDate, toDate));
+        refreshSuggestions(userId);
         return new Result(range.start(), range.endExclusive(), fetched.size(), saved);
+    }
+
+    /**
+     * 동기화로 바뀐 위험 주에 맞춰 PRE_START 제안을 갱신한다. 일정 저장은 이미 커밋됐으므로 여기서 실패해도 동기화는
+     * 성공으로 응답한다(제안은 다음 동기화나 {@code POST /api/suggestions/generate}에서 다시 만든다).
+     */
+    private void refreshSuggestions(long userId) {
+        try {
+            preStart.refresh(userId);
+        } catch (RuntimeException e) {
+            log.warn("동기화 후 PRE_START 제안 갱신 실패(userId={}): {}", userId, e.getClass().getSimpleName());
+        }
     }
 
     private static LocalDate earlier(LocalDate a, LocalDate b) {
