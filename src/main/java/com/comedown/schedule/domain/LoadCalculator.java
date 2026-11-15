@@ -33,8 +33,7 @@ public final class LoadCalculator {
     private static final LocalTime NIGHT_END = LocalTime.of(7, 0);
     private static final LocalTime NIGHT_START = LocalTime.of(22, 0);
     private static final double HEAVY_FACTOR = 1.5;
-    private static final double NIGHT_FACTOR = 1.5;
-    private static final double WEEKEND_FACTOR = 1.5;
+    private static final double TIME_FACTOR = 1.5;
     private static final int PRIOR_WEEKS = 4;
     private static final int MIN_PRIOR_DATA_WEEKS = 2;
 
@@ -245,18 +244,14 @@ public final class LoadCalculator {
         return hours;
     }
 
-    /** 22시~07시, 토·일 구간 가중치. 두 조건이 겹치면 곱한다. */
+    /**
+     * 시간대 가중치: 22시~07시이거나 토·일이면 1.5배. 심야와 주말은 하나의 조건이라 둘 다 해당해도 한 번만 적용한다.
+     * 시험·발표 가중치와 겹칠 때만 곱해 최대 2.25배가 된다(docs/계산_정책.md 1절 주간 부하 점수).
+     */
     private static double timeFactor(Instant instant) {
-        ZonedDateTime local = instant.atZone(ZONE);
-        LocalTime time = local.toLocalTime();
-        double factor = 1.0;
-        if (time.isBefore(NIGHT_END) || !time.isBefore(NIGHT_START)) {
-            factor *= NIGHT_FACTOR;
-        }
-        if (isWeekend(instant)) {
-            factor *= WEEKEND_FACTOR;
-        }
-        return factor;
+        LocalTime time = instant.atZone(ZONE).toLocalTime();
+        boolean night = time.isBefore(NIGHT_END) || !time.isBefore(NIGHT_START);
+        return night || isWeekend(instant) ? TIME_FACTOR : 1.0;
     }
 
     private static boolean isWeekend(Instant instant) {
