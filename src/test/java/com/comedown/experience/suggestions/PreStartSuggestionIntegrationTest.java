@@ -301,6 +301,93 @@ class PreStartSuggestionIntegrationTest {
 
     // ---------- 도우미 ----------
 
+    @Test
+    void 재확인_때_캘린더_자격을_얻지_못해도_FAILED로_확정하지_않는다() throws Exception {
+        long user = riskUser();
+        long id = uncertainApproval(user);
+        doThrow(new ApiException(ErrorCode.CALENDAR_REAUTH_REQUIRED)).when(credentials).credentialFor(user);
+
+        assertThat(recheckJob.recheckStale()).isEqualTo(1);
+        assertThat(statusOf(id)).isEqualTo("APPROVING");
+        verify(writer, never()).register(any(), any());
+
+        // 자격이 돌아오면 같은 등록 키로 이어서 끝낸다.
+        reset(credentials);
+        when(credentials.credentialFor(anyLong())).thenReturn(new CalendarCredential("token"));
+        when(writer.register(any(), any())).thenAnswer(i -> ((CalendarEventWriter.NewEvent) i.getArgument(1))
+                .registrationKey());
+        assertThat(recheckJob.recheckStale()).isEqualTo(1);
+        assertThat(statusOf(id)).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void 재확인_때_등록이_거절돼도_이전_시도가_만든_일정이_있으면_APPROVED() throws Exception {
+        long user = riskUser();
+        long id = uncertainApproval(user);
+        String key = registrationKey(id);
+        when(writer.register(any(), any())).thenThrow(new ExternalServiceException(Kind.FAILURE, "rate limit"));
+        when(writer.exists(any(), eq(key))).thenReturn(true);
+
+        assertThat(recheckJob.recheckStale()).isEqualTo(1);
+        assertThat(statusOf(id)).isEqualTo("APPROVED");
+        assertThat(jdbc.queryForObject("SELECT google_event_id FROM suggestions WHERE id = ?", String.class, id))
+                .isEqualTo(key);
+    }
+
+    @Test
+    void 재확인_때_등록이_거절되고_일정이_없다고_확인되면_FAILED() throws Exception {
+        long user = riskUser();
+        long id = uncertainApproval(user);
+        when(writer.register(any(), any())).thenThrow(new ExternalServiceException(Kind.FAILURE, "rejected"));
+        when(writer.exists(any(), any())).thenReturn(false);
+
+        assertThat(recheckJob.recheckStale()).isEqualTo(1);
+        assertThat(statusOf(id)).isEqualTo("FAILED");
+    }
+
+    @Test
+    void 재확인_때_등록이_거절되고_일정_확인도_못_하면_APPROVING으로_둔다() throws Exception {
+        long user = riskUser();
+        long id = uncertainApproval(user);
+        when(writer.register(any(), any())).thenThrow(new ExternalServiceException(Kind.UNAUTHORIZED, "401"));
+        when(writer.exists(any(), any())).thenThrow(new ExternalServiceException(Kind.UNAUTHORIZED, "401"));
+
+        assertThat(recheckJob.recheckStale()).isEqualTo(1);
+        assertThat(statusOf(id)).isEqualTo("APPROVING");
+    }
+
+    @Test
+    void 승인_중인_제안을_다시_승인해도_확인_전에는_FAILED로_확정하지_않는다() throws Exception {
+        long user = riskUser();
+        long id = uncertainApproval(user);
+
+        // 자격을 얻지 못하면 오류는 알리되 상태는 그대로다.
+        doThrow(new ApiException(ErrorCode.CALENDAR_REAUTH_REQUIRED)).when(credentials).credentialFor(user);
+        approve(user, id, null).andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("CALENDAR_REAUTH_REQUIRED"));
+        assertThat(statusOf(id)).isEqualTo("APPROVING");
+
+        // 등록이 거절되고 일정 확인도 못 하면 확인 중(202)으로 둔다.
+        reset(credentials);
+        when(credentials.credentialFor(anyLong())).thenReturn(new CalendarCredential("token"));
+        when(writer.register(any(), any())).thenThrow(new ExternalServiceException(Kind.FAILURE, "rate limit"));
+        when(writer.exists(any(), any())).thenThrow(new ExternalServiceException(Kind.UNCERTAIN, "timeout"));
+        approve(user, id, null).andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("APPROVING"));
+        assertThat(statusOf(id)).isEqualTo("APPROVING");
+    }
+
+    /** 첫 승인이 결과를 모르는 채(202) APPROVING으로 남고, 재확인 대상이 될 만큼 시간이 지난 상태를 만든다. */
+    private long uncertainApproval(long user) throws Exception {
+        long id = suggestionId(user);
+        when(writer.register(any(), any())).thenThrow(new ExternalServiceException(Kind.UNCERTAIN, "timeout"));
+        when(writer.exists(any(), any())).thenThrow(new ExternalServiceException(Kind.UNCERTAIN, "timeout"));
+        approve(user, id, null).andExpect(status().isAccepted());
+        assertThat(statusOf(id)).isEqualTo("APPROVING");
+        clock.set(OffsetDateTime.parse(FixedClockTestConfig.DEFAULT_NOW).plusMinutes(3).toInstant());
+        reset(writer);
+        return id;
+    }
+
     private ResultActions generate(long user) throws Exception {
         return mvc.perform(post("/api/suggestions/generate").with(loginAs(user)).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"PRE_START\"}"));

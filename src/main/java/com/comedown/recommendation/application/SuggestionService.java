@@ -84,10 +84,16 @@ public class SuggestionService implements SuggestionCommands, SuggestionApproval
     @Override
     @Transactional
     public SuggestionView beginApproval(long userId, long suggestionId, Instant start, Instant end) {
+        return startApproval(userId, suggestionId, start, end).suggestion();
+    }
+
+    @Override
+    @Transactional
+    public ApprovalStart startApproval(long userId, long suggestionId, Instant start, Instant end) {
         suggestions.lockAllOfUser(userId);
         Suggestion s = owned(userId, suggestionId);
         if (s.getStatus() == SuggestionStatus.APPROVING || s.getStatus() == SuggestionStatus.APPROVED) {
-            return toView(s);
+            return new ApprovalStart(toView(s), false);
         }
         if (s.getStatus() != SuggestionStatus.PROPOSED && s.getStatus() != SuggestionStatus.FAILED) {
             throw new ApiException(ErrorCode.SUGGESTION_NOT_PROPOSED);
@@ -102,7 +108,7 @@ public class SuggestionService implements SuggestionCommands, SuggestionApproval
         } catch (IllegalArgumentException invalid) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, invalid.getMessage());
         }
-        return toView(s);
+        return new ApprovalStart(toView(s), true);
     }
 
     @Override

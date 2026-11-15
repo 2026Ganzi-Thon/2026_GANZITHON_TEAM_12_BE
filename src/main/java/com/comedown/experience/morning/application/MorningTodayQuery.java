@@ -34,9 +34,25 @@ public class MorningTodayQuery {
         this.serviceTime = serviceTime;
     }
 
-    public MorningCheckToday today(long userId, LocalDate onboardingDate) {
+    /**
+     * @param healthDataVisible 건강정보 동의가 유효한지. 아니면 측정·컨디션·기준선·결과를 기록이 없을 때와 같게 돌려주고
+     *                          건강정보가 아닌 호흡 단계만 그대로 보여준다.
+     */
+    public MorningCheckToday today(long userId, LocalDate onboardingDate, boolean healthDataVisible) {
         LocalDate today = serviceTime.today();
         Optional<CheckinDay> day = checkinQuery.findDay(userId, today);
+        if (!healthDataVisible) {
+            return new MorningCheckToday(
+                    today,
+                    DayIndex.of(onboardingDate, today),
+                    TodayResultAssembler.BUILDING,
+                    new MorningCheckToday.Steps(
+                            new MorningCheckToday.MeasurementStep(false, null, null),
+                            new MorningCheckToday.Step(false),
+                            new MorningCheckToday.Step(day.map(d -> d.breathingCompletedAt() != null).orElse(false))),
+                    new MorningCheckToday.Baseline(0, TodayResultAssembler.BASELINE_REQUIRED_DAYS),
+                    null);
+        }
         Optional<DailyRecoverySnapshot> latest = recoveryQuery.findLatestOnOrBefore(userId, today);
         boolean established = latest.map(DailyRecoverySnapshot::baselineEstablished).orElse(false);
 
