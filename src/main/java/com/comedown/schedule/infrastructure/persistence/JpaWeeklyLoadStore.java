@@ -21,6 +21,11 @@ class JpaWeeklyLoadStore implements WeeklyLoadStore {
     }
 
     @Override
+    public int deleteAll(long userId) {
+        return repository.deleteAllByUser(userId);
+    }
+
+    @Override
     public Optional<WeekLoad> find(long userId, LocalDate weekStart) {
         return repository.findById(new WeeklyLoadId(userId, weekStart)).map(JpaWeeklyLoadStore::toDomain);
     }

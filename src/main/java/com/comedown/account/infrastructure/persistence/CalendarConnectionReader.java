@@ -19,7 +19,7 @@ public class CalendarConnectionReader {
     }
 
     public boolean hasCalendarScope(long userId) {
-        Integer count = jdbc.sql("SELECT COUNT(*) FROM oauth_tokens WHERE user_id = ? AND LOCATE(?, scopes) > 0")
+        Integer count = jdbc.sql("SELECT COUNT(*) FROM oauth_tokens WHERE user_id = ? AND LOCATE(?, scopes) > 0 AND revoke_requested_at IS NULL")
                 .params(userId, CALENDAR_SCOPE_MARKER)
                 .query(Integer.class)
                 .single();

@@ -258,6 +258,7 @@
 | access_token_enc / refresh_token_enc | text | refresh는 y | aes-256-gcm 암호화 |
 | access_token_issued_at / access_token_expires_at | datetime(6) | y | |
 | scopes | varchar(1000) | | 구글이 돌려준 실제 허용 범위(공백 구분). 캘린더 범위(`…/auth/calendar.events`) 유무로 캘린더 연결을 판단. 새 refresh token이 없으면 기존 값 유지 |
+| revoke_requested_at | datetime(6) | y | 캘린더 연결 해제·탈퇴로 구글 철회를 요청한 시각. 값이 있으면 연결이 끊긴 것으로 보고(자격정보 제공·연결 판정에서 제외), 구글 철회가 끝나면 행을 지운다. 철회 실패 때 재시도하려고 암호화 토큰을 그때까지만 보관. 새 권한을 받으면 null로 돌아가고 이전 refresh token은 쓰지 않음 |
 | updated_at | datetime(6) | | |
 
 "><summary><strong>oauth_tokens</strong> <span class="muted">— 구글 토큰</span></summary><div class="content"><table>
@@ -311,6 +312,12 @@
 <td>VARCHAR(1000)</td>
 <td></td>
 <td>구글이 돌려준 실제 허용 범위(공백 구분). 캘린더 범위(<code>…/auth/calendar.events</code>) 유무로 캘린더 연결을 판단. 새 refresh token이 없으면 기존 값 유지</td>
+</tr>
+<tr>
+<td>revoke_requested_at</td>
+<td>DATETIME(6)</td>
+<td>Y</td>
+<td>캘린더 연결 해제·탈퇴로 구글 철회를 요청한 시각. 값이 있으면 연결이 끊긴 것으로 보고(자격정보 제공·연결 판정에서 제외), 구글 철회가 끝나면 행을 지운다. 철회 실패 때 재시도하려고 암호화 토큰을 그때까지만 보관. 새 권한을 받으면 null로 돌아가고 이전 refresh token은 쓰지 않음</td>
 </tr>
 <tr>
 <td>updated_at</td>

@@ -258,7 +258,11 @@ class CalendarFlowIntegrationTest {
         String sub = "calflow-" + UUID.randomUUID();
         jdbc.update("INSERT INTO users (google_sub, onboarding_step, created_at, last_login_at) "
                 + "VALUES (?, 'SCHEDULE_REPORT', '2026-09-01 00:00:00', '2026-09-01 00:00:00')", sub);
-        return jdbc.queryForObject("SELECT id FROM users WHERE google_sub = ?", Long.class, sub);
+        long id = jdbc.queryForObject("SELECT id FROM users WHERE google_sub = ?", Long.class, sub);
+        jdbc.update("INSERT INTO oauth_tokens (user_id, provider, principal_name, access_token_enc, scopes, "
+                + "updated_at) VALUES (?, 'google', ?, 'enc', 'openid https://www.googleapis.com/auth/calendar.events', "
+                + "'2026-11-11 22:30:00.000000')", id, sub);
+        return id;
     }
 
     private long eventId(long user, String googleId) {

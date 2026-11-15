@@ -119,7 +119,7 @@ class GoogleClientsTest {
 
     private final RestClient.Builder oauthBuilder = RestClient.builder();
     private final MockRestServiceServer oauthServer = MockRestServiceServer.bindTo(oauthBuilder).build();
-    private final GoogleOAuthClient oauth = new GoogleOAuthClient(oauthBuilder, "http://google.test/token", "cid", "csecret");
+    private final GoogleOAuthClient oauth = new GoogleOAuthClient(oauthBuilder, "http://google.test/token", "cid", "csecret", "http://google.test/revoke");
     private static final Instant NOW = Instant.parse("2026-11-12T00:00:00Z");
 
     @Test
@@ -155,8 +155,31 @@ class GoogleClientsTest {
     }
 
     @Test
+    void 토큰_철회는_성공과_이미_철회된_400을_끝난_것으로_보고_그_외는_FAILURE() {
+        oauthServer.expect(requestTo("http://google.test/revoke"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().string("token=r-1"))
+                .andRespond(withSuccess());
+        oauth.revoke("r-1");
+
+        oauthServer.reset();
+        oauthServer.expect(requestTo("http://google.test/revoke")).andRespond(
+                withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":\"invalid_token\"}"));
+        oauth.revoke("r-1");
+
+        oauthServer.reset();
+        oauthServer.expect(requestTo("http://google.test/revoke")).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        assertThatThrownBy(() -> oauth.revoke("secret-token")).isInstanceOfSatisfying(ExternalServiceException.class,
+                e -> {
+                    assertThat(e.kind()).isEqualTo(Kind.FAILURE);
+                    assertThat(e.getMessage()).doesNotContain("secret-token");
+                });
+    }
+
+    @Test
     void 클라이언트가_설정되지_않으면_호출하지_않고_실패한다() {
-        GoogleOAuthClient unconfigured = new GoogleOAuthClient(RestClient.builder(), "http://google.test/token", "", "");
+        GoogleOAuthClient unconfigured = new GoogleOAuthClient(RestClient.builder(), "http://google.test/token", "", "", "http://google.test/revoke");
 
         assertThatThrownBy(() -> unconfigured.refresh("r", NOW)).isInstanceOf(ExternalServiceException.class);
     }

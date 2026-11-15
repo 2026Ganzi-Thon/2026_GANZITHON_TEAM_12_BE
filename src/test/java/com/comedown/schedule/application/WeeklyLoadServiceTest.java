@@ -145,5 +145,13 @@ class WeeklyLoadServiceTest {
             rows.put(load.weekStart(), load);
             computedAt.put(load.weekStart(), at);
         }
+
+        @Override
+        public int deleteAll(long userId) {
+            int n = rows.size();
+            rows.clear();
+            computedAt.clear();
+            return n;
+        }
     }
 }

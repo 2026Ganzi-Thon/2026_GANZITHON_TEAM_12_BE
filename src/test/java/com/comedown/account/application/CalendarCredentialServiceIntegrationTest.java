@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.comedown.account.application.GoogleAccountService.TokenGrant;
 import com.comedown.account.contract.CalendarCredentialProvider;
-import com.comedown.account.contract.GoogleTokenRefresher;
 import com.comedown.account.contract.GoogleTokenRefresher.RefreshedToken;
+import com.comedown.integration.google.GoogleOAuthClient;
 import com.comedown.account.infrastructure.crypto.TokenCipher;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
@@ -53,7 +53,7 @@ class CalendarCredentialServiceIntegrationTest {
     JdbcTemplate jdbc;
 
     @MockitoBean
-    GoogleTokenRefresher google;
+    GoogleOAuthClient google;
 
     private long user(String sub) {
         return accounts.loginOrRegister(sub, null).userId();

@@ -274,6 +274,7 @@ erDiagram
 | access_token_enc / refresh_token_enc | TEXT | refresh는 Y | AES-256-GCM 암호화 |
 | access_token_issued_at / access_token_expires_at | DATETIME(6) | Y | |
 | scopes | VARCHAR(1000) | | 구글이 돌려준 실제 허용 범위(공백 구분). 캘린더 범위(`…/auth/calendar.events`) 유무로 캘린더 연결을 판단. 새 refresh token이 없으면 기존 값 유지 |
+| revoke_requested_at | DATETIME(6) | Y | 캘린더 연결 해제·탈퇴로 구글 철회를 요청한 시각. 값이 있으면 연결이 끊긴 것으로 보고(자격정보 제공·연결 판정에서 제외), 구글 철회가 끝나면 행을 지운다. 철회 실패 때 재시도하려고 암호화 토큰을 그때까지만 보관. 새 권한을 받으면 null로 돌아가고 이전 refresh token은 쓰지 않음 |
 | updated_at | DATETIME(6) | | |
 
 #### `subscriptions` — 무료 체험·구독 (1:1, MVP는 체험 기간만)

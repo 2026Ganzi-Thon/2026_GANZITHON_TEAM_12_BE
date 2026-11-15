@@ -36,17 +36,36 @@ public class GoogleTokenReader {
     public Optional<StoredTokens> find(long userId) {
         return jdbc.sql("""
                         SELECT access_token_enc, refresh_token_enc, access_token_expires_at, scopes
-                          FROM oauth_tokens WHERE user_id = ?
+                          FROM oauth_tokens WHERE user_id = ? AND revoke_requested_at IS NULL
                         """)
                 .params(userId)
-                .query((rs, n) -> {
-                    LocalDateTime expires = rs.getObject("access_token_expires_at", LocalDateTime.class);
-                    String refresh = rs.getString("refresh_token_enc");
-                    return new StoredTokens(cipher.decrypt(rs.getString("access_token_enc")),
-                            refresh == null ? null : cipher.decrypt(refresh),
-                            expires == null ? null : expires.toInstant(ZoneOffset.UTC),
-                            rs.getString("scopes"));
-                })
+                .query(this::map)
                 .optional();
+    }
+
+    /** 철회를 요청했지만 아직 구글에서 철회하지 못한 토큰. */
+    public Optional<StoredTokens> findPendingRevoke(long userId) {
+        return jdbc.sql("""
+                        SELECT access_token_enc, refresh_token_enc, access_token_expires_at, scopes
+                          FROM oauth_tokens WHERE user_id = ? AND revoke_requested_at IS NOT NULL
+                        """)
+                .params(userId)
+                .query(this::map)
+                .optional();
+    }
+
+    /** 철회를 기다리는 사용자 id(오래된 요청부터). */
+    public java.util.List<Long> usersWithPendingRevoke(int limit) {
+        return jdbc.sql("SELECT user_id FROM oauth_tokens WHERE revoke_requested_at IS NOT NULL "
+                        + "ORDER BY revoke_requested_at LIMIT ?")
+                .params(limit).query(Long.class).list();
+    }
+
+    private StoredTokens map(java.sql.ResultSet rs, int n) throws java.sql.SQLException {
+        LocalDateTime expires = rs.getObject("access_token_expires_at", LocalDateTime.class);
+        String refresh = rs.getString("refresh_token_enc");
+        return new StoredTokens(cipher.decrypt(rs.getString("access_token_enc")),
+                refresh == null ? null : cipher.decrypt(refresh),
+                expires == null ? null : expires.toInstant(ZoneOffset.UTC), rs.getString("scopes"));
     }
 }
