@@ -541,6 +541,11 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 }
 ```
 - dayIndex < 28이면 200 + `available: false`, `cbiDue: false`, `availableFrom`(온보딩 서울 날짜 + 27일), 나머지 보고서 항목은 null입니다. 28일차이나 DAY28 CBI를 아직 안 했으면 `available: false` + `"cbiDue": true` → 재응답 화면으로(`POST /api/cbi/assessments`, round `DAY28`).
+- 온보딩 완료 후에만 조회합니다(403). 응답에는 항상 `unavailableReason`이 있으며 건강정보 동의가 없으면 `CONSENT_REQUIRED`(그 외 null)입니다.
+- `cbi`: 점수는 소수 첫째 자리, `diff` = DAY28 − INITIAL. INITIAL을 건너뛰었으면 `initial`·`diff`는 null입니다.
+- `suggestions`: 1~28일차에 날짜가 걸린 제안 중 `approved` = 상태가 APPROVED인 수, `done` = "했어요"를 누른 수.
+- **구현 해석(확인 필요)** `recovery`: 첫 주 = 1~7일차, 마지막 주 = 22~28일차. 각 주에서 대표값이 있고 교란일이 아닌 날의 ln 평균을 exp로 바꾼 값(ms, 단순 RMSSD 산술 평균 아님)이며, `changePct` = (exp(마지막 주 − 첫 주) − 1) × 100입니다. 어느 한 주라도 값이 없으면 그 값과 `changePct`는 null입니다.
+- **현재 구현 범위**: `load`(schedule 읽기 계약)·`plan`(subscription 읽기 계약)은 일정축 계약 전까지 null, `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
 
 ---
 
