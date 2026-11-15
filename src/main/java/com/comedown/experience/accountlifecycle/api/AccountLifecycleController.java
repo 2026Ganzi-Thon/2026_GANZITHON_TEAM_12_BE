@@ -39,22 +39,24 @@ class AccountLifecycleController {
 
     @DeleteMapping("/api/calendar/connection")
     ResponseEntity<?> disconnectCalendar(CurrentUser user) {
-        return respond(flow.disconnectCalendar(user.id()), null);
+        return respond(flow.disconnectCalendar(user.id()));
     }
 
+    /**
+     * 탈퇴를 시작하면 로그인 세션은 바로 끊기므로, 구글 철회가 남은 202에서도 세션·CSRF 쿠키를 지운다
+     * (로그아웃과 같은 방식).
+     */
     @DeleteMapping("/api/me")
     ResponseEntity<?> withdraw(CurrentUser user, HttpServletResponse response) {
-        return respond(flow.withdraw(user.id()), response);
+        Outcome outcome = flow.withdraw(user.id());
+        response.addHeader("Set-Cookie", "SESSION=; Path=/; Max-Age=0; HttpOnly");
+        response.addHeader("Set-Cookie", "XSRF-TOKEN=; Path=/; Max-Age=0");
+        return respond(outcome);
     }
 
-    /** 탈퇴가 끝나면 세션·CSRF 쿠키도 지운다(로그아웃과 같은 방식). */
-    private static ResponseEntity<?> respond(Outcome outcome, HttpServletResponse cookiesToClear) {
+    private static ResponseEntity<?> respond(Outcome outcome) {
         if (outcome == Outcome.PENDING) {
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("status", "DELETING"));
-        }
-        if (cookiesToClear != null) {
-            cookiesToClear.addHeader("Set-Cookie", "SESSION=; Path=/; Max-Age=0; HttpOnly");
-            cookiesToClear.addHeader("Set-Cookie", "XSRF-TOKEN=; Path=/; Max-Age=0");
         }
         return ResponseEntity.noContent().build();
     }
