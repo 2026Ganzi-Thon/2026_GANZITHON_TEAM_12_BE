@@ -88,6 +88,18 @@ public class GoogleAccountWriter {
                 .update();
     }
 
+    /** 갱신한 access token만 바꾼다(refresh token·scopes는 그대로). */
+    public void updateAccessToken(long userId, String accessToken, Instant issuedAt, Instant expiresAt, Instant now) {
+        jdbc.sql("""
+                        UPDATE oauth_tokens
+                           SET access_token_enc = ?, access_token_issued_at = ?, access_token_expires_at = ?,
+                               updated_at = ?
+                         WHERE user_id = ?
+                        """)
+                .params(cipher.encrypt(accessToken), utc(issuedAt), utc(expiresAt), utc(now), userId)
+                .update();
+    }
+
     private static LocalDateTime utc(Instant instant) {
         return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
