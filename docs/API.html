@@ -1309,12 +1309,12 @@
 <tr>
 <td>POST</td>
 <td><code>/api/dev/seed</code></td>
-<td>4주치 시연 데이터(일정 + HRV + CBI) <code>{ &quot;scenario&quot;: &quot;DEMO_OVERLOAD&quot; }</code></td>
+<td>4주치 시연 데이터 → 201. 로그인한 사용자에게 넣음 <code>{ &quot;scenario&quot;: &quot;DEMO_OVERLOAD&quot; }</code>. 오늘이 28일차가 되도록 온보딩 완료·건강정보 동의·측정 켜짐을 맞추고, 초기 CBI와 1~27일차 카메라 측정(합성 신호를 실제 <code>hrv-cam-v1</code>로 계산)·컨디션을 넣은 뒤 회복을 다시 계산(<code>recovery-v1</code>). 오늘 아침 체크와 28일차 CBI는 비워 둠(시연에서 직접 입력). 응답 <code>{ scenario, onboardingDate, today, dayIndex, seededDays, latestRecoveryStatus, cbiRounds, notSeeded }</code>. 사용자 행이 없거나 탈퇴 중이거나 아침 체크·CBI 기록이 이미 있으면 409 <code>INVALID_STATE</code>(기존 기록을 지우거나 덮지 않음). <strong>현재 구현 범위</strong>: 일정(캘린더 일정·주간 부하)은 schedule·calendar 쓰기 계약(일정축) 전까지 넣지 않음(<code>notSeeded: [&quot;SCHEDULE&quot;]</code>), 제안도 넣지 않음</td>
 </tr>
 <tr>
 <td>POST</td>
 <td><code>/api/dev/clock</code></td>
-<td>서버 기준 날짜 이동(28일차 시연) <code>{ &quot;date&quot;: &quot;2026-12-01&quot; }</code></td>
+<td>서버 기준 날짜 이동(28일차 시연) → 200 <code>{ &quot;date&quot;: &quot;2026-12-01&quot; }</code>. 서울 기준 오늘만 옮기고 시각은 실제 시계를 따름. 서버 전체(모든 사용자)에 적용되고, 실제 오늘을 보내거나 서버를 다시 시작하면 원래대로 돌아감. 응답 <code>{ &quot;today&quot;: &quot;2026-12-01&quot;, &quot;now&quot;: &quot;2026-12-01T07:30:00+09:00&quot;, &quot;offsetDays&quot;: 19 }</code>. 날짜가 없거나 형식이 틀리면 400</td>
 </tr>
 <tr>
 <td>DELETE</td>
