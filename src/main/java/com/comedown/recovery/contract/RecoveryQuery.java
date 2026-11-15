@@ -15,6 +15,9 @@ public interface RecoveryQuery {
     /** from ~ to(포함) 기간의 회복 상태(날짜 오름차순). 기록 없는 날은 빠진다. */
     List<DailyRecoverySnapshot> findRange(long userId, LocalDate from, LocalDate to);
 
+    /** asOf 이하 모든 7일 추세 값으로 계산한 내 범위 중 현재 위치(현재 = 가장 최근 추세 값). */
+    RecoveryRange rangePosition(long userId, LocalDate asOf);
+
     /** date 이하에서 가장 최근 회복 상태(기준선 진행 n/7·확정 여부 표시용). 기록이 없으면 비어 있다. */
     Optional<DailyRecoverySnapshot> findLatestOnOrBefore(long userId, LocalDate date);
 

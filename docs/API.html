@@ -787,7 +787,10 @@
 
 - 두 그래프를 겹쳐 그리거나 위아래로 나눠 x축만 맞추는 것은 프론트 선택입니다. `normalrange`는 오늘 기준 정상 범위(요약 표시용)입니다. `loadweeks`는 캘린더 미연결이면 빈 배열입니다.
 - `rangeposition`(dayindex ≥ 28이면서 7일 추세 값이 20개 이상일 때): `recovery`·`load` 각각 `{ &quot;position&quot;: 35, &quot;low&quot;: 33.2, &quot;high&quot;: 55.0 }`. `position` = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + `insufficient_data`. 회복과 부하는 따로 계산합니다([계산_정책.md](계산_정책.md) 6절).
-- `days`는 7~90.
+- `days`는 7~90(아니면 400). 온보딩 완료 후에만 조회합니다(403). 건강정보 동의가 없으면 200 + `locked: true` + `unavailablereason: &quot;consent_required&quot;`이며, 잠금일 때는 `unlock` 외 항목이 null입니다.
+- 그래프 값은 ms 소수 첫째 자리입니다. `points.excluded`는 교란일, `normalrange`·`hrvvsusualpct`는 오늘 이하 가장 최근 회복 상태 기준, `latestquality`는 기간 안에서 가장 최근 대표 측정의 품질입니다.
+- `rangeposition.availablefrom` = 온보딩 완료 서울 날짜 + 27일(28일차). 공개 전이면 `recovery`·`load`가 null입니다. 공개 후 null인 항목은 `recoveryunavailablereason`·`loadunavailablereason`(`insufficient_data`)으로 이유를 줍니다. `position`은 정수로 반올림하고 `low`·`high`는 ms 표시값입니다.
+- **현재 구현 범위**: `loadweeks`(빈 배열)·`loadvsusualpct`·`rangeposition.load`(null + `insufficient_data`)는 schedule 읽기 계약(일정축) 전까지 비어 있습니다. `interpretation`은 ai 도입 전 규칙 기반 문구(`fallback: true`)입니다.
 
 " data-group="g6"><summary><span class="method GET">GET</span><div><div class="path">/api/reports/recovery?days=14</div><div class="description">회복 그래프 · 평소 대비 변화 · 해석</div></div></summary><div class="detail-body"><pre><code class="language-json">{
   &quot;locked&quot;: false,
@@ -858,7 +861,10 @@
 <ul>
 <li>두 그래프를 겹쳐 그리거나 위아래로 나눠 X축만 맞추는 것은 프론트 선택입니다. <code>normalRange</code>는 오늘 기준 정상 범위(요약 표시용)입니다. <code>loadWeeks</code>는 캘린더 미연결이면 빈 배열입니다.</li>
 <li><code>rangePosition</code>(dayIndex ≥ 28이면서 7일 추세 값이 20개 이상일 때): <code>recovery</code>·<code>load</code> 각각 <code>{ &quot;position&quot;: 35, &quot;low&quot;: 33.2, &quot;high&quot;: 55.0 }</code>. <code>position</code> = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + <code>INSUFFICIENT_DATA</code>. 회복과 부하는 따로 계산합니다(<a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a> 6절).</li>
-<li><code>days</code>는 7~90.</li>
+<li><code>days</code>는 7~90(아니면 400). 온보딩 완료 후에만 조회합니다(403). 건강정보 동의가 없으면 200 + <code>locked: true</code> + <code>unavailableReason: &quot;CONSENT_REQUIRED&quot;</code>이며, 잠금일 때는 <code>unlock</code> 외 항목이 null입니다.</li>
+<li>그래프 값은 ms 소수 첫째 자리입니다. <code>points.excluded</code>는 교란일, <code>normalRange</code>·<code>hrvVsUsualPct</code>는 오늘 이하 가장 최근 회복 상태 기준, <code>latestQuality</code>는 기간 안에서 가장 최근 대표 측정의 품질입니다.</li>
+<li><code>rangePosition.availableFrom</code> = 온보딩 완료 서울 날짜 + 27일(28일차). 공개 전이면 <code>recovery</code>·<code>load</code>가 null입니다. 공개 후 null인 항목은 <code>recoveryUnavailableReason</code>·<code>loadUnavailableReason</code>(<code>INSUFFICIENT_DATA</code>)으로 이유를 줍니다. <code>position</code>은 정수로 반올림하고 <code>low</code>·<code>high</code>는 ms 표시값입니다.</li>
+<li><strong>현재 구현 범위</strong>: <code>loadWeeks</code>(빈 배열)·<code>loadVsUsualPct</code>·<code>rangePosition.load</code>(null + <code>INSUFFICIENT_DATA</code>)는 schedule 읽기 계약(일정축) 전까지 비어 있습니다. <code>interpretation</code>은 AI 도입 전 규칙 기반 문구(<code>fallback: true</code>)입니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="get /api/reports/four-week 28일차 cbi · 회복 · 부하 비교 ```json
 {
