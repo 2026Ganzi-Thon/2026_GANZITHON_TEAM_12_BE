@@ -1,9 +1,7 @@
 package com.comedown.schedule.application;
 
 import com.comedown.calendar.contract.CalendarEventReader;
-import com.comedown.calendar.contract.CalendarEventSnapshot;
 import com.comedown.schedule.domain.LoadCalculator;
-import com.comedown.schedule.domain.LoadCategory;
 import com.comedown.schedule.domain.LoadEvent;
 import com.comedown.schedule.domain.PriorWeek;
 import com.comedown.schedule.domain.WeekLoad;
@@ -70,7 +68,7 @@ public class WeeklyLoadService {
         InstantRange range = time.dateRange(
                 weekStart.minusDays(STREAK_PADDING_DAYS), weekStart.plusDays(6L + STREAK_PADDING_DAYS));
         List<LoadEvent> loadEvents = events.findOverlapping(userId, range).stream()
-                .map(WeeklyLoadService::toLoadEvent)
+                .map(LoadEventMapper::toLoadEvent)
                 .toList();
         WeekLoad load = LoadCalculator.calculate(weekStart, loadEvents, priorWeeks(userId, weekStart));
         store.save(userId, load, time.now());
@@ -86,11 +84,5 @@ public class WeeklyLoadService {
                     .orElse(new PriorWeek(BigDecimal.ZERO, false)));
         }
         return prior;
-    }
-
-    private static LoadEvent toLoadEvent(CalendarEventSnapshot s) {
-        LoadCategory category = s.category() == null ? null : LoadCategory.valueOf(s.category());
-        return new LoadEvent(s.start(), s.end(), s.startDate(), s.endDateExclusive(), s.allDay(),
-                category, s.deadline(), s.createdByApp(), s.transparent(), s.cancelled());
     }
 }

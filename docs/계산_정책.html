@@ -149,6 +149,8 @@
 <p><strong>구현 해석(확인 필요)</strong></p>
 <ul>
 <li>주차 부하는 <code>weekly_loads</code>에 저장하지 않고 일정 원본으로 계산합니다(저장 여부는 일정축 구현 때 결정). 계약: <code>schedule.contract.ProgramWeekLoadQuery</code>.</li>
+<li>&quot;캘린더 연결&quot;은 <code>oauth_tokens.scopes</code>에 Google 캘린더 범위(<code>.../auth/calendar…</code>)가 있는지로 판단합니다(account의 <code>CalendarConnectionQuery</code>). 연결되지 않았으면 계약은 empty를 돌려줍니다.</li>
+<li>직전 주차에 집계 대상 일정이 없으면 &quot;자료 있는 주차&quot;로 세지 않습니다(Q8). 그래서 일정이 전혀 없는 사용자는 <code>ZERO_BASELINE</code>이 아니라 <code>INSUFFICIENT_DATA</code>가 됩니다.</li>
 <li>직전 4개 주차가 동기화 범위(오늘 − 1개월 또는 이번 주 월요일 − 4주 중 이른 날)보다 앞이면 그 기간 일정을 계속 보관하는지에 따라 &quot;자료 부족&quot;이 될 수 있습니다. calendar의 과거 일정 보관 기간과 함께 정해야 합니다.</li>
 </ul>
 <h3>위험 주차 (<code>risk_level</code>)</h3>

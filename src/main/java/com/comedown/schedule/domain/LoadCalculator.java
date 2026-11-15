@@ -50,6 +50,14 @@ public final class LoadCalculator {
         if (weekStart.getDayOfWeek() != ServiceTime.WEEK_START) {
             throw new IllegalArgumentException("weekStart must be a Monday: " + weekStart);
         }
+        return calculateWindow(weekStart, events, priorWeeks);
+    }
+
+    /**
+     * 시작 요일과 무관하게 {@code windowStart}부터 7일 구간의 부하를 계산한다. 온보딩 기준 n주차 같은
+     * 월~일이 아닌 주에 쓴다. 산식은 {@link #calculate}와 같고, 결과의 {@code weekStart}는 구간 시작일이다.
+     */
+    public static WeekLoad calculateWindow(LocalDate weekStart, List<LoadEvent> events, List<PriorWeek> priorWeeks) {
         if (priorWeeks.size() != PRIOR_WEEKS) {
             throw new IllegalArgumentException("priorWeeks must have " + PRIOR_WEEKS + " entries");
         }

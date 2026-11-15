@@ -345,6 +345,30 @@ class LoadCalculatorTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void 월요일이_아닌_날부터_7일_구간도_계산한다() {
+        // 목요일(11/12)부터 7일: 토요일(11/14) 낮 2시간 = 주말 가중 3.0, 수요일(11/18) 낮 1시간
+        LocalDate thursday = MON.plusDays(3);
+        List<LoadEvent> events = List.of(
+                LoadEvent.timed(at(5, 10, 0), at(5, 12, 0), LoadCategory.CLASS),
+                LoadEvent.timed(at(9, 10, 0), at(9, 11, 0), LoadCategory.CLASS),
+                LoadEvent.timed(at(10, 10, 0), at(10, 12, 0), LoadCategory.CLASS)); // 구간 밖(11/19)
+
+        WeekLoad load = LoadCalculator.calculateWindow(thursday, events, NO_HISTORY);
+
+        assertThat(load.weekStart()).isEqualTo(thursday);
+        assertThat(load.totalHours()).isEqualByComparingTo(d("3.0"));
+        assertThat(load.loadScore()).isEqualByComparingTo(d("4.0")); // 3.0 + 1.0
+        assertThat(load.weekendHours()).isEqualByComparingTo(d("2.0"));
+        assertThat(load.restDays()).isEqualTo(5);
+    }
+
+    @Test
+    void calculate는_월요일이_아니면_여전히_거부한다() {
+        assertThatThrownBy(() -> LoadCalculator.calculate(MON.plusDays(3), List.of(), NO_HISTORY))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private static LoadEvent deadline(int day) {
         return LoadEvent.allDay(MON.plusDays(day), MON.plusDays(day + 1), LoadCategory.ASSIGNMENT, true);
     }
