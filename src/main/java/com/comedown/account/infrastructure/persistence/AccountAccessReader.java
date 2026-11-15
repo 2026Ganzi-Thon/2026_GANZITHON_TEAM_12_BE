@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 public class AccountAccessReader {
 
     static final String SENSITIVE_HRV = "SENSITIVE_HRV";
+    public static final String CALENDAR = "CALENDAR";
     static final String ACTIVE = "ACTIVE";
 
     private final JdbcClient jdbc;
@@ -51,6 +52,21 @@ public class AccountAccessReader {
                             ACTIVE.equals(rs.getString("deletion_status")));
                 })
                 .optional();
+    }
+
+    /** 그 종류의 가장 최근 동의 행(agreed_at, id 순)이 철회되지 않았는지. 동의 행이 없으면 false. */
+    public boolean hasActiveConsent(long userId, String consentType) {
+        return jdbc.sql("""
+                        SELECT c.withdrawn_at IS NULL
+                          FROM user_consents c
+                         WHERE c.user_id = ? AND c.consent_type = ?
+                         ORDER BY c.agreed_at DESC, c.id DESC
+                         LIMIT 1
+                        """)
+                .params(userId, consentType)
+                .query(Boolean.class)
+                .optional()
+                .orElse(false);
     }
 
     public Optional<String> findNickname(long userId) {

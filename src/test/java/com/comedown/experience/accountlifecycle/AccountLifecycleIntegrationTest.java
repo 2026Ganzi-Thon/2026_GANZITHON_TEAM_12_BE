@@ -191,13 +191,33 @@ class AccountLifecycleIntegrationTest {
     @Test
     void 탈퇴_중_구글_철회가_실패하면_202이고_재시도가_끝낸다() throws Exception {
         long user = userWithCalendar();
+        event(user, "g1");
+        jdbc.update("INSERT INTO weekly_loads (user_id, week_start, total_hours, load_score, deadline_count, "
+                + "late_night_count, weekend_hours, rest_days, risk_level, calculation_version, computed_at) "
+                + "VALUES (?, '2026-11-09', 0, 0, 0, 0, 0, 7, 'NONE', 'load-v1', '2026-11-11 22:30:00')", user);
+        insertCbi(user);
+        @SuppressWarnings("unchecked")
+        Session session = (Session) sessions.createSession();
+        session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, String.valueOf(user));
+        saveSession(session);
         doThrow(new ExternalServiceException(Kind.FAILURE, "x")).when(google).revoke(any());
 
         mvc.perform(delete("/api/me").with(loginAs(user)).with(csrf()))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.status").value("DELETING"));
+                .andExpect(jsonPath("$.status").value("DELETING"))
+                .andExpect(header().stringValues("Set-Cookie",
+                        org.hamcrest.Matchers.hasItems(
+                                org.hamcrest.Matchers.startsWith("SESSION=; Path=/; Max-Age=0"),
+                                org.hamcrest.Matchers.startsWith("XSRF-TOKEN=; Path=/; Max-Age=0"))));
         assertThat(jdbc.queryForObject("SELECT deletion_status FROM users WHERE id = ?", String.class, user))
                 .isEqualTo("DELETING");
+
+        // 구글 철회가 남았어도 세션·건강 기록·일정은 이미 지워졌고, 철회에 쓸 토큰만 남는다.
+        assertThat(sessions.findById(session.getId())).isNull();
+        for (String table : new String[] {"calendar_events", "weekly_loads", "cbi_assessments"}) {
+            assertThat(count(table, user)).as(table).isZero();
+        }
+        assertThat(count("oauth_tokens", user)).isEqualTo(1);
 
         reset(google);
         doNothing().when(google).revoke(any());
@@ -260,6 +280,8 @@ class AccountLifecycleIntegrationTest {
         String sub = jdbc.queryForObject("SELECT google_sub FROM users WHERE id = ?", String.class, id);
         accounts.saveTokens(id, sub, new TokenGrant("access-" + id, "refresh-" + id, NOW, NOW.plusSeconds(3500),
                 Set.of("openid", CALENDAR)));
+        jdbc.update("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, 'CALENDAR', "
+                + "'2026-11-01', '2026-09-01 00:00:00')", id);
         return id;
     }
 

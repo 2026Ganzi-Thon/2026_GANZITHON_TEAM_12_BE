@@ -23,6 +23,18 @@ public interface SuggestionApprovalCommands {
      */
     SuggestionView beginApproval(long userId, long suggestionId, Instant start, Instant end);
 
+    /**
+     * 승인 시작 결과.
+     *
+     * @param started true면 이번 호출이 APPROVING으로 바꿨다(이 등록 키로 구글에 보낸 적이 없다). false면 이미
+     *                APPROVING·APPROVED였다(이전 시도가 구글에 반영됐을 수 있다).
+     */
+    record ApprovalStart(SuggestionView suggestion, boolean started) {
+    }
+
+    /** {@link #beginApproval}과 같고, 이번 호출이 승인을 시작했는지를 함께 돌려준다. 판정은 사용자 잠금 안에서 한다. */
+    ApprovalStart startApproval(long userId, long suggestionId, Instant start, Instant end);
+
     /** Google 등록 확인 후 APPROVED. */
     SuggestionView confirmApproved(long userId, long suggestionId, String googleEventId);
 
