@@ -1,6 +1,7 @@
 package com.comedown.experience.assessments.application;
 
 import com.comedown.account.contract.AccountAccessQuery;
+import com.comedown.account.contract.AccountDeletion;
 import com.comedown.account.contract.HealthDataAccess;
 import com.comedown.account.contract.OnboardingCommands;
 import com.comedown.cbi.contract.CbiCommands;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
  * CBI 제출 흐름(가입 때·28일차 공용): 접근 조건 → 회차 조건 → 재시도 키로 보호한 한 트랜잭션에서
  * cbi 저장 → safety 평가(CBI_HIGH) → (INITIAL) 온보딩 CBI 단계 전진.
  * cbi는 safety·account를 호출하지 않고 이 흐름이 결과를 넘긴다.
+ * 저장 전에 사용자 행을 잠그고 접근 조건을 다시 확인해 건강 기록 삭제·동의 철회·탈퇴와 겹치지 않게 한다.
  */
 @Service
 public class CbiSubmitFlow {
@@ -33,15 +35,18 @@ public class CbiSubmitFlow {
     static final int DAY28 = 28;
 
     private final AccountAccessQuery accountAccess;
+    private final AccountDeletion userLock;
     private final OnboardingCommands onboarding;
     private final CbiCommands cbiCommands;
     private final SafetyCommands safetyCommands;
     private final IdempotencyService idempotency;
     private final ServiceTime serviceTime;
 
-    public CbiSubmitFlow(AccountAccessQuery accountAccess, OnboardingCommands onboarding, CbiCommands cbiCommands,
-            SafetyCommands safetyCommands, IdempotencyService idempotency, ServiceTime serviceTime) {
+    public CbiSubmitFlow(AccountAccessQuery accountAccess, AccountDeletion userLock, OnboardingCommands onboarding,
+            CbiCommands cbiCommands, SafetyCommands safetyCommands, IdempotencyService idempotency,
+            ServiceTime serviceTime) {
         this.accountAccess = accountAccess;
+        this.userLock = userLock;
         this.onboarding = onboarding;
         this.cbiCommands = cbiCommands;
         this.safetyCommands = safetyCommands;
@@ -83,6 +88,9 @@ public class CbiSubmitFlow {
             String round, Map<Integer, Integer> options) {
         long userId = access.userId();
         return idempotency.execute(userId, OPERATION, idempotencyKey, request, CbiSubmitResult.class, () -> {
+            // 접근 조건 확인과 저장 사이에 동의 철회·탈퇴가 끝났을 수 있어, 사용자 행을 잠근 뒤 다시 확인한다.
+            userLock.lock(userId);
+            requireAccess(userId);
             CbiResult result = cbiCommands.submit(new SubmitCbi(userId, round, options));
             boolean show = safetyCommands.evaluateCbi(userId, result.id(), result.highRisk());
             String step = "INITIAL".equals(round) ? onboarding.completeCbiStep(userId) : access.onboardingStep();

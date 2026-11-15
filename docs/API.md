@@ -299,6 +299,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 - `todayCheck.status`: 오늘 체크가 없으면 `NOT_STARTED`, 있으나 컨디션 전이면 `IN_PROGRESS`, 컨디션까지 저장했으면 `DONE`.
 - `todaySuggestions`: 오늘 날짜(`targetDate`)의 PRE_START·RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것(시작 시각 순).
 - **구현 해석(확인 필요)** `recovery.status`·`changePct`·`baseline`은 오늘 이하에서 가장 최근 회복 상태 기준입니다(오늘 기록 전이면 어제까지 계산값). 기록이 없으면 `BUILDING`. `excludedToday`는 오늘 컨디션까지 입력했는데 적격일이 아닐 때(교란 요인·대표값 없음) true입니다.
+- **구현 해석(확인 필요)** 건강정보 동의가 유효하지 않으면(동의를 철회하고 기록을 남긴 경우 포함) `phase`·`recovery`는 기록이 없을 때와 같은 값입니다(`BUILDING`, `changePct` null, `baseline.validDays` 0, `conditionScore` null, `excludedToday` false). `todayCheck.status`는 호흡 기록이 있으면 `IN_PROGRESS`, 없으면 `NOT_STARTED`입니다(컨디션 완료 여부는 드러내지 않음). 다시 동의하면 남아 있던 기록 기준으로 돌아옵니다. `todaySuggestions`·`safety`·`thisWeekLoad`·`plan`은 동의와 무관하게 그대로입니다.
 - **현재 구현 범위**: `thisWeekLoad`는 캘린더를 동기화해 이번 주 부하가 계산되기 전까지, `plan`은 온보딩을 완료해 체험을 시작하기 전까지 null이며, `judgment`는 추천 임계값 확정 전까지 null입니다.
 
 ---
@@ -395,7 +396,8 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 }
 ```
 - 컨디션까지 끝났으면 `result`에 아래 TodayResult가 들어옵니다(다시 들어와도 결과 화면). `steps`는 화면 순서대로 measurement → condition → breathing입니다. GET은 체크 행을 만들지 않습니다. 측정·컨디션·호흡 중 첫 저장에서 생성합니다. `DONE`은 completed_at 기준이며 측정·호흡을 못 한 날도 컨디션 완료로 마칠 수 있습니다.
-- 접근 조건은 온보딩 완료(403)만 봅니다. 건강정보 동의·측정 켜짐이 없어도 조회할 수 있습니다(저장된 기록이 없을 뿐). 조회는 회복 상태를 계산하지 않습니다.
+- 접근 조건은 온보딩 완료(403)만 봅니다. 건강정보 동의·측정 켜짐이 없어도 조회할 수 있습니다. 조회는 회복 상태를 계산하지 않습니다.
+- **구현 해석(확인 필요)** 건강정보 동의가 유효하지 않으면(동의를 철회하고 기록을 남긴 경우 포함) 저장된 건강 기록을 보여주지 않습니다: `steps.measurement`·`steps.condition`은 미완료, `phase`는 `BUILDING`, `baseline.validDays`는 0, `result`는 null입니다. 건강정보가 아닌 `steps.breathing`만 그대로입니다. 다시 동의하면 남아 있던 기록이 다시 보입니다.
 - `dayIndex`는 현재 n일차(온보딩 완료 서울 날짜 = 1일차)입니다. `phase`·`baseline.validDays`는 오늘 이하의 가장 최근 회복 상태 기준이며, 기록이 없으면 `BUILDING`·0입니다.
 - **구현 해석(확인 필요)** `steps.measurement`: 보여줄 측정은 하루 대표 측정(첫 GOOD·FAIR) → 가장 최근 수동 입력(`UNVERIFIED`) → 가장 최근 측정(`RETRY`) 순입니다. `done`은 그 측정이 GOOD·FAIR·UNVERIFIED일 때 true이고, RETRY만 있으면 false + `qualityLevel: RETRY`(재측정 안내)입니다. 측정이 없으면 `measurementId`·`qualityLevel`은 null입니다.
 
@@ -587,6 +589,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - `DELETE /api/hrv/data`와 `deleteData=true`는 측정·일별 회복 상태·컨디션 및 교란 요인·CBI 응답·회복 AI 캐시·회복 기반 미승인 추천·안전 안내를 삭제하고 기준선과 카운터를 초기화합니다. morning_checks에는 호흡 완료 등 비건강 메타데이터만 남길 수 있습니다. 승인된 일정·이력의 건강 근거는 제거합니다. CBI로 이미 통과한 온보딩 단계는 되돌리지 않습니다. "건강 기록 전체 삭제"로 UI에 표시하며 사용자가 삭제 범위를 확인하게 합니다.
 - 응답: `DELETE /api/hrv/data`, `DELETE /api/me/consents/SENSITIVE_HRV[?deleteData=true]`는 204입니다(이미 철회·삭제돼 있어도 204, 재시도 안전). 캘린더 연결 해제(`DELETE /api/calendar/connection`)는 철회 요청으로 연결이 즉시 끊기고(동기화 409 `CALENDAR_NOT_CONNECTED`), 구글 철회가 끝나면 204, 아직이면 202 `{ "status": "DELETING" }`입니다. **구현 해석(확인 필요)**: 삭제하는 "미승인 제안"은 `PRE_START` 중 `APPROVING`·`APPROVED`가 아닌 것이고, 나머지 제안은 `relatedEvent`만 null로 둡니다. 구글 철회는 refresh token(없으면 access token)을 철회하므로 구글 쪽 허용 전체가 해제됩니다(캘린더만 철회하는 방식은 열린 항목). 탈퇴 마무리 시점에 승인 요청이 진행 중(`APPROVING`)이면 그 제안은 사용자와 함께 지워지고, 이미 구글에 등록된 일정은 사용자 캘린더에 남을 수 있습니다(연결 해제와 같이 Come-down이 만든 구글 일정은 지우지 않음).
 - 기능별 삭제 계약(조율은 `experience.accountlifecycle`, 한 트랜잭션): `SuggestionDataDeletion.removeHealthBasis` → `SafetyDataDeletion.deleteAll` → `CbiDataDeletion.deleteAll` → `RecoveryDataDeletion.deleteAll` → `CheckinDataDeletion.eraseHealthData` → `IdempotencyService.deleteForUser(userId, "hrv-")`·`("cbi-")`. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. 회복 AI 캐시(`ai_outputs`)는 ai 구현 때 같은 순서에 추가합니다.
+- 측정·컨디션·CBI 저장은 저장 트랜잭션에서 사용자 행을 잠근 뒤 접근 조건(탈퇴 진행 → 건강정보 동의 → 측정 켜짐)을 한 번 더 확인합니다. 건강 기록 삭제·동의 철회·탈퇴도 같은 행을 잠그므로 저장과 겹치지 않고, 요청을 받은 뒤 철회·탈퇴가 먼저 끝났다면 저장은 아무것도 쓰지 않고 403 `HRV_CONSENT_REQUIRED`(탈퇴 진행 중이면 409 `INVALID_STATE`)로 끝납니다. 동의가 유효한 채 기록만 지운 경우(`DELETE /api/hrv/data`)에는 삭제가 끝난 뒤의 저장을 새 기록으로 받습니다.
 - **구현 해석(확인 필요)** 아침 체크는 호흡 기록이 있으면 건강 필드(컨디션·교란 요인)와 `completed_at`만 비우고 남기며, 남을 것이 없는 체크는 지웁니다. "회복 기반 미승인 추천"은 RECOVERY 중 `APPROVING`·`APPROVED`가 아닌 것이며 지웁니다(`APPROVING`은 외부 등록 확인 전이라 남김). 남는 RECOVERY 제안은 "건강 근거 제거"로 `judgment_state`·`message`를 비우고 `reason_code`를 `HEALTH_DATA_DELETED`로 바꾸며, PRE_START는 `judgment_state`만 비웁니다(제목·시간·Google 일정·승인 상태는 유지). 안전 안내는 `LOW_RECOVERY_2W`·`CBI_HIGH` 모두 건강 근거이므로 지웁니다.
 - 민감정보 비동의/철회 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.
 

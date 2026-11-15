@@ -135,6 +135,50 @@ class HomeApiIntegrationTest {
     }
 
     @Test
+    void 건강정보_동의를_철회하면_남아_있는_건강_기록을_보여주지_않는다() throws Exception {
+        double[] ln = {3.60, 3.90, 3.70, 3.80, 3.65, 3.85, 3.75};
+        for (int i = 0; i < ln.length; i++) {
+            seedEligibleDay(LocalDate.of(2026, 11, 5).plusDays(i), ln[i]);
+        }
+        recoveryCommands.recalculate(userId, LocalDate.of(2026, 11, 5), LocalDate.of(2026, 11, 11));
+        jdbc.update("INSERT INTO morning_checks (user_id, check_date, day_index, breathing_completed_at, created_at) "
+                + "VALUES (?, '2026-11-12', 3, '2026-11-11 22:20:00', '2026-11-11 22:20:00')", userId);
+        condition("{\"score\":4,\"alcohol\":false,\"sick\":false,\"caffeine\":false}");
+        home().andExpect(jsonPath("$.phase").value("ESTABLISHED"))
+                .andExpect(jsonPath("$.todayCheck.status").value("DONE"))
+                .andExpect(jsonPath("$.recovery.conditionScore").value(4));
+
+        // 기록은 남기고 동의만 철회한다(deleteData 없이).
+        jdbc.update("UPDATE user_consents SET withdrawn_at = '2026-11-11 22:25:00' WHERE user_id = ?", userId);
+
+        home().andExpect(status().isOk())
+                .andExpect(jsonPath("$.phase").value("BUILDING"))
+                .andExpect(jsonPath("$.todayCheck.status").value("IN_PROGRESS")) // 호흡 기록만 드러난다
+                .andExpect(jsonPath("$.recovery.status").value("BUILDING"))
+                .andExpect(jsonPath("$.recovery.changePct").isEmpty())
+                .andExpect(jsonPath("$.recovery.baseline.validDays").value(0))
+                .andExpect(jsonPath("$.recovery.baseline.established").value(false))
+                .andExpect(jsonPath("$.recovery.conditionScore").isEmpty())
+                .andExpect(jsonPath("$.recovery.excludedToday").value(false));
+
+        // 다시 동의하면 남아 있던 기록이 다시 보인다.
+        jdbc.update("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, "
+                + "'SENSITIVE_HRV', '2026-11-01', '2026-11-11 22:28:00')", userId);
+        home().andExpect(jsonPath("$.phase").value("ESTABLISHED"))
+                .andExpect(jsonPath("$.todayCheck.status").value("DONE"))
+                .andExpect(jsonPath("$.recovery.conditionScore").value(4));
+    }
+
+    @Test
+    void 동의_없이_호흡_기록도_없으면_오늘_체크는_시작_전이다() throws Exception {
+        condition("{\"score\":4,\"alcohol\":false,\"sick\":false,\"caffeine\":false}");
+        jdbc.update("UPDATE user_consents SET withdrawn_at = '2026-11-11 22:25:00' WHERE user_id = ?", userId);
+
+        home().andExpect(jsonPath("$.todayCheck.status").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.recovery.conditionScore").isEmpty());
+    }
+
+    @Test
     void 온보딩_전이면_403() throws Exception {
         long onboarding = insertUser(null);
 
