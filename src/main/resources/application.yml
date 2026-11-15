@@ -26,5 +26,12 @@ server:
       cookie:
         http-only: true
         same-site: lax
-# OAuth 등록, CSRF, 토큰 암호화, AI 클라이언트는 shared.security / account / integration 구현 PR에서 추가한다.
+comedown:
+  google:
+    # 비어 있으면 Google 로그인·캘린더 연결 경로가 만들어지지 않는다(local은 테스트 로그인 사용).
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+  # 구글 토큰 암호화 키(Base64 32바이트). 실제 값은 환경 변수로만 둔다.
+  token-key: ${COMEDOWN_TOKEN_KEY:}
+# AI 클라이언트는 integration 구현 PR에서 추가한다.
 # Spring Session 테이블도 Flyway migration으로 만든다(initialize-schema: never).

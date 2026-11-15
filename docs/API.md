@@ -23,6 +23,8 @@
 - 구글 로그인은 세션 쿠키 방식입니다. 프론트는 토큰을 다루지 않습니다.
 - **로그인 시작**: `GET /oauth2/authorization/google`로 이동(페이지 이동, fetch 아님). 성공하면 `/`로 돌아오고, 프론트는 `GET /api/me`의 `onboardingStep`으로 화면을 정합니다.
 - **캘린더 권한 받기**(권장 흐름): 로그인 때는 기본 정보만 받고, 가입 화면에서 캘린더 동의를 체크한 뒤 `GET /oauth2/authorization/google-calendar`로 이동해 캘린더 권한을 추가로 받습니다. 성공 시 `/onboarding/cbi`로 돌아옵니다. 마이페이지 "다시 연결"도 같은 주소입니다.
+- **요청 범위**: 로그인은 `openid email`(이름·프로필은 받지 않음), 캘린더는 추가로 `https://www.googleapis.com/auth/calendar.events`(일정 읽기·쓰기)입니다. 캘린더 연결은 refresh token을 받으려고 동의 화면을 다시 띄웁니다. 구글이 돌려준 실제 허용 범위가 `oauth_tokens.scopes`에 저장되며, 여기에 캘린더 범위가 있어야 "연결됨"입니다.
+- **실패**: 로그인·권한 허용이 실패하거나 취소되면 `/?authError=true`로 돌아옵니다. 탈퇴 진행 중인 계정은 로그인할 수 없습니다.
 - **CSRF**: 앱을 처음 열 때 `GET /api/auth/csrf`를 한 번 부르면 `XSRF-TOKEN` 쿠키가 생깁니다. `POST`·`PUT`·`PATCH`·`DELETE` 요청에는 이 값을 `X-XSRF-TOKEN` 헤더에 넣습니다.
 
 ### 접근 조건
