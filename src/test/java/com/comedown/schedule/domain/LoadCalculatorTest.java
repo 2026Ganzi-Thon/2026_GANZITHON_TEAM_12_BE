@@ -99,17 +99,25 @@ class LoadCalculatorTest {
     }
 
     @Test
-    void 주말_밤은_곱해서_2점25배() {
-        WeekLoad load = calc(List.of(event(5, 22, 23, LoadCategory.CLASS)));
+    void 주말_밤이어도_시간대_가중은_한_번만_1점5배() {
+        // 토요일 05~07시: 심야이면서 주말이지만 시간대 조건은 하나다.
+        WeekLoad load = calc(List.of(event(5, 5, 7, LoadCategory.CLASS)));
 
-        assertThat(load.loadScore()).isEqualByComparingTo(d("2.3")); // 2.25 → 소수 첫째 자리 반올림
+        assertThat(load.loadScore()).isEqualByComparingTo(d("3.0")); // 2시간 × 1.5
     }
 
     @Test
-    void 시험이_주말_밤이면_세_가중치가_모두_곱해진다() {
-        WeekLoad load = calc(List.of(event(5, 22, 23, LoadCategory.EXAM)));
+    void 시험이_평일_밤이면_두_조건을_곱해_2점25배() {
+        WeekLoad load = calc(List.of(event(0, 5, 7, LoadCategory.EXAM)));
 
-        assertThat(load.loadScore()).isEqualByComparingTo(d("3.4")); // 3.375
+        assertThat(load.loadScore()).isEqualByComparingTo(d("4.5")); // 2시간 × 1.5 × 1.5
+    }
+
+    @Test
+    void 시험이_주말_밤이어도_최대_2점25배를_넘지_않는다() {
+        WeekLoad load = calc(List.of(event(5, 5, 7, LoadCategory.EXAM)));
+
+        assertThat(load.loadScore()).isEqualByComparingTo(d("4.5")); // 2시간 × 2.25 (3.375배가 아니다)
     }
 
     @Test
@@ -175,7 +183,7 @@ class LoadCalculatorTest {
         WeekLoad nextWeek = LoadCalculator.calculate(MON.plusDays(7), List.of(crossing), NO_HISTORY);
 
         assertThat(thisWeek.totalHours()).isEqualByComparingTo(d("1.0"));
-        assertThat(thisWeek.loadScore()).isEqualByComparingTo(d("2.3")); // 일요일 밤 2.25
+        assertThat(thisWeek.loadScore()).isEqualByComparingTo(d("1.5")); // 일요일 밤(시간대 가중 한 번)
         assertThat(nextWeek.totalHours()).isEqualByComparingTo(d("1.0"));
         assertThat(nextWeek.loadScore()).isEqualByComparingTo(d("1.5")); // 월요일 새벽
     }
