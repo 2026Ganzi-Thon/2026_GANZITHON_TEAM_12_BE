@@ -7,6 +7,7 @@ import com.comedown.calendar.domain.CategoryOverride;
 import com.comedown.calendar.domain.CategorySource;
 import com.comedown.calendar.domain.Classification;
 import com.comedown.calendar.domain.ClassificationResolver;
+import com.comedown.calendar.domain.RuleClassifier;
 import com.comedown.calendar.infrastructure.persistence.CalendarEventStore;
 import com.comedown.calendar.infrastructure.persistence.CategoryOverrideStore;
 import com.comedown.calendar.infrastructure.persistence.StoredEvent;
@@ -24,7 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 구글에서 읽은 일정을 저장된 일정과 맞춘다. 구글 호출은 이 트랜잭션 밖에서 끝난 뒤에 들어온다.
- * AI·규칙 분류기는 아직 없으므로 새 일정은 직접 수정 규칙만 적용받고 나머지는 미분류(가중치 1.0)로 남는다.
+ * 분류 우선순위는 직접 수정 규칙 &gt; AI &gt; 제목 규칙이다. AI 분류기는 아직 없으므로 직접 수정 규칙이 없는 일정은
+ * 제목 규칙({@link RuleClassifier})으로 분류한다. 제목은 분류와 해시 계산에만 쓰고 저장하지 않는다.
  */
 @Service
 public class CalendarSyncService implements CalendarEventSync {
@@ -64,8 +66,7 @@ public class CalendarSyncService implements CalendarEventSync {
             SyncedEvent s = in.source();
             StoredEvent row = existing.get(s.googleEventId());
             Classification stored = row == null ? null : row.classification();
-            // 분류기가 없으므로 기존 AI·규칙 분류는 그대로 두고, 직접 수정 규칙만 새로 적용한다.
-            Classification automatic = stored != null && stored.source() != CategorySource.USER ? stored : null;
+            Classification automatic = automatic(s, stored);
             Classification resolved = ClassificationResolver.resolve(
                     new com.comedown.calendar.domain.EventKeys(s.googleEventId(), s.recurringEventId(), in.titleHash()),
                     rules, stored, automatic);
@@ -95,6 +96,17 @@ public class CalendarSyncService implements CalendarEventSync {
             store.removeOrCancel(userId, gone, referencedEventIds);
         }
         return new SyncResult(incoming.size(), created, updated, gone.size(), classified);
+    }
+
+    /**
+     * 직접 수정 규칙이 없을 때 쓸 자동 분류. 저장된 AI 분류는 그대로 두고(AI &gt; 규칙), 그 외에는 지금 제목으로 규칙 분류를
+     * 다시 한다(제목이 바뀌거나 규칙표가 바뀌면 다음 동기화에서 반영된다).
+     */
+    private static Classification automatic(SyncedEvent event, Classification stored) {
+        if (stored != null && stored.source() == CategorySource.AI) {
+            return stored;
+        }
+        return RuleClassifier.classify(event.title(), event.createdByApp());
     }
 
     private Map<String, Incoming> normalize(long userId, List<SyncedEvent> events) {

@@ -419,7 +419,7 @@
 - 범위: 시작 = min(오늘 − 1개월, 이번 주 월요일 − 4주), 끝 = 이번 주 월요일 + 5주.
 - 검사 순서: 로그인(401) → 캘린더 이용 동의(409 `onboarding_step_invalid`, &quot;캘린더 이용 동의를 먼저 완료해 주세요.&quot;) → 캘린더 연결(409 `calendar_not_connected`) → 구글 조회. 동의가 없으면 구글을 부르지 않고 일정·주간 부하를 저장하지 않습니다.
 - **구현 해석(확인 필요)** 동의는 `calendar`의 가장 최근 동의가 유효한지로 판단합니다. 이 동의는 프로필 단계(`put /api/onboarding/profile`)의 필수 동의라서, 프로필 단계를 마치기 전에 캘린더 권한만 받고 동기화하는 경우에 거절됩니다. 별도 동의 오류 코드가 없어 &quot;선행 단계 미완료&quot;인 `onboarding_step_invalid`를 씁니다. `calendar` 동의의 철회 api는 없고 캘린더를 그만 쓰려면 연결 해제(`delete /api/calendar/connection`)를 씁니다.
-- **현재 구현 범위**: ai·규칙 분류기는 아직 없어 새 일정은 직접 수정 규칙이 없으면 미분류(`category: null`, 가중치 1.0)로 남습니다. `kept`는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 `cancelled`로 표시해 조회에서 뺍니다. come-down이 만든 구글 일정은 지우지 않습니다. 저장 후 pre_start 제안을 갱신하며, 갱신이 실패해도 동기화는 성공으로 응답합니다(제안은 다음 동기화나 `generate`에서 다시 만듦).
+- **현재 구현 범위**: ai 분류기는 아직 없어, 직접 수정 규칙이 없는 일정은 제목 규칙(`classify-rule-v1`, [계산 정책](계산_정책.md) 1절 &quot;일정 자동 분류&quot;)으로 분류합니다(`categorysource: rule`). 어느 규칙에도 맞지 않으면 `other`(가중치 1.0)이고, `classified`는 이번 동기화에서 분류가 새로 정해지거나 바뀐 일정 수입니다. `kept`는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 `cancelled`로 표시해 조회에서 뺍니다. come-down이 만든 구글 일정은 지우지 않습니다. 저장 후 pre_start 제안을 갱신하며, 갱신이 실패해도 동기화는 성공으로 응답합니다(제안은 다음 동기화나 `generate`에서 다시 만듦).
 - 홈·캘린더 탭에 들어올 때 마지막 동기화가 10분 넘었으면 부릅니다.
 
 " data-group="g3"><summary><span class="method POST">POST</span><div><div class="path">/api/calendar/sync</div><div class="description">구글 일정 동기화 · 분류 · 부하 갱신</div></div></summary><div class="detail-body"><p>구글에서 일정을 읽어 저장 → 분류(직접 수정 규칙 → AI → 실패 시 규칙) → 주간 부하 계산 → 과부하 대비 제안 갱신까지 한 번에 합니다.</p>
@@ -430,7 +430,7 @@
 <li>범위: 시작 = min(오늘 − 1개월, 이번 주 월요일 − 4주), 끝 = 이번 주 월요일 + 5주.</li>
 <li>검사 순서: 로그인(401) → 캘린더 이용 동의(409 <code>ONBOARDING_STEP_INVALID</code>, &quot;캘린더 이용 동의를 먼저 완료해 주세요.&quot;) → 캘린더 연결(409 <code>CALENDAR_NOT_CONNECTED</code>) → 구글 조회. 동의가 없으면 구글을 부르지 않고 일정·주간 부하를 저장하지 않습니다.</li>
 <li><strong>구현 해석(확인 필요)</strong> 동의는 <code>CALENDAR</code>의 가장 최근 동의가 유효한지로 판단합니다. 이 동의는 프로필 단계(<code>PUT /api/onboarding/profile</code>)의 필수 동의라서, 프로필 단계를 마치기 전에 캘린더 권한만 받고 동기화하는 경우에 거절됩니다. 별도 동의 오류 코드가 없어 &quot;선행 단계 미완료&quot;인 <code>ONBOARDING_STEP_INVALID</code>를 씁니다. <code>CALENDAR</code> 동의의 철회 API는 없고 캘린더를 그만 쓰려면 연결 해제(<code>DELETE /api/calendar/connection</code>)를 씁니다.</li>
-<li><strong>현재 구현 범위</strong>: AI·규칙 분류기는 아직 없어 새 일정은 직접 수정 규칙이 없으면 미분류(<code>category: null</code>, 가중치 1.0)로 남습니다. <code>kept</code>는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 <code>cancelled</code>로 표시해 조회에서 뺍니다. Come-down이 만든 구글 일정은 지우지 않습니다. 저장 후 PRE_START 제안을 갱신하며, 갱신이 실패해도 동기화는 성공으로 응답합니다(제안은 다음 동기화나 <code>generate</code>에서 다시 만듦).</li>
+<li><strong>현재 구현 범위</strong>: AI 분류기는 아직 없어, 직접 수정 규칙이 없는 일정은 제목 규칙(<code>classify-rule-v1</code>, <a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산 정책</a> 1절 &quot;일정 자동 분류&quot;)으로 분류합니다(<code>categorySource: RULE</code>). 어느 규칙에도 맞지 않으면 <code>OTHER</code>(가중치 1.0)이고, <code>classified</code>는 이번 동기화에서 분류가 새로 정해지거나 바뀐 일정 수입니다. <code>kept</code>는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 <code>cancelled</code>로 표시해 조회에서 뺍니다. Come-down이 만든 구글 일정은 지우지 않습니다. 저장 후 PRE_START 제안을 갱신하며, 갱신이 실패해도 동기화는 성공으로 응답합니다(제안은 다음 동기화나 <code>generate</code>에서 다시 만듦).</li>
 <li>홈·캘린더 탭에 들어올 때 마지막 동기화가 10분 넘었으면 부릅니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="get /api/calendar/events?from=2026-11-16&amp;to=2026-11-22 기간별 일정과 분류 조회 `{ &quot;events&quot;: [calendarevent], &quot;week&quot;: weekload }`
