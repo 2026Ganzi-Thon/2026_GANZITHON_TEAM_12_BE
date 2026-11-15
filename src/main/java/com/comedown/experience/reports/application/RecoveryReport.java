@@ -9,7 +9,8 @@ import java.util.List;
  *
  * @param unavailableReason 건강정보 동의가 없으면 CONSENT_REQUIRED, 그 외 null
  * @param recoveryStatus    오늘 이하 가장 최근 회복 상태(NORMAL·LOW·INSUFFICIENT). "낮음" 칩은 %가 아니라 이 값으로 정한다
- * @param loadVsUsualPct    이번 주 일정 부하 평소 대비. schedule 읽기 계약(일정축) 전까지 null
+ * @param loadVsUsualPct    진행 중인 n주차의 일정 부하 평소 대비(직전 4개 주차 평균 대비). 캘린더 미연결·schedule 계약
+ *                          구현(일정축) 전에는 null
  * @param interpretation    회복 해석 문구. AI 도입 전까지 규칙 기반 문구(fallback: true)
  */
 public record RecoveryReport(
@@ -28,10 +29,22 @@ public record RecoveryReport(
     }
 
     /**
-     * @param loadWeeks 주간 일정 부하 막대. schedule 읽기 계약(일정축) 전까지 빈 배열
+     * @param from      첫 주차 시작 날짜(온보딩 기준 n주차 경계)
+     * @param to        진행 중인 주차의 끝 날짜. 오늘보다 뒤일 수 있다(오늘 이후는 HRV 항목 없음)
+     * @param loadWeeks 주간 일정 부하 막대. 범위 안 주차마다 하나씩 항상 들어간다
      */
     public record Graph(LocalDate from, LocalDate to, List<Point> points, List<TrendPoint> trend,
-            List<Band> normalBand, Range normalRange, List<Object> loadWeeks) {
+            List<Band> normalBand, Range normalRange, List<LoadWeek> loadWeeks) {
+    }
+
+    /**
+     * 온보딩 기준 n주차 일정 부하 막대.
+     *
+     * @param week      n주차(1 = 1~7일차)
+     * @param current   오늘이 들어 있는 주차
+     * @param loadScore load-v1 부하 점수(소수 첫째 자리). 캘린더 미연결·schedule 계약 구현 전에는 null
+     */
+    public record LoadWeek(int week, LocalDate weekStart, LocalDate weekEnd, boolean current, Double loadScore) {
     }
 
     /** @param excluded 교란일(회색) */

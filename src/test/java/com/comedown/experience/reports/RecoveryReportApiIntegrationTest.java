@@ -86,6 +86,8 @@ class RecoveryReportApiIntegrationTest {
 
     @Test
     void 기준선_확정_후_그래프와_요약과_규칙_기반_해석을_준다() throws Exception {
+        // 서울 11-04 01:00 온보딩 → 오늘(11-12) 9일차 = 2주차(11-11~11-17)
+        jdbc.update("UPDATE users SET onboarding_completed_at = '2026-11-03 16:00:00' WHERE id = ?", userId);
         seedDay(LocalDate.of(2026, 11, 4), 3.10, true); // 교란일
         for (int i = 0; i < BASE.length; i++) {
             seedDay(LocalDate.of(2026, 11, 5).plusDays(i), BASE[i], false);
@@ -95,8 +97,9 @@ class RecoveryReportApiIntegrationTest {
         report("?days=14").andExpect(status().isOk())
                 .andExpect(jsonPath("$.locked").value(false))
                 .andExpect(jsonPath("$.unlock.validDays").value(7))
-                .andExpect(jsonPath("$.graph.from").value("2026-10-30"))
-                .andExpect(jsonPath("$.graph.to").value("2026-11-12"))
+                // 2주 = 1~2주차, 진행 중인 2주차 끝(11-17)까지
+                .andExpect(jsonPath("$.graph.from").value("2026-11-04"))
+                .andExpect(jsonPath("$.graph.to").value("2026-11-17"))
                 .andExpect(jsonPath("$.graph.points.length()").value(8))
                 .andExpect(jsonPath("$.graph.points[0].date").value("2026-11-04"))
                 .andExpect(jsonPath("$.graph.points[0].excluded").value(true))
@@ -112,7 +115,12 @@ class RecoveryReportApiIntegrationTest {
                 .andExpect(jsonPath("$.graph.normalBand[0].lowerMs").value(38.2))
                 .andExpect(jsonPath("$.graph.normalRange.lowerMs").value(38.2))
                 .andExpect(jsonPath("$.graph.normalRange.upperMs").value(47.4))
-                .andExpect(jsonPath("$.graph.loadWeeks").isEmpty())
+                // 일정축 계약 구현 전: 주차 칸은 항상 주고 부하 값만 null
+                .andExpect(content().json("""
+                        {"graph":{"loadWeeks":[
+                          {"week":1,"weekStart":"2026-11-04","weekEnd":"2026-11-10","current":false,"loadScore":null},
+                          {"week":2,"weekStart":"2026-11-11","weekEnd":"2026-11-17","current":true,"loadScore":null}]}}
+                        """))
                 .andExpect(jsonPath("$.hrvVsUsualPct").value(0.0))
                 .andExpect(jsonPath("$.recoveryStatus").value("NORMAL"))
                 .andExpect(jsonPath("$.latestQuality").value("GOOD"))
@@ -121,7 +129,7 @@ class RecoveryReportApiIntegrationTest {
                 .andExpect(jsonPath("$.interpretation.aiGenerated").value(false))
                 .andExpect(jsonPath("$.interpretation.fallback").value(true))
                 .andExpect(jsonPath("$.rangePosition.available").value(false))
-                .andExpect(jsonPath("$.rangePosition.availableFrom").value("2026-12-07"))
+                .andExpect(jsonPath("$.rangePosition.availableFrom").value("2026-12-01"))
                 .andExpect(jsonPath("$.rangePosition.recovery").value(Matchers.nullValue()));
     }
 
@@ -144,6 +152,34 @@ class RecoveryReportApiIntegrationTest {
                 .andExpect(jsonPath("$.rangePosition.recoveryUnavailableReason").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.rangePosition.load").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.rangePosition.loadUnavailableReason").value("INSUFFICIENT_DATA"));
+    }
+
+    @Test
+    void 그래프는_온보딩_기준_주차로_자르고_첫_주차보다_앞으로_가지_않는다() throws Exception {
+        long user = insertUser("2026-10-01 01:00:00"); // 서울 10-01 → 오늘 43일차 = 7주차(11-12~11-18)
+        LocalDate first = LocalDate.of(2026, 10, 1);
+        for (int i = 0; i < 8; i++) {
+            seedDayFor(user, first.plusDays(i), BASE[i % BASE.length], false);
+        }
+        recoveryCommands.recalculate(user, first, LocalDate.of(2026, 11, 11));
+
+        // 28일 → 4주차~7주차, 오늘 이후 날짜까지 포함
+        mvc.perform(get("/api/reports/recovery?days=28").with(loginAs(user)))
+                .andExpect(jsonPath("$.graph.from").value("2026-10-22"))
+                .andExpect(jsonPath("$.graph.to").value("2026-11-18"))
+                .andExpect(jsonPath("$.graph.loadWeeks.length()").value(4))
+                .andExpect(jsonPath("$.graph.loadWeeks[0].week").value(4))
+                .andExpect(jsonPath("$.graph.loadWeeks[3].week").value(7))
+                .andExpect(jsonPath("$.graph.loadWeeks[3].current").value(true));
+        // 7의 배수가 아니면 올림: 10일 → 2주
+        mvc.perform(get("/api/reports/recovery?days=10").with(loginAs(user)))
+                .andExpect(jsonPath("$.graph.from").value("2026-11-05"))
+                .andExpect(jsonPath("$.graph.loadWeeks.length()").value(2));
+        // 90일(13주)이어도 1주차보다 앞으로 가지 않음
+        mvc.perform(get("/api/reports/recovery?days=90").with(loginAs(user)))
+                .andExpect(jsonPath("$.graph.from").value("2026-10-01"))
+                .andExpect(jsonPath("$.graph.points.length()").value(8))
+                .andExpect(jsonPath("$.graph.loadWeeks.length()").value(7));
     }
 
     @Test

@@ -493,9 +493,8 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
     "normalBand": [{ "date": "2026-11-05", "lowerMs": 38.3, "upperMs": 51.2 }],
     "normalRange": { "lowerMs": 38.1, "upperMs": 51.6 },
     "loadWeeks": [
-      { "weekStart": "2026-10-26", "weekEnd": "2026-11-01", "loadScore": 41.0, "vsUsualPct": -5.0, "riskLevel": "NONE" },
-      { "weekStart": "2026-11-02", "weekEnd": "2026-11-08", "loadScore": 52.0, "vsUsualPct": 25.0, "riskLevel": "WATCH" },
-      { "weekStart": "2026-11-09", "weekEnd": "2026-11-15", "loadScore": 48.5, "vsUsualPct": 12.0, "riskLevel": "NONE" }
+      { "week": 3, "weekStart": "2026-10-30", "weekEnd": "2026-11-05", "current": false, "loadScore": 41.0 },
+      { "week": 4, "weekStart": "2026-11-06", "weekEnd": "2026-11-12", "current": true, "loadScore": 52.0 }
     ]
   },
   "hrvVsUsualPct": -6.0,
@@ -511,22 +510,25 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 }
 ```
 - 기준선 확정 전이면 200 + `locked: true` → "유효 측정 7일이 모이면 공개돼요 · {validDays}/7". 원칙적으로 7일차 체크 완료 후 공개되며 달력 일수만으로 잠금을 풀지 않습니다.
+- 예시는 온보딩 10-16(1일차), 오늘 11-12(28일차), `days=14`입니다.
 - **그래프**: HRV는 하루 단위, 일정 부하는 주 단위라 단위가 다르므로 **X축(날짜)만 공유하고 표현을 다르게** 합니다. 부하가 높은 주에 회복이 떨어졌는지를 한눈에 보기 위한 구성입니다.
+- **그래프의 주 = 온보딩 기준 n주차**(1주차 = 1~7일차, 2주차 = 8~14일차 …)입니다. 캘린더 탭·홈의 월~일 주와 다릅니다. 범위는 **진행 중인 주차를 포함한 최근 ⌈`days`/7⌉개 주차**이고 1주차보다 앞으로 가지 않습니다. 그래서 `to`는 진행 중인 주차의 끝 날짜로 오늘보다 뒤일 수 있습니다(오늘 이후 날짜에는 HRV 항목이 없음). 예: 30일차에 `days=28`이면 2~5주차(8~35일차).
 
 | 요소 | 필드 | 표현 |
 |---|---|---|
-| 날짜 축 | `from`·`to` | 서울 날짜, 오늘 포함 `days`일 |
+| 날짜 축 | `from`·`to` | 서울 날짜. 첫 주차 시작 ~ 진행 중인 주차 끝 |
 | HRV 점 | `points` | 날마다 점(하루 대표값). `excluded: true`(교란일)는 회색. 측정 없는 날은 항목 없음 |
 | 7일 평균선 | `trend` | exp(`trend_ln`). 추세가 없는 날은 항목 없음 |
 | 정상 범위 띠 | `normalBand` | 날짜별 기준선 평균 ± 1SD(ms 변환). 기준선이 매일 갱신되므로 날짜별 값 |
-| 일정 부하 막대 | `loadWeeks` | 주 단위 막대를 해당 주 월~일 폭으로 깔기. `from`~`to`와 겹치는 모든 주(첫·마지막 주는 범위 밖 날짜 포함) |
+| 일정 부하 막대 | `loadWeeks` | 주차마다 막대 하나를 `weekStart`~`weekEnd`(7일) 폭으로 깔기. 범위 안 주차마다 항상 한 항목. `current: true`(오늘이 든 주차)는 진하게. `loadScore`는 load-v1 부하 점수(소수 첫째 자리)이며 앞으로의 날짜는 이미 잡힌 일정까지만 반영 |
 
-- 두 그래프를 겹쳐 그리거나 위아래로 나눠 X축만 맞추는 것은 프론트 선택입니다. `normalRange`는 오늘 기준 정상 범위(요약 표시용)입니다. `loadWeeks`는 캘린더 미연결이면 빈 배열입니다.
+- 두 그래프를 겹쳐 그리거나 위아래로 나눠 X축만 맞추는 것은 프론트 선택입니다. `normalRange`는 오늘 기준 정상 범위(요약 표시용)입니다. 캘린더 미연결이면 `loadWeeks`의 `loadScore`와 `loadVsUsualPct`가 null입니다(주차 칸은 그대로 줌).
+- `loadVsUsualPct` = 진행 중인 주차의 부하 ÷ 직전 4개 주차 평균 − 1(%, 소수 첫째 자리). 온보딩 전 기간(0주차 이하)도 동기화된 일정으로 계산합니다. 못 구하면 null입니다([계산_정책.md](계산_정책.md) 1절 "온보딩 기준 주차 부하").
 - `rangePosition`(dayIndex ≥ 28이면서 7일 추세 값이 20개 이상일 때): `recovery`·`load` 각각 `{ "position": 35, "low": 33.2, "high": 55.0 }`. `position` = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + `INSUFFICIENT_DATA`. 회복과 부하는 따로 계산합니다([계산_정책.md](계산_정책.md) 6절).
 - `days`는 7~90(아니면 400). 온보딩 완료 후에만 조회합니다(403). 건강정보 동의가 없으면 200 + `locked: true` + `unavailableReason: "CONSENT_REQUIRED"`이며, 잠금일 때는 `unlock` 외 항목이 null입니다.
 - 그래프 값은 ms 소수 첫째 자리입니다. `points.excluded`는 교란일, `normalRange`·`hrvVsUsualPct`·`recoveryStatus`는 오늘 이하 가장 최근 회복 상태 기준, `latestQuality`는 기간 안에서 가장 최근 대표 측정의 품질입니다. `recoveryStatus`(`NORMAL` `LOW` `INSUFFICIENT`)는 C1-2의 "낮음" 칩에 씁니다. %가 음수여도 `NORMAL`일 수 있으므로 칩을 %로 추측하지 않습니다.
 - `rangePosition.availableFrom` = 온보딩 완료 서울 날짜 + 27일(28일차). 공개 전이면 `recovery`·`load`가 null입니다. 공개 후 null인 항목은 `recoveryUnavailableReason`·`loadUnavailableReason`(`INSUFFICIENT_DATA`)으로 이유를 줍니다. `position`은 정수로 반올림하고 `low`·`high`는 ms 표시값입니다.
-- **현재 구현 범위**: `loadWeeks`(빈 배열)·`loadVsUsualPct`·`rangePosition.load`(null + `INSUFFICIENT_DATA`)는 schedule 읽기 계약(일정축) 전까지 비어 있습니다. `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
+- **현재 구현 범위**: 부하 값은 schedule의 `ProgramWeekLoadQuery` 계약으로 읽으며, 일정축 구현 전에는 `loadWeeks[].loadScore`·`loadVsUsualPct`가 null입니다. `rangePosition.load`는 null + `INSUFFICIENT_DATA`입니다. `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
 
 ### `GET /api/reports/four-week` → 200 — 28일차 비교 리포트
 ```json
@@ -547,9 +549,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - dayIndex < 28이면 200 + `available: false`, `cbiDue: false`, `availableFrom`(온보딩 서울 날짜 + 27일), 나머지 보고서 항목은 null입니다. 28일차이나 DAY28 CBI를 아직 안 했으면 `available: false` + `"cbiDue": true` → 재응답 화면으로(`POST /api/cbi/assessments`, round `DAY28`).
 - 온보딩 완료 후에만 조회합니다(403). 응답에는 항상 `unavailableReason`이 있으며 건강정보 동의가 없으면 `CONSENT_REQUIRED`(그 외 null)입니다.
 - `cbi`: 점수는 소수 첫째 자리, `diff` = DAY28 − INITIAL. INITIAL을 건너뛰었으면 `initial`·`diff`는 null입니다.
+- `load`: 온보딩 기준 1주차(1~7일차)와 4주차(22~28일차)의 일정 부하 평소 대비(각 주차의 직전 4개 주차 평균 대비, %). 못 구한 값은 null, 캘린더 미연결이면 `load`가 null입니다.
 - `suggestions`: 1~28일차에 날짜가 걸린 제안 중 `approved` = 상태가 APPROVED인 수, `done` = "했어요"를 누른 수.
 - **구현 해석(확인 필요)** `recovery`: 첫 주 = 1~7일차, 마지막 주 = 22~28일차. 각 주에서 대표값이 있고 교란일이 아닌 날의 ln 평균을 exp로 바꾼 값(ms, 단순 RMSSD 산술 평균 아님)이며, `changePct` = (exp(마지막 주 − 첫 주) − 1) × 100입니다. 어느 한 주라도 값이 없으면 그 값과 `changePct`는 null입니다.
-- **현재 구현 범위**: `load`(schedule 읽기 계약)·`plan`(subscription 읽기 계약)은 일정축 계약 전까지 null, `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
+- **현재 구현 범위**: `load`는 schedule의 `ProgramWeekLoadQuery` 계약 구현(일정축) 전까지, `plan`(subscription 읽기 계약)은 일정축 계약 전까지 null, `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
 
 ---
 
