@@ -13,7 +13,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
- * 측정 저장 흐름: 재시도 키로 보호한 한 트랜잭션에서 checkin 저장 → 그 날짜부터 회복 재계산 → 응답 조합.
+ * 측정 저장 흐름: 재시도 키로 보호한 한 트랜잭션에서 checkin 저장 → 그 날짜부터 회복 재계산 → 2주 연속 낮음 안전 평가
+ * → 응답 조합.
  * 컨디션 저장 뒤의 재측정도 같은 체크에 연결되고, 그날 이후 회복 상태가 다시 계산된다.
  * <p>
  * 아직 하지 않는 일: 미승인 RECOVERY 추천 재계산(추천 구현 후 연결).
@@ -26,13 +27,15 @@ public class MeasurementSaveFlow {
 
     private final MeasurementCommands measurementCommands;
     private final RecoveryCommands recoveryCommands;
+    private final LowRecoverySafetyCheck lowRecoverySafety;
     private final IdempotencyService idempotency;
     private final ServiceTime serviceTime;
 
     public MeasurementSaveFlow(MeasurementCommands measurementCommands, RecoveryCommands recoveryCommands,
-            IdempotencyService idempotency, ServiceTime serviceTime) {
+            LowRecoverySafetyCheck lowRecoverySafety, IdempotencyService idempotency, ServiceTime serviceTime) {
         this.measurementCommands = measurementCommands;
         this.recoveryCommands = recoveryCommands;
+        this.lowRecoverySafety = lowRecoverySafety;
         this.idempotency = idempotency;
         this.serviceTime = serviceTime;
     }
@@ -45,6 +48,7 @@ public class MeasurementSaveFlow {
         return idempotency.execute(userId, OPERATION, idempotencyKey, request, MeasurementSaveResult.class, () -> {
             RecordedMeasurement recorded = record(userId, onboardingDate, measurement);
             recoveryCommands.recalculate(userId, recorded.checkDate(), serviceTime.today());
+            lowRecoverySafety.evaluate(userId);
             return IdempotentResponse.of(201, toResult(recorded));
         });
     }
