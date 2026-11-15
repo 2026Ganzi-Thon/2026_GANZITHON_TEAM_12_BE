@@ -393,6 +393,7 @@
   &quot;fetched&quot;: 52, &quot;kept&quot;: 48, &quot;created&quot;: 3, &quot;updated&quot;: 1, &quot;deleted&quot;: 0, &quot;classified&quot;: 4 }
 ```
 - 범위: 시작 = min(오늘 − 1개월, 이번 주 월요일 − 4주), 끝 = 이번 주 월요일 + 5주.
+- **현재 구현 범위**: ai·규칙 분류기와 pre_start 갱신은 아직 없어 새 일정은 직접 수정 규칙이 없으면 미분류(`category: null`, 가중치 1.0)로 남습니다. `kept`는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 `cancelled`로 표시해 조회에서 뺍니다. come-down이 만든 구글 일정은 지우지 않습니다.
 - 홈·캘린더 탭에 들어올 때 마지막 동기화가 10분 넘었으면 부릅니다.
 
 " data-group="g3"><summary><span class="method POST">POST</span><div><div class="path">/api/calendar/sync</div><div class="description">구글 일정 동기화 · 분류 · 부하 갱신</div></div></summary><div class="detail-body"><p>구글에서 일정을 읽어 저장 → 분류(직접 수정 규칙 → AI → 실패 시 규칙) → 주간 부하 계산 → 과부하 대비 제안 갱신까지 한 번에 합니다.</p>
@@ -401,6 +402,7 @@
 </code></pre>
 <ul>
 <li>범위: 시작 = min(오늘 − 1개월, 이번 주 월요일 − 4주), 끝 = 이번 주 월요일 + 5주.</li>
+<li><strong>현재 구현 범위</strong>: AI·규칙 분류기와 PRE_START 갱신은 아직 없어 새 일정은 직접 수정 규칙이 없으면 미분류(<code>category: null</code>, 가중치 1.0)로 남습니다. <code>kept</code>는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 <code>cancelled</code>로 표시해 조회에서 뺍니다. Come-down이 만든 구글 일정은 지우지 않습니다.</li>
 <li>홈·캘린더 탭에 들어올 때 마지막 동기화가 10분 넘었으면 부릅니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="get /api/calendar/events?from=2026-11-16&amp;to=2026-11-22 기간별 일정과 분류 조회 `{ &quot;events&quot;: [calendarevent], &quot;week&quot;: weekload }`
