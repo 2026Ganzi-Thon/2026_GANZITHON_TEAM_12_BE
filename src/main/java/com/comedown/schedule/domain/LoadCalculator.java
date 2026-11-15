@@ -143,6 +143,41 @@ public final class LoadCalculator {
                 List.copyOf(reasons), VERSION);
     }
 
+    /**
+     * 임의 기간 {@code [from, toExclusive)}의 요약(일정 리포트의 "지난 한 달"). 시간·쉬는 날·늦은 밤·마감 집계 규칙은
+     * 주간 계산과 같고, 부하 점수·위험 판정·평소 대비는 내지 않는다.
+     */
+    public static PeriodSummary summarize(LocalDate from, LocalDate toExclusive, List<LoadEvent> events) {
+        List<LoadEvent> counted = events.stream().filter(LoadEvent::isCounted).toList();
+        List<LoadEvent> timed = counted.stream().filter(e -> !e.allDay()).toList();
+        Hours hours = weightedHours(from, toExclusive, timed);
+        int deadlineCount = 0;
+        int lateNightCount = 0;
+        int eventCount = 0;
+        for (LoadEvent event : counted) {
+            LocalDate eventDate = event.allDay() ? event.startDate() : toDate(event.start());
+            if (eventDate.isBefore(from) || !eventDate.isBefore(toExclusive)) {
+                continue;
+            }
+            eventCount++;
+            if (event.isDeadlineEvent()) {
+                deadlineCount++;
+            }
+            if (!event.allDay() && isLateNight(event)) {
+                lateNightCount++;
+            }
+        }
+        TreeSet<LocalDate> eventDays = eventDays(timed);
+        int restDays = 0;
+        for (LocalDate day = from; day.isBefore(toExclusive); day = day.plusDays(1)) {
+            if (!eventDays.contains(day)) {
+                restDays++;
+            }
+        }
+        return new PeriodSummary(from, toExclusive.minusDays(1), round1(hours.totalSeconds / 3600.0),
+                round1(hours.weekendSeconds / 3600.0), deadlineCount, lateNightCount, restDays, eventCount);
+    }
+
     private static int loadHighPoints(BigDecimal vsUsualPct) {
         // vs_usual이 null이면 0점(정책 Q10 임시 해석).
         if (vsUsualPct == null) {

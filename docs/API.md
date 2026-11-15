@@ -256,6 +256,8 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 }
 ```
 - `enoughData: false`면 일정이 너무 적은 경우 → 빈 상태 화면.
+- 캘린더가 연결되지 않았으면 409 `CALENDAR_NOT_CONNECTED`. 동기화 전이면 `syncedAt`·`thisWeek`는 null, `upcomingWeeks`는 빈 배열입니다.
+- **구현 해석(확인 필요)**: `pastMonth` = [오늘 − 1개월, 어제]이며 집계 규칙은 주간 부하와 같고, `enoughData` = 그 기간에 집계 대상 일정이 1건 이상입니다. "너무 적은" 기준 수는 확정되면 갱신합니다.
 - 과부하 대비 제안은 `GET /api/suggestions?type=PRE_START`로 따로 받습니다.
 
 ### `POST /api/onboarding/complete` → 200 — A5 "홈으로"
