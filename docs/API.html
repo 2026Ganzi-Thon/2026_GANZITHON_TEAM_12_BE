@@ -41,13 +41,15 @@
 
 " data-group="g0"><summary><span class="method POST">POST</span><div><div class="path">/api/auth/logout</div><div class="description">로그아웃</div></div></summary><div class="detail-body"><p>세션(서버 세션 저장소 행 포함)을 끊고 <code>SESSION</code>·<code>XSRF-TOKEN</code> 쿠키를 지웁니다. CSRF 헤더가 필요합니다(없으면 403 <code>CSRF_TOKEN_INVALID</code>, 세션 유지). 이미 로그아웃된 상태여도 204입니다. 이후 <code>GET /api/auth/csrf</code>로 CSRF 쿠키를 다시 받습니다.</p>
 </div></details><details class="endpoint" data-search="delete /api/me 회원 탈퇴 모든 사용자 데이터·로그인 세션 및 csrf 인증 상태를 제거합니다. 구글 토큰 철회는 실패 시 재시도합니다. 외부 정리가 진행 중이면 202 + `{ &quot;status&quot;: &quot;deleting&quot; }`, 완료 후 204. 새 로그인으로 삭제 작업을 취소하지 않습니다. come-down이 캘린더에 넣은 일정을 지울지는 열린 항목 4.
-- **현재 구현 범위**: 구글 철회가 성공하면(이미 철회된 토큰 포함) 제안의 일정 참조 해제 → 일정·분류 규칙·주간 부하 → 세션 → 사용자 순으로 한 트랜잭션에서 지웁니다. 철회가 실패하면 202이고, `deleting` 표시와 암호화 토큰이 남아 재시도 작업(기본 5분)이나 같은 api 재호출이 이어서 끝냅니다. 끝나면 `session`·`xsrf-token` 쿠키를 지우는 204입니다. come-down이 만든 구글 일정은 지우지 않습니다(열린 항목 4).
+- **현재 구현 범위**: 탈퇴를 시작하면 한 트랜잭션에서 `deleting` 표시 → 구글 철회 요청 → 건강 기록 → 제안의 일정 참조 해제·일정·분류 규칙·주간 부하 → 로그인 세션을 지웁니다. 이어서 구글 철회가 성공하면(이미 철회된 토큰 포함) 사용자 행을 지우고(동의·설정·구독·남은 제안은 fk cascade) 204입니다. 철회가 실패하면 202이며, 이때도 세션과 위 데이터는 이미 지워졌고 `session`·`xsrf-token` 쿠키도 지웁니다(204와 같음). `deleting` 표시된 사용자 행과 철회에 필요한 암호화 토큰이 남아 재시도 작업(기본 5분)이 이어서 끝내며, 그동안 같은 구글 계정으로 로그인할 수 없습니다. come-down이 만든 구글 일정은 지우지 않습니다(열린 항목 4).
+- **구현 해석(확인 필요)** 202 동안 남는 것은 사용자 행(닉네임·이메일·구글 계정 식별자)과 그에 딸린 동의 기록·생활 정보 설정·구독·승인 이력, 구글 철회용 암호화 토큰입니다. 건강 기록·일정·세션은 구글 철회를 기다리지 않고 지웁니다. 남는 항목까지 즉시 지우려면 철회용 토큰을 사용자 행과 분리해 보관해야 하며(스키마 변경), 필요하면 따로 정합니다.
 
 ---
 
 " data-group="g0"><summary><span class="method DELETE">DELETE</span><div><div class="path">/api/me</div><div class="description">회원 탈퇴</div></div></summary><div class="detail-body"><p>모든 사용자 데이터·로그인 세션 및 CSRF 인증 상태를 제거합니다. 구글 토큰 철회는 실패 시 재시도합니다. 외부 정리가 진행 중이면 202 + <code>{ &quot;status&quot;: &quot;DELETING&quot; }</code>, 완료 후 204. 새 로그인으로 삭제 작업을 취소하지 않습니다. Come-down이 캘린더에 넣은 일정을 지울지는 열린 항목 4.</p>
 <ul>
-<li><strong>현재 구현 범위</strong>: 구글 철회가 성공하면(이미 철회된 토큰 포함) 제안의 일정 참조 해제 → 일정·분류 규칙·주간 부하 → 세션 → 사용자 순으로 한 트랜잭션에서 지웁니다. 철회가 실패하면 202이고, <code>DELETING</code> 표시와 암호화 토큰이 남아 재시도 작업(기본 5분)이나 같은 API 재호출이 이어서 끝냅니다. 끝나면 <code>SESSION</code>·<code>XSRF-TOKEN</code> 쿠키를 지우는 204입니다. Come-down이 만든 구글 일정은 지우지 않습니다(열린 항목 4).</li>
+<li><strong>현재 구현 범위</strong>: 탈퇴를 시작하면 한 트랜잭션에서 <code>DELETING</code> 표시 → 구글 철회 요청 → 건강 기록 → 제안의 일정 참조 해제·일정·분류 규칙·주간 부하 → 로그인 세션을 지웁니다. 이어서 구글 철회가 성공하면(이미 철회된 토큰 포함) 사용자 행을 지우고(동의·설정·구독·남은 제안은 FK CASCADE) 204입니다. 철회가 실패하면 202이며, 이때도 세션과 위 데이터는 이미 지워졌고 <code>SESSION</code>·<code>XSRF-TOKEN</code> 쿠키도 지웁니다(204와 같음). <code>DELETING</code> 표시된 사용자 행과 철회에 필요한 암호화 토큰이 남아 재시도 작업(기본 5분)이 이어서 끝내며, 그동안 같은 구글 계정으로 로그인할 수 없습니다. Come-down이 만든 구글 일정은 지우지 않습니다(열린 항목 4).</li>
+<li><strong>구현 해석(확인 필요)</strong> 202 동안 남는 것은 사용자 행(닉네임·이메일·구글 계정 식별자)과 그에 딸린 동의 기록·생활 정보 설정·구독·승인 이력, 구글 철회용 암호화 토큰입니다. 건강 기록·일정·세션은 구글 철회를 기다리지 않고 지웁니다. 남는 항목까지 즉시 지우려면 철회용 토큰을 사용자 행과 분리해 보관해야 하며(스키마 변경), 필요하면 따로 정합니다.</li>
 </ul>
 <hr />
 </div></details></section><section class="api-group" id="g1"><h2>2. 온보딩 (A1~A5)</h2><details class="endpoint" data-search="put /api/onboarding/profile 닉네임 · 약관 · 동의 저장 ```json

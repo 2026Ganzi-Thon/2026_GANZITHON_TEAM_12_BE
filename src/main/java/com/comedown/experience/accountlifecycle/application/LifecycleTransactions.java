@@ -83,12 +83,20 @@ public class LifecycleTransactions {
         deleteCalendarDerived(userId);
     }
 
-    /** 탈퇴 시작: 탈퇴 중으로 표시하고 구글 철회를 요청한다(새 입력이 막힌다). */
+    /**
+     * 탈퇴 시작: 탈퇴 중으로 표시하고 구글 철회를 요청한 뒤, 구글 철회를 기다리지 않고 지울 수 있는 것을 모두 지운다
+     * (건강 기록 → 일정·파생 → 로그인 세션). 구글 철회가 실패해 외부 정리가 남아도 이 시점부터 로그인 세션이 없고
+     * 건강 기록·일정은 남지 않는다. 사용자 행과 철회에 필요한 암호화 토큰(그리고 사용자 행에 딸린 동의·설정·구독·
+     * 승인 이력)은 철회가 끝난 뒤 {@link #finishWithdrawal}이 지운다. 다시 불러도 같은 결과다.
+     */
     @Transactional
     public void beginWithdrawal(long userId) {
         deletion.lock(userId);
         deletion.markDeleting(userId);
         revocation.requestRevoke(userId);
+        eraseHealthRecords(userId);
+        deleteCalendarDerived(userId);
+        sessions.revokeAll(userId);
     }
 
     /** 탈퇴 마무리(구글 철회가 끝난 뒤): 참조 해제 → 일정·파생 → 세션 → 사용자(나머지는 FK CASCADE). */
