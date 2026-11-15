@@ -57,8 +57,9 @@
     "GET /oauth2/authorization/google": "shared.security + account + integration.google",
     "GET /oauth2/authorization/google-calendar": "shared.security + account + integration.google",
     "GET /login/oauth2/code/{registrationId}": "shared.security + account + integration.google",
-    "POST /api/dev/seed": "local 전용 개발 지원; 기능별 contract로 시드 입력",
-    "POST /api/dev/clock": "local 전용 개발 지원; shared.time의 테스트 시계 경계",
+    "POST /api/dev/login": "local 전용 개발 지원; shared.security 테스트 로그인(세션만 생성, 사용자 행은 만들지 않음)",
+    "POST /api/dev/seed": "local 전용 개발 지원; experience.devseed가 기능별 contract로 시드 입력(계정 준비는 account의 local 전용 DemoAccountSetup 계약)",
+    "POST /api/dev/clock": "local 전용 개발 지원; shared.time의 날짜 이동 시계(AdjustableClock, local 프로필 Clock 빈)",
     "DELETE /api/dev/data": "local 전용 개발 지원; experience.accountlifecycle의 정리 계약 사용"
   }
 }
