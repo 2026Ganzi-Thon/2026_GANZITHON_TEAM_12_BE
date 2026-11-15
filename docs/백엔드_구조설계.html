@@ -257,6 +257,49 @@ integration의 adapter → 그 port를 구현 + Google/OpenAI SDK
 <p>experience.home/reports가 account·checkin·recovery·schedule·recommendation·cbi·subscription의 읽기 계약과 ai 해석을 조합한다. cbi/recovery는 safety를 호출하지 않고 해당 결과로 experience가 safety 평가 명령을 보낸다. 자료 부족·비동의·아직 28일 전인 상태는 명세의 null/잠금 사유로 반환한다. 범위 위치의 회복 값과 일정 부하 값은 각각 recovery와 schedule이 계산한다.</p>
 <h3>연결 해제·건강 기록 삭제·탈퇴</h3>
 <p>experience.accountlifecycle이 각 기능의 삭제 계약을 순서대로 호출한다. account가 전체 Repository를 가져와 일괄 삭제하지 않는다. 잠금/삭제 진행 상태로 새 입력을 막고 Google 정리 → 관련 참조 해제 → 파생 데이터·건강 응답 캐시 → 원본 데이터 → 세션/사용자 순서를 명세에 맞춰 조율한다. 캘린더만 해제하는 경우와 건강 기록만 삭제하는 경우, 탈퇴는 서로 다른 유스케이스다. 외부 정리 실패는 재시도하며 민감정보가 캐시에서 복원되지 않게 한다.</p>
+<p>HRV축 기능의 건강 기록 삭제 계약(각 기능이 자기 테이블만 지운다):</p>
+<table>
+<thead>
+<tr>
+<th>기능</th>
+<th>계약</th>
+<th>지우는 것</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>recommendation</td>
+<td><code>SuggestionDataDeletion.removeHealthBasis</code></td>
+<td>미승인 RECOVERY 제안 삭제, 남는 제안의 판단·회복 사유·문구 제거</td>
+</tr>
+<tr>
+<td>safety</td>
+<td><code>SafetyDataDeletion.deleteAll</code></td>
+<td>safety_alerts</td>
+</tr>
+<tr>
+<td>cbi</td>
+<td><code>CbiDataDeletion.deleteAll</code></td>
+<td>cbi_assessments(+ cbi_answers CASCADE)</td>
+</tr>
+<tr>
+<td>recovery</td>
+<td><code>RecoveryDataDeletion.deleteAll</code></td>
+<td>hrv_daily_states(기준선·추세·카운터)</td>
+</tr>
+<tr>
+<td>checkin</td>
+<td><code>CheckinDataDeletion.eraseHealthData</code></td>
+<td>hrv_measurements, morning_checks 건강 필드·completed_at(호흡 기록 없는 체크는 행 삭제)</td>
+</tr>
+<tr>
+<td>shared.idempotency</td>
+<td><code>IdempotencyService.deleteForUser(userId, &quot;hrv-&quot; / &quot;cbi-&quot;)</code></td>
+<td>측정·CBI 재시도 응답 캐시</td>
+</tr>
+</tbody>
+</table>
+<p>건강 기록 삭제는 위 순서로 한 트랜잭션에서 호출한다(외부 호출 없음). 탈퇴는 users 삭제의 FK CASCADE가 이 테이블들을 함께 지우므로 별도 호출이 필요 없다(suggestions의 일정 참조 해제 순서는 calendar 쪽에서 조율).</p>
 <h2>8. 두 개발자의 작업 경계</h2>
 <p>2026-11-12 팀 합의로 확정한 분담이다. <strong>HRV축(신체)</strong> 과 <strong>일정축(Google 캘린더 연동)</strong> 으로 나눈다. 패키지 구조·HTTP 책임·테이블 소유권(<a href="%EC%B1%85%EC%9E%84_%EB%A7%A4%ED%95%91.html">책임 매핑</a>)은 바뀌지 않으며, 아래는 각 패키지·파일을 누가 주로 작성하고 리뷰하는지에 대한 분담이다.</p>
 <table>

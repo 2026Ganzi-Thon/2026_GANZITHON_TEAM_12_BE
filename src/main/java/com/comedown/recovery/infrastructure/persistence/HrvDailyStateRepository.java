@@ -22,6 +22,10 @@ public interface HrvDailyStateRepository extends JpaRepository<HrvDailyState, Hr
     List<HrvDailyState> findByUserIdAndStateDateLessThanEqualAndTrendLnIsNotNullOrderByStateDateAsc(long userId,
             LocalDate asOf);
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM HrvDailyState s WHERE s.userId = :userId")
+    int deleteAllOfUser(@Param("userId") long userId);
+
     /** from 이후 결과를 지운다. 범위 삭제가 잠금을 잡아 같은 사용자의 동시 재계산을 직렬화한다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM HrvDailyState s WHERE s.userId = :userId AND s.stateDate >= :from")
