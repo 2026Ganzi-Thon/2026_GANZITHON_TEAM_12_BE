@@ -92,7 +92,7 @@ public class GoogleCalendarClient {
             if (status == 409) {
                 return false;
             }
-            throw writeFailure(status, "일정 등록");
+            throw writeFailure(e, "일정 등록");
         } catch (RestClientException e) {
             throw new ExternalServiceException(Kind.UNCERTAIN, "일정 등록 요청의 결과를 알 수 없습니다.", e);
         }
@@ -112,7 +112,7 @@ public class GoogleCalendarClient {
             if (status == 404 || status == 410) {
                 return java.util.Optional.empty();
             }
-            throw writeFailure(status, "일정 조회");
+            throw writeFailure(e, "일정 조회");
         } catch (RestClientException e) {
             throw new ExternalServiceException(Kind.UNCERTAIN, "일정 조회 요청의 결과를 알 수 없습니다.", e);
         }
@@ -130,21 +130,35 @@ public class GoogleCalendarClient {
             if (status == 404 || status == 410) {
                 return;
             }
-            throw writeFailure(status, "일정 삭제");
+            throw writeFailure(e, "일정 삭제");
         } catch (RestClientException e) {
             throw new ExternalServiceException(Kind.UNCERTAIN, "일정 삭제 요청의 결과를 알 수 없습니다.", e);
         }
     }
 
-    private static ExternalServiceException writeFailure(int status, String what) {
+    /**
+     * 쓰기·단건 조회 실패. 403은 권한 범위 부족일 때만 INSUFFICIENT_SCOPE이고, 사용량 제한(rateLimitExceeded 등)이나
+     * 다른 거절은 요청을 처리하지 않았다는 응답이므로 FAILURE다. 429·5xx는 결과를 알 수 없어 UNCERTAIN.
+     */
+    private static ExternalServiceException writeFailure(RestClientResponseException e, String what) {
+        int status = e.getStatusCode().value();
         if (status == 401) {
             return new ExternalServiceException(Kind.UNAUTHORIZED, "캘린더 인증이 만료됐습니다.");
         }
-        if (status == 403) {
+        if (isInsufficientScope(e)) {
             return new ExternalServiceException(Kind.INSUFFICIENT_SCOPE, "캘린더 권한 범위가 부족합니다.");
         }
         Kind kind = status >= 500 || status == 429 ? Kind.UNCERTAIN : Kind.FAILURE;
         return new ExternalServiceException(kind, what + "에 실패했습니다(status=" + status + ").");
+    }
+
+    /**
+     * 403 중 권한 범위 부족만 고른다. Google은 범위 부족을 {@code insufficientPermissions} 또는
+     * {@code ACCESS_TOKEN_SCOPE_INSUFFICIENT}("insufficient authentication scopes")로 알려 준다.
+     */
+    static boolean isInsufficientScope(RestClientResponseException e) {
+        return e.getStatusCode().value() == 403
+                && e.getResponseBodyAsString().toLowerCase(java.util.Locale.ROOT).contains("insufficient");
     }
 
     private Map<String, Object> fetchPage(String accessToken, Instant timeMin, Instant timeMax, String pageToken) {
@@ -171,7 +185,7 @@ public class GoogleCalendarClient {
             if (status == 401) {
                 throw new ExternalServiceException(Kind.UNAUTHORIZED, "캘린더 인증이 만료됐습니다.");
             }
-            if (status == 403 && e.getResponseBodyAsString().toLowerCase().contains("insufficient")) {
+            if (isInsufficientScope(e)) {
                 throw new ExternalServiceException(Kind.INSUFFICIENT_SCOPE, "캘린더 권한 범위가 부족합니다.");
             }
             throw new ExternalServiceException(Kind.FAILURE, "캘린더 조회에 실패했습니다(status=" + status + ").");

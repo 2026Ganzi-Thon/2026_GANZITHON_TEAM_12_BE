@@ -3,6 +3,7 @@ package com.comedown.recommendation.contract;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /** recommendation이 공개하는 제안 읽기 계약. */
 public interface SuggestionQuery {
@@ -16,4 +17,7 @@ public interface SuggestionQuery {
     List<SuggestionView> search(long userId, String type, String status, LocalDate targetDate);
 
     Optional<SuggestionView> find(long userId, long suggestionId);
+
+    /** 제안이 참조하는 일정(calendar_events) id. 일정 동기화가 참조 중인 일정을 지우지 않게 한다. */
+    Set<Long> referencedEventIds(long userId);
 }

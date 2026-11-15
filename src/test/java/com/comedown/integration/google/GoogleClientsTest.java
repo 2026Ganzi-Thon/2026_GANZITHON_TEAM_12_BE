@@ -156,6 +156,33 @@ class GoogleClientsTest {
     }
 
     @Test
+    void 등록_403은_권한_부족일_때만_INSUFFICIENT_SCOPE이고_사용량_제한은_FAILURE() {
+        Instant start = Instant.parse("2026-11-17T07:00:00Z");
+        Instant end = Instant.parse("2026-11-17T07:30:00Z");
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events")).andRespond(
+                withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"errors\":[{\"reason\":\"insufficientPermissions\"}]}}"));
+        assertThatThrownBy(() -> calendar.insert("t", "cdkey", "x", start, end))
+                .isInstanceOfSatisfying(ExternalServiceException.class,
+                        e -> assertThat(e.kind()).isEqualTo(Kind.INSUFFICIENT_SCOPE));
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events")).andRespond(
+                withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"errors\":[{\"reason\":\"rateLimitExceeded\"}],"
+                                + "\"message\":\"Rate Limit Exceeded\"}}"));
+        assertThatThrownBy(() -> calendar.insert("t", "cdkey", "x", start, end))
+                .isInstanceOfSatisfying(ExternalServiceException.class, e -> assertThat(e.kind()).isEqualTo(Kind.FAILURE));
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events/cdkey")).andRespond(
+                withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"errors\":[{\"reason\":\"userRateLimitExceeded\"}]}}"));
+        assertThatThrownBy(() -> calendar.delete("t", "cdkey"))
+                .isInstanceOfSatisfying(ExternalServiceException.class, e -> assertThat(e.kind()).isEqualTo(Kind.FAILURE));
+    }
+
+    @Test
     void 일정_조회는_없거나_삭제된_일정을_비어_있게_준다() {
         calendarServer.expect(requestTo(BASE + "/calendars/primary/events/cdkey")).andRespond(
                 withSuccess(ALL_DAY.replace("\"id\":\"e2\"", "\"id\":\"cdkey\""), MediaType.APPLICATION_JSON));

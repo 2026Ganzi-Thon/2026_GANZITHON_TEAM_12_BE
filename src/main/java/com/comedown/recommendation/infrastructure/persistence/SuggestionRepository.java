@@ -44,6 +44,10 @@ public interface SuggestionRepository extends JpaRepository<Suggestion, Long> {
     int deleteByTypeExceptStatuses(@Param("userId") long userId, @Param("type") SuggestionType type,
             @Param("kept") Collection<SuggestionStatus> kept);
 
+    /** 제안이 참조하는 일정 id. */
+    @Query("SELECT DISTINCT s.relatedEventId FROM Suggestion s WHERE s.userId = :userId AND s.relatedEventId IS NOT NULL")
+    List<Long> findRelatedEventIds(@Param("userId") long userId);
+
     /** 일정 참조를 끊는다(캘린더 연결 해제·탈퇴: 일정을 지우기 전에). */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Suggestion s SET s.relatedEventId = NULL, s.updatedAt = :now "

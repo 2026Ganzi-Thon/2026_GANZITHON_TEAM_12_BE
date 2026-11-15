@@ -3,10 +3,9 @@ package com.comedown.experience.suggestions.application;
 import com.comedown.account.contract.LifestyleQuery;
 import com.comedown.calendar.contract.CalendarEventReader;
 import com.comedown.calendar.contract.CalendarEventSnapshot;
+import com.comedown.recommendation.contract.SuggestionPlanning;
+import com.comedown.recommendation.contract.SuggestionPlanning.TimeSlot;
 import com.comedown.recommendation.contract.SuggestionView;
-import com.comedown.recommendation.domain.policy.FreeSlotFinder;
-import com.comedown.recommendation.domain.policy.FreeSlotFinder.Interval;
-import com.comedown.recommendation.domain.policy.PrepareAheadPolicy;
 import com.comedown.shared.time.ServiceTime;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -23,11 +22,14 @@ class SlotService {
 
     private final CalendarEventReader events;
     private final LifestyleQuery lifestyle;
+    private final SuggestionPlanning planning;
     private final ServiceTime time;
 
-    SlotService(CalendarEventReader events, LifestyleQuery lifestyle, ServiceTime time) {
+    SlotService(CalendarEventReader events, LifestyleQuery lifestyle, SuggestionPlanning planning,
+            ServiceTime time) {
         this.events = events;
         this.lifestyle = lifestyle;
+        this.planning = planning;
         this.time = time;
     }
 
@@ -37,24 +39,24 @@ class SlotService {
      * @param ignoreSuggestionId 막힌 시간에서 뺄 제안 id(자기 자신). 없으면 -1
      */
     @Transactional(readOnly = true)
-    List<Interval> busyOn(long userId, LocalDate day, List<SuggestionView> existing, List<SuggestionView> created,
+    List<TimeSlot> busyOn(long userId, LocalDate day, List<SuggestionView> existing, List<SuggestionView> created,
             long ignoreSuggestionId) {
         var dayRange = time.dateRange(day, day);
-        List<Interval> busy = new ArrayList<>();
+        List<TimeSlot> busy = new ArrayList<>();
         for (CalendarEventSnapshot e : events.findOverlapping(userId, dayRange)) {
             if (!e.allDay() && !e.cancelled() && !e.transparent()) {
-                busy.add(new Interval(e.start(), e.end()));
+                busy.add(new TimeSlot(e.start(), e.end()));
             }
         }
         for (SuggestionView s : existing) {
             if (s.id() != ignoreSuggestionId && PreStartGenerationFlow.isLive(s.status())
                     && s.targetDate().equals(day)) {
-                busy.add(new Interval(s.start(), s.end()));
+                busy.add(new TimeSlot(s.start(), s.end()));
             }
         }
         for (SuggestionView s : created) {
             if (s.targetDate().equals(day)) {
-                busy.add(new Interval(s.start(), s.end()));
+                busy.add(new TimeSlot(s.start(), s.end()));
             }
         }
         return busy;
@@ -62,18 +64,17 @@ class SlotService {
 
     /** 같은 날·같은 길이로 넣을 수 있는 빈 시간(최대 5개). */
     @Transactional(readOnly = true)
-    List<Interval> alternatives(SuggestionView suggestion, List<SuggestionView> sameUserSuggestions) {
+    List<TimeSlot> alternatives(SuggestionView suggestion, List<SuggestionView> sameUserSuggestions) {
         LifestyleQuery.SleepWindow sleep = lifestyle.sleepWindow(suggestion.userId());
-        List<Interval> busy = busyOn(suggestion.userId(), suggestion.targetDate(), sameUserSuggestions, List.of(),
+        List<TimeSlot> busy = busyOn(suggestion.userId(), suggestion.targetDate(), sameUserSuggestions, List.of(),
                 suggestion.id());
-        return FreeSlotFinder.find(suggestion.targetDate(), ServiceTime.ZONE,
-                Duration.ofMinutes(suggestion.durationMin()), busy, sleep.sleepStart(), sleep.sleepEnd(),
-                PrepareAheadPolicy.MIN_GAP, time.now(), MAX_SLOTS);
+        return planning.freeSlots(suggestion.targetDate(), Duration.ofMinutes(suggestion.durationMin()), busy,
+                sleep.sleepStart(), sleep.sleepEnd(), time.now(), MAX_SLOTS);
     }
 
     /** 다른 시간으로 승인하려는 구간이 같은 날·같은 길이로 빈 시간에 들어가는지. */
     @Transactional(readOnly = true)
-    boolean fits(SuggestionView suggestion, Interval wanted, List<SuggestionView> sameUserSuggestions) {
+    boolean fits(SuggestionView suggestion, TimeSlot wanted, List<SuggestionView> sameUserSuggestions) {
         if (!wanted.end().equals(wanted.start().plusSeconds(suggestion.durationMin() * 60))) {
             return false;
         }
@@ -82,9 +83,8 @@ class SlotService {
             return false;
         }
         LifestyleQuery.SleepWindow sleep = lifestyle.sleepWindow(suggestion.userId());
-        List<Interval> busy = busyOn(suggestion.userId(), suggestion.targetDate(), sameUserSuggestions, List.of(),
+        List<TimeSlot> busy = busyOn(suggestion.userId(), suggestion.targetDate(), sameUserSuggestions, List.of(),
                 suggestion.id());
-        return FreeSlotFinder.fits(suggestion.targetDate(), ServiceTime.ZONE, wanted, busy, sleep.sleepStart(),
-                sleep.sleepEnd(), PrepareAheadPolicy.MIN_GAP);
+        return planning.fits(suggestion.targetDate(), wanted, busy, sleep.sleepStart(), sleep.sleepEnd());
     }
 }

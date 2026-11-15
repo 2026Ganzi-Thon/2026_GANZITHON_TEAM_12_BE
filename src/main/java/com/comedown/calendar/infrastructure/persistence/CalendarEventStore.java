@@ -164,32 +164,34 @@ public class CalendarEventStore {
     }
 
     /**
-     * 구글에서 사라진 일정을 지운다. 제안(suggestions)이 참조하는 일정은 제안 쪽 참조를 건드리지 않도록
-     * 지우지 않고 취소 상태로 바꾼다(부하 계산에서는 제외된다).
+     * 구글에서 사라진 일정을 지운다. 다른 기능(제안)이 참조하는 일정({@code referenced})은 그쪽 참조를 건드리지 않도록
+     * 지우지 않고 취소 상태로 바꾼다(부하 계산에서는 제외된다). 다른 기능의 테이블은 읽지 않는다.
      *
-     * @return 처리한 일정 수
+     * @return 지운 일정 수
      */
-    public int removeOrCancel(long userId, Collection<Long> ids) {
-        int handled = 0;
-        List<Long> list = new ArrayList<>(ids);
-        for (int i = 0; i < list.size(); i += IN_CHUNK) {
-            List<Long> chunk = list.subList(i, Math.min(i + IN_CHUNK, list.size()));
-            jdbc.sql("""
-                            UPDATE calendar_events e SET e.event_status = 'cancelled'
-                             WHERE e.user_id = :user AND e.id IN (:ids) AND e.event_status <> 'cancelled'
-                               AND EXISTS (SELECT 1 FROM suggestions s
-                                            WHERE s.user_id = e.user_id AND s.related_event_id = e.id)
-                            """)
-                    .param("user", userId).param("ids", chunk).update();
-            handled += jdbc.sql("""
-                            DELETE e FROM calendar_events e
-                             WHERE e.user_id = :user AND e.id IN (:ids)
-                               AND NOT EXISTS (SELECT 1 FROM suggestions s
-                                                WHERE s.user_id = e.user_id AND s.related_event_id = e.id)
-                            """)
-                    .param("user", userId).param("ids", chunk).update();
+    public int removeOrCancel(long userId, Collection<Long> ids, Collection<Long> referenced) {
+        List<Long> toCancel = new ArrayList<>();
+        List<Long> toDelete = new ArrayList<>();
+        for (Long id : ids) {
+            (referenced.contains(id) ? toCancel : toDelete).add(id);
         }
-        return handled;
+        for (int i = 0; i < toCancel.size(); i += IN_CHUNK) {
+            jdbc.sql("""
+                            UPDATE calendar_events SET event_status = 'cancelled'
+                             WHERE user_id = :user AND id IN (:ids) AND event_status <> 'cancelled'
+                            """)
+                    .param("user", userId)
+                    .param("ids", toCancel.subList(i, Math.min(i + IN_CHUNK, toCancel.size())))
+                    .update();
+        }
+        int deleted = 0;
+        for (int i = 0; i < toDelete.size(); i += IN_CHUNK) {
+            deleted += jdbc.sql("DELETE FROM calendar_events WHERE user_id = :user AND id IN (:ids)")
+                    .param("user", userId)
+                    .param("ids", toDelete.subList(i, Math.min(i + IN_CHUNK, toDelete.size())))
+                    .update();
+        }
+        return deleted;
     }
 
     private static final String SELECT = """

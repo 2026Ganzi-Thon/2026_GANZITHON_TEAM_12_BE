@@ -15,6 +15,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,6 +25,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class CalendarSyncFlow {
+
+    private static final Logger log = LoggerFactory.getLogger(CalendarSyncFlow.class);
 
     public record Result(Instant from, Instant to, int fetched, SyncResult saved) {
     }
@@ -60,8 +64,20 @@ public class CalendarSyncFlow {
             };
         }
         SyncResult saved = commit.commit(userId, range, fetched, mondaysBetween(fromDate, toDate));
-        preStart.refresh(userId); // 동기화로 바뀐 위험 주에 맞춰 PRE_START 제안을 갱신한다
+        refreshSuggestions(userId);
         return new Result(range.start(), range.endExclusive(), fetched.size(), saved);
+    }
+
+    /**
+     * 동기화로 바뀐 위험 주에 맞춰 PRE_START 제안을 갱신한다. 일정 저장은 이미 커밋됐으므로 여기서 실패해도 동기화는
+     * 성공으로 응답한다(제안은 다음 동기화나 {@code POST /api/suggestions/generate}에서 다시 만든다).
+     */
+    private void refreshSuggestions(long userId) {
+        try {
+            preStart.refresh(userId);
+        } catch (RuntimeException e) {
+            log.warn("동기화 후 PRE_START 제안 갱신 실패(userId={}): {}", userId, e.getClass().getSimpleName());
+        }
     }
 
     private static LocalDate earlier(LocalDate a, LocalDate b) {

@@ -309,7 +309,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
   "fetched": 52, "kept": 48, "created": 3, "updated": 1, "deleted": 0, "classified": 4 }
 ```
 - 범위: 시작 = min(오늘 − 1개월, 이번 주 월요일 − 4주), 끝 = 이번 주 월요일 + 5주.
-- **현재 구현 범위**: AI·규칙 분류기와 PRE_START 갱신은 아직 없어 새 일정은 직접 수정 규칙이 없으면 미분류(`category: null`, 가중치 1.0)로 남습니다. `kept`는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 `cancelled`로 표시해 조회에서 뺍니다. Come-down이 만든 구글 일정은 지우지 않습니다.
+- **현재 구현 범위**: AI·규칙 분류기는 아직 없어 새 일정은 직접 수정 규칙이 없으면 미분류(`category: null`, 가중치 1.0)로 남습니다. `kept`는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 `cancelled`로 표시해 조회에서 뺍니다. Come-down이 만든 구글 일정은 지우지 않습니다. 저장 후 PRE_START 제안을 갱신하며, 갱신이 실패해도 동기화는 성공으로 응답합니다(제안은 다음 동기화나 `generate`에서 다시 만듦).
 - 홈·캘린더 탭에 들어올 때 마지막 동기화가 10분 넘었으면 부릅니다.
 
 ### `GET /api/calendar/events?from=2026-11-16&to=2026-11-22` → 200
@@ -369,7 +369,8 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). `type=RECOVERY` 조회는 온보딩 완료 후(403 `ONBOARDING_REQUIRED`), PRE_START는 온보딩 중에도 조회합니다. `type`·`status`가 정의된 값이 아니거나 `date`가 `YYYY-MM-DD`가 아니면 400입니다. 목록은 시작 시각 순입니다.
 - done을 일정 종료 전에 부르면 409 `INVALID_STATE`("일정이 끝난 뒤에 체크할 수 있어요.")입니다. `message`는 문구가 없으면 null입니다.
 - 제안의 등록 키(`registration_key`)는 생성 때 서버가 만드는 Google event id(`cd` + 32자, base32hex 문자만)이며 응답에 내보내지 않습니다. 승인 시작 때 같은 사용자의 다른 APPROVING·APPROVED 예약과 겹치면 409 `SLOT_CONFLICT`입니다. 만료 시각이 지난 PROPOSED는 서버가 주기적으로 `EXPIRED`로 바꿉니다.
-- **현재 구현 범위**: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) "과부하 대비 제안"). `generate`는 `type: PRE_START`만 되고 `RECOVERY`는 "1~7일 컨디션 기반 추천 임계값" 확정 전까지 422 `CALCULATION_POLICY_PENDING`입니다. `relatedEvent`는 아직 null입니다(제안의 대상 일정은 `riskWeekStart`로만 알 수 있음). 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `FAILED`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `APPROVING` + 202, 서버가 1분마다 재확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `INVALID_STATE`입니다.
+- **현재 구현 범위**: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) "과부하 대비 제안"). `generate`는 `type: PRE_START`만 되고 `RECOVERY`는 "1~7일 컨디션 기반 추천 임계값" 확정 전까지 422 `CALCULATION_POLICY_PENDING`입니다. `relatedEvent`는 아직 null입니다(제안의 대상 일정은 `riskWeekStart`로만 알 수 있음). 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `FAILED`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `APPROVING` + 202, 서버가 1분마다 재확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `INVALID_STATE`입니다. 구글 403은 권한 범위 부족일 때만 `CALENDAR_SCOPE_MISSING`이고, 사용량 제한 등 그 외 403은 확정 실패(`FAILED`, `CALENDAR_API_ERROR`)입니다.
+- **구현 해석(확인 필요)** PRE_START 재제안: 같은 마감 일정에 `PROPOSED`·`APPROVING`·`APPROVED`·`FAILED`(재시도 가능)·`DISMISSED`·`UNDONE` 제안이 있으면 동기화·`generate`가 새 제안을 만들지 않습니다. 사용자가 건너뛰거나 되돌린 마감은 다시 권하지 않고, `EXPIRED`(응답 없이 날짜가 지남)만 다시 제안합니다.
 
 ---
 
@@ -581,7 +582,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 
 - `GET /api/me/settings`는 measureTime·sleepStart·sleepEnd·preferredActivities·hrvEnabled를 반환합니다. `PUT /api/me/settings`는 앞의 생활 정보 4필드 전체 교체이며 hrvEnabled 변경은 동의 API로만 처리합니다. 시간 HH:mm, 수면 시작≠종료, 활동 중복·미등록 코드 불가입니다.
 - `DELETE /api/hrv/data`와 `deleteData=true`는 측정·일별 회복 상태·컨디션 및 교란 요인·CBI 응답·회복 AI 캐시·회복 기반 미승인 추천·안전 안내를 삭제하고 기준선과 카운터를 초기화합니다. morning_checks에는 호흡 완료 등 비건강 메타데이터만 남길 수 있습니다. 승인된 일정·이력의 건강 근거는 제거합니다. CBI로 이미 통과한 온보딩 단계는 되돌리지 않습니다. "건강 기록 전체 삭제"로 UI에 표시하며 사용자가 삭제 범위를 확인하게 합니다.
-- 응답: `DELETE /api/hrv/data`, `DELETE /api/me/consents/SENSITIVE_HRV[?deleteData=true]`는 204입니다(이미 철회·삭제돼 있어도 204, 재시도 안전). 캘린더 연결 해제(`DELETE /api/calendar/connection`)는 철회 요청으로 연결이 즉시 끊기고(동기화 409 `CALENDAR_NOT_CONNECTED`), 구글 철회가 끝나면 204, 아직이면 202 `{ "status": "DELETING" }`입니다. **구현 해석(확인 필요)**: 삭제하는 "미승인 제안"은 `PRE_START` 중 `APPROVING`·`APPROVED`가 아닌 것이고, 나머지 제안은 `relatedEvent`만 null로 둡니다. 구글 철회는 refresh token(없으면 access token)을 철회하므로 구글 쪽 허용 전체가 해제됩니다(캘린더만 철회하는 방식은 열린 항목).
+- 응답: `DELETE /api/hrv/data`, `DELETE /api/me/consents/SENSITIVE_HRV[?deleteData=true]`는 204입니다(이미 철회·삭제돼 있어도 204, 재시도 안전). 캘린더 연결 해제(`DELETE /api/calendar/connection`)는 철회 요청으로 연결이 즉시 끊기고(동기화 409 `CALENDAR_NOT_CONNECTED`), 구글 철회가 끝나면 204, 아직이면 202 `{ "status": "DELETING" }`입니다. **구현 해석(확인 필요)**: 삭제하는 "미승인 제안"은 `PRE_START` 중 `APPROVING`·`APPROVED`가 아닌 것이고, 나머지 제안은 `relatedEvent`만 null로 둡니다. 구글 철회는 refresh token(없으면 access token)을 철회하므로 구글 쪽 허용 전체가 해제됩니다(캘린더만 철회하는 방식은 열린 항목). 탈퇴 마무리 시점에 승인 요청이 진행 중(`APPROVING`)이면 그 제안은 사용자와 함께 지워지고, 이미 구글에 등록된 일정은 사용자 캘린더에 남을 수 있습니다(연결 해제와 같이 Come-down이 만든 구글 일정은 지우지 않음).
 - 기능별 삭제 계약(조율은 `experience.accountlifecycle`, 한 트랜잭션): `SuggestionDataDeletion.removeHealthBasis` → `SafetyDataDeletion.deleteAll` → `CbiDataDeletion.deleteAll` → `RecoveryDataDeletion.deleteAll` → `CheckinDataDeletion.eraseHealthData` → `IdempotencyService.deleteForUser(userId, "hrv-")`·`("cbi-")`. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. 회복 AI 캐시(`ai_outputs`)는 ai 구현 때 같은 순서에 추가합니다.
 - **구현 해석(확인 필요)** 아침 체크는 호흡 기록이 있으면 건강 필드(컨디션·교란 요인)와 `completed_at`만 비우고 남기며, 남을 것이 없는 체크는 지웁니다. "회복 기반 미승인 추천"은 RECOVERY 중 `APPROVING`·`APPROVED`가 아닌 것이며 지웁니다(`APPROVING`은 외부 등록 확인 전이라 남김). 남는 RECOVERY 제안은 "건강 근거 제거"로 `judgment_state`·`message`를 비우고 `reason_code`를 `HEALTH_DATA_DELETED`로 바꾸며, PRE_START는 `judgment_state`만 비웁니다(제목·시간·Google 일정·승인 상태는 유지). 안전 안내는 `LOW_RECOVERY_2W`·`CBI_HIGH` 모두 건강 근거이므로 지웁니다.
 - 민감정보 비동의/철회 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.

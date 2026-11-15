@@ -107,6 +107,24 @@ class PreStartSuggestionIntegrationTest {
     }
 
     @Test
+    void 건너뛰거나_되돌린_마감은_다시_제안하지_않고_만료된_마감만_다시_제안한다() throws Exception {
+        long user = riskUser();
+        long id = suggestionId(user);
+
+        jdbc.update("UPDATE suggestions SET status = 'DISMISSED' WHERE id = ?", id);
+        generate(user).andExpect(jsonPath("$.suggestions.length()").value(0));
+        jdbc.update("UPDATE suggestions SET status = 'UNDONE' WHERE id = ?", id);
+        generate(user).andExpect(jsonPath("$.suggestions.length()").value(0));
+        jdbc.update("UPDATE suggestions SET status = 'FAILED' WHERE id = ?", id); // 재시도할 수 있으므로 새로 만들지 않음
+        generate(user).andExpect(jsonPath("$.suggestions.length()").value(0));
+        assertThat(count(user)).isEqualTo(1);
+
+        jdbc.update("UPDATE suggestions SET status = 'EXPIRED' WHERE id = ?", id);
+        generate(user).andExpect(jsonPath("$.suggestions.length()").value(1));
+        assertThat(count(user)).isEqualTo(2);
+    }
+
+    @Test
     void 일정이_있는_시간과_10분_간격을_피하고_RECOVERY는_아직_준비_중이다() throws Exception {
         long user = riskUser();
         event(user, "busy", "2026-11-16 22:00:00", "2026-11-16 23:00:00", "CLASS"); // 11-17 07:00~08:00 서울

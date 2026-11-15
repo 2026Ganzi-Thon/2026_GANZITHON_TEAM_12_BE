@@ -6,9 +6,9 @@ import com.comedown.calendar.contract.CalendarEventWriter;
 import com.comedown.calendar.contract.CalendarEventWriter.DeleteResult;
 import com.comedown.calendar.contract.CalendarEventWriter.NewEvent;
 import com.comedown.recommendation.contract.SuggestionApprovalCommands;
+import com.comedown.recommendation.contract.SuggestionPlanning.TimeSlot;
 import com.comedown.recommendation.contract.SuggestionQuery;
 import com.comedown.recommendation.contract.SuggestionView;
-import com.comedown.recommendation.domain.policy.FreeSlotFinder.Interval;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
 import com.comedown.shared.error.ExternalServiceException;
@@ -53,7 +53,7 @@ public class SuggestionApprovalFlow {
     }
 
     /** 다른 시간 보기: 같은 날·같은 길이로 넣을 수 있는 빈 시간(최대 5개). PROPOSED·FAILED 제안만. */
-    public List<Interval> slots(long userId, long suggestionId) {
+    public List<TimeSlot> slots(long userId, long suggestionId) {
         SuggestionView s = owned(userId, suggestionId);
         if (!"PROPOSED".equals(s.status()) && !"FAILED".equals(s.status())) {
             throw new ApiException(ErrorCode.SUGGESTION_NOT_PROPOSED);
@@ -147,7 +147,7 @@ public class SuggestionApprovalFlow {
         if (start == null || end == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "시작과 종료 시각을 함께 보내 주세요.");
         }
-        if (!end.isAfter(start) || !slots.fits(s, new Interval(start, end), query.search(userId, null, null,
+        if (!end.isAfter(start) || !slots.fits(s, new TimeSlot(start, end), query.search(userId, null, null,
                 s.targetDate()))) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "같은 날 같은 길이로, 수면 시간과 다른 일정을 피해 정해 주세요.");
