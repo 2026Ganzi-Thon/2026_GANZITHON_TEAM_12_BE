@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -50,16 +51,25 @@ public record RecoveryDayInput(
      */
     public static RecoveryDayInput of(
             LocalDate date, List<MeasurementSample> measurements, boolean conditionCompleted, boolean confounded) {
-        List<MeasurementSample> qualified = measurements.stream()
-                .filter(m -> REPRESENTATIVE_QUALITIES.contains(m.qualityLevel()) && m.lnRmssd() != null)
-                .sorted(Comparator.comparing(MeasurementSample::measuredAt))
-                .toList();
+        List<MeasurementSample> qualified = qualified(measurements);
         if (qualified.isEmpty()) {
             return new RecoveryDayInput(date, null, null, 0, conditionCompleted, confounded);
         }
         MeasurementSample first = qualified.getFirst();
         return new RecoveryDayInput(
                 date, first.lnRmssd(), first.qualityLevel(), qualified.size(), conditionCompleted, confounded);
+    }
+
+    /** {@link #of}와 같은 규칙으로 고른 하루 대표 측정. 적격 측정이 없으면 비어 있다. */
+    public static Optional<MeasurementSample> representative(List<MeasurementSample> measurements) {
+        return qualified(measurements).stream().findFirst();
+    }
+
+    private static List<MeasurementSample> qualified(List<MeasurementSample> measurements) {
+        return measurements.stream()
+                .filter(m -> REPRESENTATIVE_QUALITIES.contains(m.qualityLevel()) && m.lnRmssd() != null)
+                .sorted(Comparator.comparing(MeasurementSample::measuredAt))
+                .toList();
     }
 
     /** 적격일: 대표값이 있고, 컨디션·교란 요인 입력이 끝났고, 교란 요인이 없는 날. */

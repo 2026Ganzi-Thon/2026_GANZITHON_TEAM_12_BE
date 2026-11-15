@@ -45,6 +45,18 @@ class RecoveryDayInputTest {
     }
 
     @Test
+    void 대표_측정은_of와_같은_규칙으로_고르고_id를_유지한다() {
+        List<MeasurementSample> measurements = List.of(
+                new MeasurementSample(11L, Instant.parse("2026-11-11T22:20:00Z"), "GOOD", 3.9),
+                new MeasurementSample(10L, Instant.parse("2026-11-11T22:10:00Z"), "RETRY", null),
+                new MeasurementSample(12L, Instant.parse("2026-11-11T22:15:00Z"), "FAIR", 3.7));
+
+        assertThat(RecoveryDayInput.representative(measurements))
+                .get().extracting(MeasurementSample::measurementId).isEqualTo(12L);
+        assertThat(RecoveryDayInput.representative(List.of(measurements.get(1)))).isEmpty();
+    }
+
+    @Test
     void RETRY와_수동값_UNVERIFIED는_대표값이_되지_않는다() {
         List<MeasurementSample> measurements = List.of(
                 sample("2026-11-11T22:10:00Z", "RETRY", null),

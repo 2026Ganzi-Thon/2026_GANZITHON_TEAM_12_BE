@@ -2,6 +2,7 @@ package com.comedown.experience.morning.api;
 
 import com.comedown.experience.morning.application.MeasurementSaveFlow;
 import com.comedown.experience.morning.application.MeasurementSaveResult;
+import com.comedown.experience.morning.application.MorningAccessGuard;
 import com.comedown.experience.morning.application.ValidatedMeasurement;
 import com.comedown.shared.idempotency.IdempotentResponse;
 import com.comedown.shared.security.CurrentUser;
@@ -20,10 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class HrvMeasurementController {
 
+    private final MorningAccessGuard accessGuard;
     private final MeasurementSaveFlow flow;
     private final MeasurementRequestValidator validator;
 
-    public HrvMeasurementController(MeasurementSaveFlow flow, MeasurementRequestValidator validator) {
+    public HrvMeasurementController(MorningAccessGuard accessGuard, MeasurementSaveFlow flow,
+            MeasurementRequestValidator validator) {
+        this.accessGuard = accessGuard;
         this.flow = flow;
         this.validator = validator;
     }
@@ -33,7 +37,7 @@ public class HrvMeasurementController {
             CurrentUser user,
             @RequestHeader("Idempotency-Key") UUID idempotencyKey,
             @RequestBody MeasurementSaveRequest request) {
-        LocalDate onboardingDate = flow.requireMeasurementAccess(user.id());
+        LocalDate onboardingDate = accessGuard.requireMeasurementAccess(user.id());
         ValidatedMeasurement measurement = validator.validate(request);
         IdempotentResponse<MeasurementSaveResult> response =
                 flow.save(user.id(), onboardingDate, idempotencyKey, request, measurement);
