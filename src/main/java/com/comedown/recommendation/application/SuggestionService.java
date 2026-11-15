@@ -136,6 +136,14 @@ public class SuggestionService implements SuggestionCommands, SuggestionApproval
         return toView(s);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<SuggestionView> findStaleApproving(Instant cutoff, int limit) {
+        return suggestions.findStale(SuggestionStatus.APPROVING, cutoff,
+                org.springframework.data.domain.PageRequest.of(0, limit))
+                .stream().map(SuggestionService::toView).toList();
+    }
+
     // ---------- 조회 ----------
 
     @Override

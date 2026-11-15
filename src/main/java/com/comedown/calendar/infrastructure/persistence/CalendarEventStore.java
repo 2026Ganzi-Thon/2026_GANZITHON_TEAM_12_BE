@@ -45,6 +45,14 @@ public class CalendarEventStore {
         return result;
     }
 
+    /** 시작이 범위에 드는 과제 일정(id, 시작). */
+    public List<StoredEvent> findAssignments(long userId, Instant from, Instant to) {
+        return jdbc.sql(SELECT + " WHERE user_id = ? AND calendar_id = ? AND category = 'ASSIGNMENT' "
+                        + "AND event_status <> 'cancelled' AND start_at >= ? AND start_at < ? ORDER BY start_at, id")
+                .params(userId, CALENDAR_ID, utc(from), utc(to))
+                .query(CalendarEventStore::map).list();
+    }
+
     /** 사용자의 모든 일정을 지운다(제안의 일정 참조를 먼저 끊은 뒤). */
     public int deleteAll(long userId) {
         return jdbc.sql("DELETE FROM calendar_events WHERE user_id = ?").params(userId).update();

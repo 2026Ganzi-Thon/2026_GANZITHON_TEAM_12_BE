@@ -494,7 +494,7 @@
 - 조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). `type=recovery` 조회는 온보딩 완료 후(403 `onboarding_required`), pre_start는 온보딩 중에도 조회합니다. `type`·`status`가 정의된 값이 아니거나 `date`가 `yyyy-mm-dd`가 아니면 400입니다. 목록은 시작 시각 순입니다.
 - done을 일정 종료 전에 부르면 409 `invalid_state`(&quot;일정이 끝난 뒤에 체크할 수 있어요.&quot;)입니다. `message`는 문구가 없으면 null입니다.
 - 제안의 등록 키(`registration_key`)는 생성 때 서버가 만드는 google event id(`cd` + 32자, base32hex 문자만)이며 응답에 내보내지 않습니다. 승인 시작 때 같은 사용자의 다른 approving·approved 예약과 겹치면 409 `slot_conflict`입니다. 만료 시각이 지난 proposed는 서버가 주기적으로 `expired`로 바꿉니다.
-- **현재 구현 범위**: `relatedevent`는 calendar 읽기 계약(일정축)이 생기기 전까지 null입니다. recovery 추천 생성은 &quot;1~7일 컨디션 기반 추천 임계값&quot; 확정 후 구현합니다.
+- **현재 구현 범위**: pre_start 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) &quot;과부하 대비 제안&quot;). `generate`는 `type: pre_start`만 되고 `recovery`는 &quot;1~7일 컨디션 기반 추천 임계값&quot; 확정 전까지 422 `calculation_policy_pending`입니다. `relatedevent`는 아직 null입니다(제안의 대상 일정은 `riskweekstart`로만 알 수 있음). 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `failed`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `approving` + 202, 서버가 1분마다 재확인). 되돌리기는 come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `invalid_state`입니다.
 
 ---
 
@@ -505,7 +505,7 @@
 <li>조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). <code>type=RECOVERY</code> 조회는 온보딩 완료 후(403 <code>ONBOARDING_REQUIRED</code>), PRE_START는 온보딩 중에도 조회합니다. <code>type</code>·<code>status</code>가 정의된 값이 아니거나 <code>date</code>가 <code>YYYY-MM-DD</code>가 아니면 400입니다. 목록은 시작 시각 순입니다.</li>
 <li>done을 일정 종료 전에 부르면 409 <code>INVALID_STATE</code>(&quot;일정이 끝난 뒤에 체크할 수 있어요.&quot;)입니다. <code>message</code>는 문구가 없으면 null입니다.</li>
 <li>제안의 등록 키(<code>registration_key</code>)는 생성 때 서버가 만드는 Google event id(<code>cd</code> + 32자, base32hex 문자만)이며 응답에 내보내지 않습니다. 승인 시작 때 같은 사용자의 다른 APPROVING·APPROVED 예약과 겹치면 409 <code>SLOT_CONFLICT</code>입니다. 만료 시각이 지난 PROPOSED는 서버가 주기적으로 <code>EXPIRED</code>로 바꿉니다.</li>
-<li><strong>현재 구현 범위</strong>: <code>relatedEvent</code>는 calendar 읽기 계약(일정축)이 생기기 전까지 null입니다. RECOVERY 추천 생성은 &quot;1~7일 컨디션 기반 추천 임계값&quot; 확정 후 구현합니다.</li>
+<li><strong>현재 구현 범위</strong>: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 <a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산 정책</a> &quot;과부하 대비 제안&quot;). <code>generate</code>는 <code>type: PRE_START</code>만 되고 <code>RECOVERY</code>는 &quot;1~7일 컨디션 기반 추천 임계값&quot; 확정 전까지 422 <code>CALCULATION_POLICY_PENDING</code>입니다. <code>relatedEvent</code>는 아직 null입니다(제안의 대상 일정은 <code>riskWeekStart</code>로만 알 수 있음). 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 <code>FAILED</code>로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 <code>APPROVING</code> + 202, 서버가 1분마다 재확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 <code>INVALID_STATE</code>입니다.</li>
 </ul>
 <hr />
 </div></details></section><section class="api-group" id="g5"><h2>6. 아침 측정 (B3~B6)</h2><details class="endpoint" data-search="get /api/morning-checks/today 오늘 체크 진행 단계 · 결과 ```json

@@ -74,6 +74,11 @@ public interface SuggestionRepository extends JpaRepository<Suggestion, Long> {
     @Query("SELECT s FROM Suggestion s WHERE s.status = :status AND s.expiresAt <= :now")
     List<Suggestion> findDue(@Param("status") SuggestionStatus status, @Param("now") Instant now);
 
+    /** 갱신된 지 오래된 승인 중 제안(오래된 순). 외부 등록 결과를 다시 확인할 대상. */
+    @Query("SELECT s FROM Suggestion s WHERE s.status = :status AND s.updatedAt <= :cutoff ORDER BY s.updatedAt, s.id")
+    List<Suggestion> findStale(@Param("status") SuggestionStatus status, @Param("cutoff") Instant cutoff,
+            org.springframework.data.domain.Pageable page);
+
     /** 같은 사용자의 [start, end)와 겹치는 다른 예약(APPROVING·APPROVED). */
     @Query("""
             SELECT s FROM Suggestion s

@@ -115,6 +115,79 @@ class GoogleClientsTest {
                 });
     }
 
+    // ---- 일정 쓰기(등록·조회·삭제) ----
+
+    @Test
+    void 고정_id로_일정을_만들고_앱_표식을_붙인다() {
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer token-1"))
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("\"id\":\"cdkey\""),
+                        org.hamcrest.Matchers.containsString("\"comedownApp\":\"true\""),
+                        org.hamcrest.Matchers.containsString("2026-11-17T07:00:00Z"))))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(calendar.insert("token-1", "cdkey", "과제 미리 시작하기",
+                Instant.parse("2026-11-17T07:00:00Z"), Instant.parse("2026-11-17T07:30:00Z"))).isTrue();
+    }
+
+    @Test
+    void 이미_있는_id는_만들지_않고_거절_5xx_타임아웃은_구분한다() {
+        Instant start = Instant.parse("2026-11-17T07:00:00Z");
+        Instant end = Instant.parse("2026-11-17T07:30:00Z");
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events")).andRespond(withStatus(HttpStatus.CONFLICT));
+        assertThat(calendar.insert("t", "cdkey", "x", start, end)).isFalse();
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events")).andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> calendar.insert("t", "cdkey", "x", start, end))
+                .isInstanceOfSatisfying(ExternalServiceException.class, e -> assertThat(e.kind()).isEqualTo(Kind.FAILURE));
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events")).andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        assertThatThrownBy(() -> calendar.insert("t", "cdkey", "x", start, end))
+                .isInstanceOfSatisfying(ExternalServiceException.class, e -> assertThat(e.kind()).isEqualTo(Kind.UNCERTAIN));
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        assertThatThrownBy(() -> calendar.insert("t", "cdkey", "x", start, end))
+                .isInstanceOfSatisfying(ExternalServiceException.class, e -> assertThat(e.kind()).isEqualTo(Kind.UNAUTHORIZED));
+    }
+
+    @Test
+    void 일정_조회는_없거나_삭제된_일정을_비어_있게_준다() {
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events/cdkey")).andRespond(
+                withSuccess(ALL_DAY.replace("\"id\":\"e2\"", "\"id\":\"cdkey\""), MediaType.APPLICATION_JSON));
+        assertThat(calendar.get("t", "cdkey")).hasValueSatisfying(e -> assertThat(e.createdByApp()).isTrue());
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events/cdkey")).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThat(calendar.get("t", "cdkey")).isEmpty();
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events/cdkey")).andRespond(
+                withSuccess("{\"id\":\"cdkey\",\"status\":\"cancelled\",\"start\":{\"date\":\"2026-11-20\"},"
+                        + "\"end\":{\"date\":\"2026-11-21\"}}", MediaType.APPLICATION_JSON));
+        assertThat(calendar.get("t", "cdkey")).isEmpty();
+    }
+
+    @Test
+    void 일정_삭제는_이미_없어도_성공이고_5xx는_UNCERTAIN() {
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events/cdkey"))
+                .andExpect(method(HttpMethod.DELETE)).andRespond(withStatus(HttpStatus.NO_CONTENT));
+        calendar.delete("t", "cdkey");
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events/cdkey")).andRespond(withStatus(HttpStatus.GONE));
+        calendar.delete("t", "cdkey");
+
+        calendarServer.reset();
+        calendarServer.expect(requestTo(BASE + "/calendars/primary/events/cdkey")).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        assertThatThrownBy(() -> calendar.delete("t", "cdkey"))
+                .isInstanceOfSatisfying(ExternalServiceException.class, e -> assertThat(e.kind()).isEqualTo(Kind.UNCERTAIN));
+    }
+
     // ---- OAuth 토큰 갱신 ----
 
     private final RestClient.Builder oauthBuilder = RestClient.builder();

@@ -3,6 +3,7 @@ package com.comedown.experience.calendarflow.application;
 import com.comedown.account.contract.CalendarCredential;
 import com.comedown.account.contract.CalendarCredentialProvider;
 import com.comedown.calendar.contract.CalendarEventSource;
+import com.comedown.experience.suggestions.application.PreStartGenerationFlow;
 import com.comedown.calendar.contract.SyncResult;
 import com.comedown.calendar.contract.SyncedEvent;
 import com.comedown.shared.error.ApiException;
@@ -29,13 +30,15 @@ public class CalendarSyncFlow {
     private final CalendarCredentialProvider credentials;
     private final CalendarEventSource source;
     private final CalendarSyncCommit commit;
+    private final PreStartGenerationFlow preStart;
     private final ServiceTime time;
 
     public CalendarSyncFlow(CalendarCredentialProvider credentials, CalendarEventSource source,
-            CalendarSyncCommit commit, ServiceTime time) {
+            CalendarSyncCommit commit, PreStartGenerationFlow preStart, ServiceTime time) {
         this.credentials = credentials;
         this.source = source;
         this.commit = commit;
+        this.preStart = preStart;
         this.time = time;
     }
 
@@ -53,10 +56,11 @@ public class CalendarSyncFlow {
             throw switch (e.kind()) {
                 case UNAUTHORIZED -> new ApiException(ErrorCode.CALENDAR_REAUTH_REQUIRED);
                 case INSUFFICIENT_SCOPE -> new ApiException(ErrorCode.CALENDAR_SCOPE_MISSING);
-                case FAILURE -> new ApiException(ErrorCode.CALENDAR_API_ERROR);
+                case FAILURE, UNCERTAIN -> new ApiException(ErrorCode.CALENDAR_API_ERROR);
             };
         }
         SyncResult saved = commit.commit(userId, range, fetched, mondaysBetween(fromDate, toDate));
+        preStart.refresh(userId); // 동기화로 바뀐 위험 주에 맞춰 PRE_START 제안을 갱신한다
         return new Result(range.start(), range.endExclusive(), fetched.size(), saved);
     }
 

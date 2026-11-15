@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** 내 정보·생활 정보·동의 조회. */
 @Service
-public class AccountQueryService {
+public class AccountQueryService implements com.comedown.account.contract.LifestyleQuery {
 
     public record SettingsView(LocalTime measureTime, LocalTime sleepStart, LocalTime sleepEnd,
             List<String> preferredActivities, boolean hrvEnabled) {
@@ -55,6 +55,14 @@ public class AccountQueryService {
         return new SettingsView(row == null ? null : row.measureTime(), row == null ? null : row.sleepStart(),
                 row == null ? null : row.sleepEnd(), store.preferredActivities(userId),
                 row != null && row.hrvEnabled());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SleepWindow sleepWindow(long userId) {
+        return store.findSettings(userId)
+                .map(s -> new SleepWindow(s.sleepStart(), s.sleepEnd()))
+                .orElse(new SleepWindow(LocalTime.of(23, 0), LocalTime.of(7, 0)));
     }
 
     /** 기록이 있는 동의만(가장 최근 한 건씩). */
