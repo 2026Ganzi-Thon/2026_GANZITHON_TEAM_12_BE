@@ -45,6 +45,23 @@ public class CalendarEventStore {
         return result;
     }
 
+    /** 마지막 동기화 시각과 (취소 제외) 전체·분류된 일정 수. */
+    public Overview overview(long userId) {
+        return jdbc.sql("""
+                        SELECT MAX(synced_at) AS synced_at, COUNT(*) AS total, COUNT(category) AS classified
+                          FROM calendar_events
+                         WHERE user_id = ? AND calendar_id = ? AND event_status <> 'cancelled'
+                        """)
+                .params(userId, CALENDAR_ID)
+                .query((rs, n) -> new Overview(rs.getTimestamp("synced_at") == null ? null
+                        : rs.getTimestamp("synced_at").toLocalDateTime().toInstant(ZoneOffset.UTC),
+                        rs.getInt("total"), rs.getInt("classified")))
+                .single();
+    }
+
+    public record Overview(Instant syncedAt, int total, int classified) {
+    }
+
     /** 사용자 본인의 일정만 찾는다(남의 id는 비어 있음). */
     public Optional<StoredEvent> findById(long userId, long id) {
         return jdbc.sql(SELECT + " WHERE user_id = ? AND id = ?").params(userId, id)

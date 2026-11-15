@@ -29,6 +29,11 @@ class WeekLoadsAdapter implements WeekLoads {
         return service.weeks(userId, weekStart, 1).stream().findFirst().map(WeekLoadsAdapter::view);
     }
 
+    @Override
+    public List<WeekLoadView> range(long userId, LocalDate from, int count) {
+        return service.weeks(userId, from, count).stream().map(WeekLoadsAdapter::view).toList();
+    }
+
     static WeekLoadView view(WeekLoad load) {
         return new WeekLoadView(load.weekStart(), load.weekStart().plusDays(6), load.totalHours(),
                 load.loadScore(), load.vsUsualPct(), load.deadlineCount(), load.lateNightCount(), load.restDays(),

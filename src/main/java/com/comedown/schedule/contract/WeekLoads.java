@@ -13,4 +13,7 @@ public interface WeekLoads {
 
     /** 저장된 한 주의 부하. 계산된 적 없으면 비어 있다. */
     Optional<WeekLoadView> find(long userId, LocalDate weekStart);
+
+    /** {@code from}이 속한 주부터 {@code count}주의 저장된 부하(계산된 적 없는 주는 빠진다). */
+    List<WeekLoadView> range(long userId, LocalDate from, int count);
 }

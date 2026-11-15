@@ -302,6 +302,8 @@
 }
 ```
 - `enoughdata: false`면 일정이 너무 적은 경우 → 빈 상태 화면.
+- 캘린더가 연결되지 않았으면 409 `calendar_not_connected`. 동기화 전이면 `syncedat`·`thisweek`는 null, `upcomingweeks`는 빈 배열입니다.
+- **구현 해석(확인 필요)**: `pastmonth` = [오늘 − 1개월, 어제]이며 집계 규칙은 주간 부하와 같고, `enoughdata` = 그 기간에 집계 대상 일정이 1건 이상입니다. &quot;너무 적은&quot; 기준 수는 확정되면 갱신합니다.
 - 과부하 대비 제안은 `get /api/suggestions?type=pre_start`로 따로 받습니다.
 
 " data-group="g1"><summary><span class="method GET">GET</span><div><div class="path">/api/schedule/report</div><div class="description">지난달 분석 · 앞으로 4주 일정 리포트</div></div></summary><div class="detail-body"><pre><code class="language-json">{
@@ -318,6 +320,8 @@
 </code></pre>
 <ul>
 <li><code>enoughData: false</code>면 일정이 너무 적은 경우 → 빈 상태 화면.</li>
+<li>캘린더가 연결되지 않았으면 409 <code>CALENDAR_NOT_CONNECTED</code>. 동기화 전이면 <code>syncedAt</code>·<code>thisWeek</code>는 null, <code>upcomingWeeks</code>는 빈 배열입니다.</li>
+<li><strong>구현 해석(확인 필요)</strong>: <code>pastMonth</code> = [오늘 − 1개월, 어제]이며 집계 규칙은 주간 부하와 같고, <code>enoughData</code> = 그 기간에 집계 대상 일정이 1건 이상입니다. &quot;너무 적은&quot; 기준 수는 확정되면 갱신합니다.</li>
 <li>과부하 대비 제안은 <code>GET /api/suggestions?type=PRE_START</code>로 따로 받습니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="post /api/onboarding/complete 온보딩 완료 · 1일차 시작 `{ &quot;onboardingstep&quot;: &quot;done&quot;, &quot;dayindex&quot;: 1 }`. 이때부터 1일차·무료 체험이 시작됩니다.
