@@ -33,5 +33,6 @@ public class DemoAccountSetupService implements DemoAccountSetup {
         Instant now = serviceTime.now();
         writer.enableHrv(userId, now);
         writer.ensureHrvConsent(userId, now);
+        writer.ensureCalendarConsent(userId, now);
     }
 }

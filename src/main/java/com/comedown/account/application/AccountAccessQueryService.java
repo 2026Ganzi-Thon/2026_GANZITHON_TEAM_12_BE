@@ -25,6 +25,11 @@ public class AccountAccessQueryService implements AccountAccessQuery {
     }
 
     @Override
+    public boolean calendarConsented(long userId) {
+        return reader.hasActiveConsent(userId, AccountAccessReader.CALENDAR);
+    }
+
+    @Override
     public Optional<String> findNickname(long userId) {
         return reader.findNickname(userId);
     }

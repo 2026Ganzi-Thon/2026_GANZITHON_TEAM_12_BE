@@ -192,6 +192,31 @@ class MorningTodayApiIntegrationTest {
         today().andExpect(status().isOk());
     }
 
+    @Test
+    void 동의를_철회하면_남아_있는_측정과_컨디션_결과는_보여주지_않고_호흡만_보여준다() throws Exception {
+        measureCamera(STARTED_AT, SyntheticPpg.clean(70_000, 30));
+        mvc.perform(put("/api/morning-checks/today/condition").with(loginAs(userId)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"score\":4,\"alcohol\":false,\"sick\":false,\"caffeine\":false}"))
+                .andExpect(status().isOk());
+        jdbc.update("UPDATE morning_checks SET breathing_completed_at = '2026-11-11 22:35:00' WHERE user_id = ?",
+                userId);
+        today().andExpect(jsonPath("$.steps.condition.done").value(true))
+                .andExpect(jsonPath("$.result").isNotEmpty());
+
+        // 기록은 남기고 동의만 철회한다(deleteData 없이).
+        jdbc.update("UPDATE user_consents SET withdrawn_at = '2026-11-11 22:40:00' WHERE user_id = ?", userId);
+
+        today().andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {"date":"2026-11-12","dayIndex":3,"phase":"BUILDING",
+                         "steps":{"measurement":{"done":false,"measurementId":null,"qualityLevel":null},
+                                  "condition":{"done":false},"breathing":{"done":true}},
+                         "baseline":{"validDays":0,"required":7},
+                         "result":null}
+                        """, JsonCompareMode.STRICT));
+    }
+
     // ---------- 도우미 ----------
 
     private ResultActions today() throws Exception {

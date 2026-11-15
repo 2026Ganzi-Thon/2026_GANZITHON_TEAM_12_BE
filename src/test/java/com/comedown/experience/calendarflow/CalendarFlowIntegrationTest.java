@@ -142,6 +142,28 @@ class CalendarFlowIntegrationTest {
     }
 
     @Test
+    void 캘린더_이용_동의가_없으면_구글을_부르지_않고_아무것도_저장하지_않는다() throws Exception {
+        long user = newUser();
+        jdbc.update("DELETE FROM user_consents WHERE user_id = ?", user); // 프로필 단계 전: 권한만 받은 상태
+
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ONBOARDING_STEP_INVALID"))
+                .andExpect(jsonPath("$.message").value("캘린더 이용 동의를 먼저 완료해 주세요."));
+
+        org.mockito.Mockito.verifyNoInteractions(source, credentials);
+        assertThat(count("calendar_events", user)).isZero();
+        assertThat(count("weekly_loads", user)).isZero();
+
+        // 동의를 기록하면 동기화된다.
+        jdbc.update("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, 'CALENDAR', "
+                + "'2026-11-01', '2026-11-11 22:00:00')", user);
+        when(credentials.credentialFor(user)).thenReturn(new CalendarCredential("token"));
+        when(source.fetch(any(), any())).thenReturn(List.of());
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+    }
+
+    @Test
     void 구글_오류는_API_오류_코드로_바뀐다() throws Exception {
         long user = newUser();
         doThrow(new ExternalServiceException(Kind.UNAUTHORIZED, "x")).when(source).fetch(any(), any());
@@ -262,6 +284,8 @@ class CalendarFlowIntegrationTest {
         jdbc.update("INSERT INTO oauth_tokens (user_id, provider, principal_name, access_token_enc, scopes, "
                 + "updated_at) VALUES (?, 'google', ?, 'enc', 'openid https://www.googleapis.com/auth/calendar.events', "
                 + "'2026-11-11 22:30:00.000000')", id, sub);
+        jdbc.update("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, 'CALENDAR', "
+                + "'2026-11-01', '2026-09-01 00:00:00')", id);
         return id;
     }
 

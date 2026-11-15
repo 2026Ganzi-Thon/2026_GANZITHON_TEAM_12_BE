@@ -14,6 +14,7 @@ public interface DemoAccountSetup {
      *   <li>users: onboarding_step = DONE, onboarding_completed_at = 지정 시각</li>
      *   <li>user_settings: 측정 켜짐(hrv_enabled = TRUE). 행이 없으면 만든다</li>
      *   <li>user_consents: 유효한 건강정보(SENSITIVE_HRV) 동의가 없으면 새 동의 1건</li>
+     *   <li>user_consents: 유효한 캘린더 이용(CALENDAR) 동의가 없으면 새 동의 1건(동기화의 선행 조건)</li>
      * </ul>
      * 다른 동의(약관·캘린더 등)와 닉네임·생활 정보는 바꾸지 않는다.
      */
