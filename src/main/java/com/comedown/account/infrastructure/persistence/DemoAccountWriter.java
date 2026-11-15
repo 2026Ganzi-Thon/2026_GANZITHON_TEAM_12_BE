@@ -40,6 +40,15 @@ public class DemoAccountWriter {
 
     /** 가장 최근 건강정보 동의가 없거나 철회됐으면 새 동의를 넣는다. */
     public void ensureHrvConsent(long userId, Instant now) {
+        ensureConsent(userId, AccountAccessReader.SENSITIVE_HRV, now);
+    }
+
+    /** 가장 최근 캘린더 이용 동의가 없거나 철회됐으면 새 동의를 넣는다(캘린더 동기화의 선행 조건). */
+    public void ensureCalendarConsent(long userId, Instant now) {
+        ensureConsent(userId, AccountAccessReader.CALENDAR, now);
+    }
+
+    private void ensureConsent(long userId, String consentType, Instant now) {
         Boolean valid = jdbc.sql("""
                         SELECT c.withdrawn_at IS NULL
                           FROM user_consents c
@@ -47,13 +56,13 @@ public class DemoAccountWriter {
                          ORDER BY c.agreed_at DESC, c.id DESC
                          LIMIT 1
                         """)
-                .params(userId, AccountAccessReader.SENSITIVE_HRV)
+                .params(userId, consentType)
                 .query(Boolean.class)
                 .optional()
                 .orElse(false);
         if (!valid) {
             jdbc.sql("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, ?, ?, ?)")
-                    .params(userId, AccountAccessReader.SENSITIVE_HRV, DEMO_CONSENT_VERSION, utc(now))
+                    .params(userId, consentType, DEMO_CONSENT_VERSION, utc(now))
                     .update();
         }
     }
