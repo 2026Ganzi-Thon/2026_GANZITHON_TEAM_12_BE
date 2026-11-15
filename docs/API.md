@@ -265,6 +265,9 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 
 ### `POST /api/onboarding/complete` → 200 — A5 "홈으로"
 `{ "onboardingStep": "DONE", "dayIndex": 1 }`. 이때부터 1일차·무료 체험이 시작됩니다.
+- 완료 전에 선행 조건을 다시 확인합니다(0절). 순서: 단계가 `SCHEDULE_REPORT`가 아니면 409 `ONBOARDING_STEP_INVALID` → 캘린더 권한이 없으면 409 `CALENDAR_NOT_CONNECTED` → 일정 분석 결과가 없으면 409 `ONBOARDING_STEP_INVALID`("일정 분석을 먼저 끝내 주세요."). 거절되면 단계·완료 시각·체험은 바뀌지 않습니다.
+- 이미 완료한 사용자가 다시 부르면 조건을 다시 보지 않고 처음 완료 결과를 돌려줍니다(완료 뒤 캘린더를 해제해도 온보딩은 되돌리지 않음).
+- **구현 해석(확인 필요)** "일정 분석 결과"는 `POST /api/calendar/sync`가 저장하는 이번 주(월요일 시작) 주간 부하가 있는지로 판단합니다. 동기화가 성공했다면 일정이 0건이어도 행이 있어 완료할 수 있습니다.
 
 ---
 

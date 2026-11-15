@@ -110,6 +110,19 @@ class OnboardingFlowIntegrationTest {
                 .andExpect(jsonPath("$.preferredActivities.length()").value(2))
                 .andExpect(jsonPath("$.hrvEnabled").value(true));
 
+        // 완료는 캘린더 권한과 일정 분석 결과를 다시 확인한다.
+        mvc.perform(post("/api/onboarding/complete").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CALENDAR_NOT_CONNECTED"));
+        connectCalendar(user);
+        mvc.perform(post("/api/onboarding/complete").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ONBOARDING_STEP_INVALID"))
+                .andExpect(jsonPath("$.message").value("일정 분석을 먼저 끝내 주세요."));
+        assertThat(jdbc.queryForObject("SELECT onboarding_completed_at FROM users WHERE id = ?", Object.class, user))
+                .isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM subscriptions WHERE user_id = ?", Integer.class, user))
+                .isZero();
+        analyzedThisWeek(user); // 일정이 0건이어도 동기화하면 이번 주 부하 행이 생긴다
+
         mvc.perform(post("/api/onboarding/complete").with(loginAs(user)).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.onboardingStep").value("DONE"))
@@ -130,6 +143,12 @@ class OnboardingFlowIntegrationTest {
         mvc.perform(get("/api/me").with(loginAs(user)))
                 .andExpect(jsonPath("$.plan.plan").value("FREE")).andExpect(jsonPath("$.plan.daysLeft").value(0));
         clock.set(FixedClockTestConfig.DEFAULT_NOW);
+        // 완료한 뒤에는 캘린더를 해제해도 온보딩을 되돌리지 않는다(다시 불러도 같은 결과).
+        jdbc.update("DELETE FROM oauth_tokens WHERE user_id = ?", user);
+        jdbc.update("DELETE FROM weekly_loads WHERE user_id = ?", user);
+        mvc.perform(post("/api/onboarding/complete").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.onboardingStep").value("DONE"))
+                .andExpect(jsonPath("$.dayIndex").value(1));
         // 완료 후 생활 정보 수정은 단계를 바꾸지 않는다.
         send(put("/api/me/settings"), user, SETTINGS.replace("23:00", "00:30"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.onboardingStep").doesNotExist());
@@ -216,6 +235,19 @@ class OnboardingFlowIntegrationTest {
             long user, String body) throws Exception {
         return mvc.perform(builder.with(loginAs(user)).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content(body));
+    }
+
+    private void connectCalendar(long user) {
+        jdbc.update("INSERT INTO oauth_tokens (user_id, provider, principal_name, access_token_enc, scopes, "
+                + "updated_at) VALUES (?, 'google', ?, 'enc', 'openid https://www.googleapis.com/auth/calendar.events', "
+                + "'2026-11-11 22:30:00.000000')", user, "onb-" + UUID.randomUUID());
+    }
+
+    /** 동기화가 저장하는 이번 주(2026-11-09 월요일 시작) 주간 부하 행. */
+    private void analyzedThisWeek(long user) {
+        jdbc.update("INSERT INTO weekly_loads (user_id, week_start, total_hours, load_score, deadline_count, "
+                + "late_night_count, weekend_hours, rest_days, risk_level, calculation_version, computed_at) "
+                + "VALUES (?, '2026-11-09', 0, 0, 0, 0, 0, 7, 'NONE', 'load-v1', '2026-11-11 22:30:00')", user);
     }
 
     private long newUser() {
