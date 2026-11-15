@@ -189,6 +189,20 @@ class SuggestionIntegrationTest {
     }
 
     @Test
+    void 승인_시작은_이번_호출이_시작했는지_알려준다() {
+        SuggestionView s = propose(userId, "RECOVERY", TODAY, "2026-11-12T07:00:00Z", 20, null);
+
+        assertThat(approvals.startApproval(userId, s.id(), null, null).started()).isTrue();
+        // 이미 승인 중이면 바꾸지 않고, 이전 시도가 있었음을 알린다.
+        var again = approvals.startApproval(userId, s.id(), null, null);
+        assertThat(again.started()).isFalse();
+        assertThat(again.suggestion().status()).isEqualTo("APPROVING");
+
+        approvals.markFailed(userId, s.id());
+        assertThat(approvals.startApproval(userId, s.id(), null, null).started()).isTrue(); // 확정 실패 뒤 재시도
+    }
+
+    @Test
     void 확정_실패_뒤_재시도와_되돌리기() {
         SuggestionView s = propose(userId, "RECOVERY", TODAY, "2026-11-12T07:00:00Z", 20, null);
         approvals.beginApproval(userId, s.id(), null, null);

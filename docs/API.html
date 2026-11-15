@@ -498,7 +498,7 @@
 
 " data-group="g4"><summary><span class="method POST">POST</span><div><div class="path">/api/suggestions/{id}/undo</div><div class="description">등록한 추천 일정 되돌리기</div></div></summary><div class="detail-body"><p>Come-down이 넣은 그 일정만 구글에서 지우고 <code>UNDONE</code>으로 바꿉니다.</p>
 </div></details><details class="endpoint" data-search="post /api/suggestions/{id}/done 활동 수행 완료 체크 
-- 상태 규칙: `proposed → approving → approved`; `proposed → dismissed/expired`; 확정 등록 실패만 `approving → failed`(재시도는 failed → approving). 타임아웃은 failed로 확정하지 않습니다.
+- 상태 규칙: `proposed → approving → approved`; `proposed → dismissed/expired`; 확정 등록 실패만 `approving → failed`(재시도는 failed → approving). 타임아웃은 failed로 확정하지 않습니다. 재확인 작업이나 이미 `approving`인 제안의 재승인처럼 같은 등록 키로 이전 시도가 있었을 수 있으면, 이번 시도가 거절되거나 캘린더 자격을 얻지 못해도 구글에 그 일정이 없다고 확인된 뒤에만 `failed`로 확정하고, 확인하지 못하면 `approving`으로 둡니다(자격이 돌아오면 재확인 작업이 같은 키로 끝냄).
 - dismiss는 proposed에서만, undo는 approved에서만 허용합니다. undo는 앱 소유 google 일정임을 확인하고 삭제 후 undone(이미 삭제된 404도 성공). done은 approved에서 일정 종료 후 허용하고 `doneat`만 채우며 상태는 유지합니다. 완료한 일정은 undo 불가입니다. 반복 dismiss/undo/done은 같은 결과 200, 그 외 전이는 409 `invalid_state`입니다.
 - generate는 기존 approved를 보존하고 미승인 중복을 만들지 않습니다. 모든 갱신 응답은 최신 suggestion입니다.
 - 조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). `type=recovery` 조회는 온보딩 완료 후(403 `onboarding_required`), pre_start는 온보딩 중에도 조회합니다. `type`·`status`가 정의된 값이 아니거나 `date`가 `yyyy-mm-dd`가 아니면 400입니다. 목록은 시작 시각 순입니다.
@@ -510,7 +510,7 @@
 ---
 
 " data-group="g4"><summary><span class="method POST">POST</span><div><div class="path">/api/suggestions/{id}/done</div><div class="description">활동 수행 완료 체크</div></div></summary><div class="detail-body"><ul>
-<li>상태 규칙: <code>PROPOSED → APPROVING → APPROVED</code>; <code>PROPOSED → DISMISSED/EXPIRED</code>; 확정 등록 실패만 <code>APPROVING → FAILED</code>(재시도는 FAILED → APPROVING). 타임아웃은 FAILED로 확정하지 않습니다.</li>
+<li>상태 규칙: <code>PROPOSED → APPROVING → APPROVED</code>; <code>PROPOSED → DISMISSED/EXPIRED</code>; 확정 등록 실패만 <code>APPROVING → FAILED</code>(재시도는 FAILED → APPROVING). 타임아웃은 FAILED로 확정하지 않습니다. 재확인 작업이나 이미 <code>APPROVING</code>인 제안의 재승인처럼 같은 등록 키로 이전 시도가 있었을 수 있으면, 이번 시도가 거절되거나 캘린더 자격을 얻지 못해도 구글에 그 일정이 없다고 확인된 뒤에만 <code>FAILED</code>로 확정하고, 확인하지 못하면 <code>APPROVING</code>으로 둡니다(자격이 돌아오면 재확인 작업이 같은 키로 끝냄).</li>
 <li>dismiss는 PROPOSED에서만, undo는 APPROVED에서만 허용합니다. undo는 앱 소유 Google 일정임을 확인하고 삭제 후 UNDONE(이미 삭제된 404도 성공). done은 APPROVED에서 일정 종료 후 허용하고 <code>doneAt</code>만 채우며 상태는 유지합니다. 완료한 일정은 undo 불가입니다. 반복 dismiss/undo/done은 같은 결과 200, 그 외 전이는 409 <code>INVALID_STATE</code>입니다.</li>
 <li>generate는 기존 APPROVED를 보존하고 미승인 중복을 만들지 않습니다. 모든 갱신 응답은 최신 Suggestion입니다.</li>
 <li>조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). <code>type=RECOVERY</code> 조회는 온보딩 완료 후(403 <code>ONBOARDING_REQUIRED</code>), PRE_START는 온보딩 중에도 조회합니다. <code>type</code>·<code>status</code>가 정의된 값이 아니거나 <code>date</code>가 <code>YYYY-MM-DD</code>가 아니면 400입니다. 목록은 시작 시각 순입니다.</li>

@@ -6,6 +6,7 @@ import com.comedown.calendar.contract.CalendarEventWriter;
 import com.comedown.calendar.contract.CalendarEventWriter.DeleteResult;
 import com.comedown.calendar.contract.CalendarEventWriter.NewEvent;
 import com.comedown.recommendation.contract.SuggestionApprovalCommands;
+import com.comedown.recommendation.contract.SuggestionApprovalCommands.ApprovalStart;
 import com.comedown.recommendation.contract.SuggestionPlanning.TimeSlot;
 import com.comedown.recommendation.contract.SuggestionQuery;
 import com.comedown.recommendation.contract.SuggestionView;
@@ -14,6 +15,7 @@ import com.comedown.shared.error.ErrorCode;
 import com.comedown.shared.error.ExternalServiceException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ import org.springframework.stereotype.Service;
  *   - 확정된 거절(4xx)·자격 오류: markFailed (재시도는 FAILED → APPROVING)
  *   - 타임아웃·5xx(결과 모름): 실패로 확정하지 않고 등록 키로 조회해 확인. 못 알면 APPROVING으로 두고 202,
  *     재확인 작업({@link ApprovalRecheckJob})이 같은 키로 이어서 확인·재시도한다.
+ *   - 재확인·이미 APPROVING인 제안의 재승인: 같은 키로 이전 시도가 있었을 수 있으므로, 거절·자격 오류여도 구글에 그 일정이
+ *     없다고 확인된 뒤에만 markFailed. 확인하지 못하면 APPROVING으로 둔다.
  * </pre>
  */
 @Service
@@ -73,11 +77,12 @@ public class SuggestionApprovalFlow {
         if (start != null || end != null) {
             validateChange(s, start, end, userId);
         }
-        SuggestionView begun = approvals.beginApproval(userId, suggestionId, start, end);
-        if ("APPROVED".equals(begun.status())) {
-            return new Result(begun, true);
+        ApprovalStart begun = approvals.startApproval(userId, suggestionId, start, end);
+        if ("APPROVED".equals(begun.suggestion().status())) {
+            return new Result(begun.suggestion(), true);
         }
-        return register(begun, true);
+        // 이번 호출이 승인을 시작한 것이 아니면(이미 APPROVING) 이전 시도가 구글에 반영됐을 수 있다.
+        return register(begun.suggestion(), true, !begun.started());
     }
 
     /** 되돌리기: Come-down이 만든 구글 일정만 지우고 UNDONE. 이미 UNDONE이면 같은 결과. */
@@ -100,34 +105,73 @@ public class SuggestionApprovalFlow {
 
     /** 승인 중인 채 오래된 제안의 외부 결과를 다시 확인한다(재확인 작업). */
     void recheck(SuggestionView s) {
-        register(s, false);
+        register(s, false, true);
     }
 
     // ---------- 내부 ----------
 
-    /** 등록 키로 구글에 등록하고(이미 있으면 만들지 않음) 결과에 따라 상태를 확정한다. */
-    private Result register(SuggestionView s, boolean surfaceErrors) {
+    /**
+     * 등록 키로 구글에 등록하고(이미 있으면 만들지 않음) 결과에 따라 상태를 확정한다.
+     *
+     * @param earlierAttemptPossible 같은 등록 키로 이전 시도가 있었을 수 있는지(재확인 작업, 이미 APPROVING인 제안의 재승인).
+     *                               이전 시도는 결과를 모르는 채 끝났을 수 있으므로, 이번 시도가 거절돼도 구글에 일정이
+     *                               없다고 확인되기 전에는 FAILED로 확정하지 않는다.
+     */
+    private Result register(SuggestionView s, boolean surfaceErrors, boolean earlierAttemptPossible) {
         CalendarCredential credential;
         try {
             credential = credentials.credentialFor(s.userId());
         } catch (ApiException e) {
-            approvals.markFailed(s.userId(), s.id()); // 구글에 아무것도 보내지 않았으므로 확정 실패
-            throw e;
+            if (!earlierAttemptPossible) {
+                approvals.markFailed(s.userId(), s.id()); // 구글에 아무것도 보낸 적이 없으므로 확정 실패
+                throw e;
+            }
+            // 이전 시도의 결과를 확인할 자격이 없다. 실패로 확정하지 않고 APPROVING으로 둔다(자격이 돌아오면 재확인이 끝낸다).
+            log.warn("제안 승인 결과를 확인할 캘린더 자격이 없습니다(suggestion={}, code={})", s.id(), e.errorCode());
+            if (surfaceErrors) {
+                throw e;
+            }
+            return new Result(s, false);
         }
         NewEvent event = new NewEvent(s.registrationKey(), s.title(), s.start(), s.end());
         try {
             String googleEventId = writer.register(credential, event);
             return new Result(approvals.confirmApproved(s.userId(), s.id(), googleEventId), true);
         } catch (ExternalServiceException e) {
-            if (e.kind() != ExternalServiceException.Kind.UNCERTAIN) {
-                approvals.markFailed(s.userId(), s.id());
-                if (surfaceErrors) {
-                    throw mapped(e);
-                }
-                log.warn("제안 승인 확정 실패(suggestion={}, kind={})", s.id(), e.kind());
-                return new Result(s, false);
+            if (e.kind() == ExternalServiceException.Kind.UNCERTAIN) {
+                return confirmIfRegistered(s, credential);
             }
-            return confirmIfRegistered(s, credential);
+            if (earlierAttemptPossible) {
+                Optional<Result> settled = settleEarlierAttempt(s, credential);
+                if (settled.isPresent()) {
+                    return settled.get();
+                }
+            }
+            approvals.markFailed(s.userId(), s.id());
+            if (surfaceErrors) {
+                throw mapped(e);
+            }
+            log.warn("제안 승인 확정 실패(suggestion={}, kind={})", s.id(), e.kind());
+            return new Result(s, false);
+        }
+    }
+
+    /**
+     * 이번 등록이 거절됐을 때, 이전 시도가 만든 일정이 있는지 등록 키로 확인한다.
+     *
+     * @return 일정이 있으면 APPROVED로 확정한 결과, 확인하지 못했으면 APPROVING 그대로인 결과. 일정이 없다고 확인되면
+     *         비어 있다(호출하는 쪽이 확정 실패로 처리).
+     */
+    private Optional<Result> settleEarlierAttempt(SuggestionView s, CalendarCredential credential) {
+        try {
+            if (writer.exists(credential, s.registrationKey())) {
+                return Optional.of(
+                        new Result(approvals.confirmApproved(s.userId(), s.id(), s.registrationKey()), true));
+            }
+            return Optional.empty();
+        } catch (ExternalServiceException e) {
+            log.warn("이전 승인 시도의 결과를 확인하지 못했습니다(suggestion={}, kind={})", s.id(), e.kind());
+            return Optional.of(new Result(s, false));
         }
     }
 
