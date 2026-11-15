@@ -333,10 +333,18 @@
 <li>과부하 대비 제안은 <code>GET /api/suggestions?type=PRE_START</code>로 따로 받습니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="post /api/onboarding/complete 온보딩 완료 · 1일차 시작 `{ &quot;onboardingstep&quot;: &quot;done&quot;, &quot;dayindex&quot;: 1 }`. 이때부터 1일차·무료 체험이 시작됩니다.
+- 완료 전에 선행 조건을 다시 확인합니다(0절). 순서: 단계가 `schedule_report`가 아니면 409 `onboarding_step_invalid` → 캘린더 권한이 없으면 409 `calendar_not_connected` → 일정 분석 결과가 없으면 409 `onboarding_step_invalid`(&quot;일정 분석을 먼저 끝내 주세요.&quot;). 거절되면 단계·완료 시각·체험은 바뀌지 않습니다.
+- 이미 완료한 사용자가 다시 부르면 조건을 다시 보지 않고 처음 완료 결과를 돌려줍니다(완료 뒤 캘린더를 해제해도 온보딩은 되돌리지 않음).
+- **구현 해석(확인 필요)** &quot;일정 분석 결과&quot;는 `post /api/calendar/sync`가 저장하는 이번 주(월요일 시작) 주간 부하가 있는지로 판단합니다. 동기화가 성공했다면 일정이 0건이어도 행이 있어 완료할 수 있습니다.
 
 ---
 
 " data-group="g1"><summary><span class="method POST">POST</span><div><div class="path">/api/onboarding/complete</div><div class="description">온보딩 완료 · 1일차 시작</div></div></summary><div class="detail-body"><p><code>{ &quot;onboardingStep&quot;: &quot;DONE&quot;, &quot;dayIndex&quot;: 1 }</code>. 이때부터 1일차·무료 체험이 시작됩니다.</p>
+<ul>
+<li>완료 전에 선행 조건을 다시 확인합니다(0절). 순서: 단계가 <code>SCHEDULE_REPORT</code>가 아니면 409 <code>ONBOARDING_STEP_INVALID</code> → 캘린더 권한이 없으면 409 <code>CALENDAR_NOT_CONNECTED</code> → 일정 분석 결과가 없으면 409 <code>ONBOARDING_STEP_INVALID</code>(&quot;일정 분석을 먼저 끝내 주세요.&quot;). 거절되면 단계·완료 시각·체험은 바뀌지 않습니다.</li>
+<li>이미 완료한 사용자가 다시 부르면 조건을 다시 보지 않고 처음 완료 결과를 돌려줍니다(완료 뒤 캘린더를 해제해도 온보딩은 되돌리지 않음).</li>
+<li><strong>구현 해석(확인 필요)</strong> &quot;일정 분석 결과&quot;는 <code>POST /api/calendar/sync</code>가 저장하는 이번 주(월요일 시작) 주간 부하가 있는지로 판단합니다. 동기화가 성공했다면 일정이 0건이어도 행이 있어 완료할 수 있습니다.</li>
+</ul>
 <hr />
 </div></details><details class="endpoint" data-search="post /api/onboarding/cbi/skip 건강정보 비동의 시 cbi 건너뛰기 profile 완료 + 민감정보 동의 없음인 경우만 허용.
 
