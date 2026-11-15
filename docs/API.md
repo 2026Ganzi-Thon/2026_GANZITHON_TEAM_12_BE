@@ -33,6 +33,7 @@
 | 로그인 | `/api/**` 전부(`/api/auth/csrf` 제외) | 401 `UNAUTHENTICATED` |
 | 온보딩 완료 | 홈·아침 측정·회복 리포트·RECOVERY 추천 | 403 `ONBOARDING_REQUIRED` |
 | 온보딩 중 허용 | 내 정보·설정·동의, CBI, 캘린더 연결·동기화·조회, 일정 리포트·주간 부하, PRE_START 조회·승인·건너뛰기, 안전 안내 | 현재 단계의 선행 조건은 별도 검증 |
+| 캘린더 이용 동의 | 캘린더 동기화 | 409 `ONBOARDING_STEP_INVALID` |
 | 건강정보 동의 | 측정·CBI·컨디션 저장 | 403 `HRV_CONSENT_REQUIRED` |
 | 측정 켜짐 | 측정 저장 | 403 `HRV_DISABLED` |
 | 유료(체험 종료 후) | 위험 주차 예측·과부하 대비 제안, 회복 일정 추천, 4주 리포트, 내 범위 중 현재 위치 | 403 `PREMIUM_REQUIRED` (**MVP에서는 막지 않고 `plan`만 내려줌**) |
@@ -313,6 +314,8 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
   "fetched": 52, "kept": 48, "created": 3, "updated": 1, "deleted": 0, "classified": 4 }
 ```
 - 범위: 시작 = min(오늘 − 1개월, 이번 주 월요일 − 4주), 끝 = 이번 주 월요일 + 5주.
+- 검사 순서: 로그인(401) → 캘린더 이용 동의(409 `ONBOARDING_STEP_INVALID`, "캘린더 이용 동의를 먼저 완료해 주세요.") → 캘린더 연결(409 `CALENDAR_NOT_CONNECTED`) → 구글 조회. 동의가 없으면 구글을 부르지 않고 일정·주간 부하를 저장하지 않습니다.
+- **구현 해석(확인 필요)** 동의는 `CALENDAR`의 가장 최근 동의가 유효한지로 판단합니다. 이 동의는 프로필 단계(`PUT /api/onboarding/profile`)의 필수 동의라서, 프로필 단계를 마치기 전에 캘린더 권한만 받고 동기화하는 경우에 거절됩니다. 별도 동의 오류 코드가 없어 "선행 단계 미완료"인 `ONBOARDING_STEP_INVALID`를 씁니다. `CALENDAR` 동의의 철회 API는 없고 캘린더를 그만 쓰려면 연결 해제(`DELETE /api/calendar/connection`)를 씁니다.
 - **현재 구현 범위**: AI·규칙 분류기는 아직 없어 새 일정은 직접 수정 규칙이 없으면 미분류(`category: null`, 가중치 1.0)로 남습니다. `kept`는 저장 대상으로 남은 일정 수이고, 구글에서 사라진 일정은 삭제하되 제안이 참조 중이면 `cancelled`로 표시해 조회에서 뺍니다. Come-down이 만든 구글 일정은 지우지 않습니다. 저장 후 PRE_START 제안을 갱신하며, 갱신이 실패해도 동기화는 성공으로 응답합니다(제안은 다음 동기화나 `generate`에서 다시 만듦).
 - 홈·캘린더 탭에 들어올 때 마지막 동기화가 10분 넘었으면 부릅니다.
 

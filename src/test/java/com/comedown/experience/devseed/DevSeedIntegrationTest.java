@@ -143,6 +143,8 @@ class DevSeedIntegrationTest {
         seed(userId, SEED).andExpect(status().isCreated());
 
         assertThat(count("user_consents WHERE consent_type = 'SENSITIVE_HRV'")).isEqualTo(2);
+        // 캘린더 이용 동의도 함께 넣는다(시드 계정으로 캘린더 동기화를 쓸 수 있게).
+        assertThat(count("user_consents WHERE consent_type = 'CALENDAR' AND withdrawn_at IS NULL")).isEqualTo(1);
         assertThat(count("user_consents WHERE consent_type = 'SENSITIVE_HRV' AND withdrawn_at IS NULL"))
                 .isEqualTo(1);
     }

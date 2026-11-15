@@ -260,6 +260,8 @@ class AccountLifecycleIntegrationTest {
         String sub = jdbc.queryForObject("SELECT google_sub FROM users WHERE id = ?", String.class, id);
         accounts.saveTokens(id, sub, new TokenGrant("access-" + id, "refresh-" + id, NOW, NOW.plusSeconds(3500),
                 Set.of("openid", CALENDAR)));
+        jdbc.update("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, 'CALENDAR', "
+                + "'2026-11-01', '2026-09-01 00:00:00')", id);
         return id;
     }
 
