@@ -253,11 +253,11 @@
 |---|---|---|---|
 | id | bigint | | pk |
 | user_id | bigint | | fk |
-| provider | varchar(20) | | `google`. uk(provider, principal_name), uk(user_id, provider). 현재는 사용자별 google 1개 |
+| provider | varchar(20) | | `google`. uk(provider, principal_name), uk(user_id, provider). 현재는 사용자별 google 1개이고 로그인·캘린더 허용 모두 이 행에 합쳐 저장 |
 | principal_name | varchar(64) | | 구글 sub |
 | access_token_enc / refresh_token_enc | text | refresh는 y | aes-256-gcm 암호화 |
 | access_token_issued_at / access_token_expires_at | datetime(6) | y | |
-| scopes | varchar(1000) | | 사용자가 실제로 허용한 범위(캘린더 체크 해제 여부 판단) |
+| scopes | varchar(1000) | | 구글이 돌려준 실제 허용 범위(공백 구분). 캘린더 범위(`…/auth/calendar.events`) 유무로 캘린더 연결을 판단. 새 refresh token이 없으면 기존 값 유지 |
 | updated_at | datetime(6) | | |
 
 "><summary><strong>oauth_tokens</strong> <span class="muted">— 구글 토큰</span></summary><div class="content"><table>
@@ -286,7 +286,7 @@
 <td>provider</td>
 <td>VARCHAR(20)</td>
 <td></td>
-<td><code>google</code>. UK(provider, principal_name), UK(user_id, provider). 현재는 사용자별 google 1개</td>
+<td><code>google</code>. UK(provider, principal_name), UK(user_id, provider). 현재는 사용자별 google 1개이고 로그인·캘린더 허용 모두 이 행에 합쳐 저장</td>
 </tr>
 <tr>
 <td>principal_name</td>
@@ -310,7 +310,7 @@
 <td>scopes</td>
 <td>VARCHAR(1000)</td>
 <td></td>
-<td>사용자가 실제로 허용한 범위(캘린더 체크 해제 여부 판단)</td>
+<td>구글이 돌려준 실제 허용 범위(공백 구분). 캘린더 범위(<code>…/auth/calendar.events</code>) 유무로 캘린더 연결을 판단. 새 refresh token이 없으면 기존 값 유지</td>
 </tr>
 <tr>
 <td>updated_at</td>

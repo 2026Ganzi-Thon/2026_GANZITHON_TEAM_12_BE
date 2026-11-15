@@ -3,3 +3,6 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+comedown:
+  # 테스트 전용 더미 키(0x00 32바이트). 실제 키가 아니다.
+  token-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=

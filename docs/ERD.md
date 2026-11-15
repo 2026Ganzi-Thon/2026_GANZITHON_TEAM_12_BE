@@ -269,11 +269,11 @@ erDiagram
 |---|---|---|---|
 | id | BIGINT | | PK |
 | user_id | BIGINT | | FK |
-| provider | VARCHAR(20) | | `google`. UK(provider, principal_name), UK(user_id, provider). 현재는 사용자별 google 1개 |
+| provider | VARCHAR(20) | | `google`. UK(provider, principal_name), UK(user_id, provider). 현재는 사용자별 google 1개이고 로그인·캘린더 허용 모두 이 행에 합쳐 저장 |
 | principal_name | VARCHAR(64) | | 구글 sub |
 | access_token_enc / refresh_token_enc | TEXT | refresh는 Y | AES-256-GCM 암호화 |
 | access_token_issued_at / access_token_expires_at | DATETIME(6) | Y | |
-| scopes | VARCHAR(1000) | | 사용자가 실제로 허용한 범위(캘린더 체크 해제 여부 판단) |
+| scopes | VARCHAR(1000) | | 구글이 돌려준 실제 허용 범위(공백 구분). 캘린더 범위(`…/auth/calendar.events`) 유무로 캘린더 연결을 판단. 새 refresh token이 없으면 기존 값 유지 |
 | updated_at | DATETIME(6) | | |
 
 #### `subscriptions` — 무료 체험·구독 (1:1, MVP는 체험 기간만)
