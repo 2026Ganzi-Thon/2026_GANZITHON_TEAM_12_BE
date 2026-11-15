@@ -13,11 +13,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 주간 부하 재계산·조회 유스케이스. 일정은 calendar 계약으로만 읽고 weekly_loads만 쓴다.
- * Spring 빈 등록과 트랜잭션 경계는 저장 어댑터가 준비되면 붙인다.
+ * 외부 호출이 없으므로 DB 트랜잭션 하나로 묶는다.
  */
+@Service
 public class WeeklyLoadService {
 
     /** 연속 일정일 10일 판정에 필요한 앞뒤 여유(10일 연속이면 주의 앞뒤로 최대 9일). */
@@ -40,6 +43,7 @@ public class WeeklyLoadService {
      * @param weekStarts 월요일 날짜들(순서·중복 무관)
      * @return 계산한 주(오름차순)
      */
+    @Transactional
     public List<WeekLoad> recalculate(long userId, Iterable<LocalDate> weekStarts) {
         List<LocalDate> ordered = new ArrayList<>();
         for (LocalDate weekStart : weekStarts) {
@@ -56,6 +60,7 @@ public class WeeklyLoadService {
     }
 
     /** 저장된 주간 부하를 {@code from}이 속한 주부터 {@code count}주 돌려준다. 계산된 적 없는 주는 빠진다. */
+    @Transactional(readOnly = true)
     public List<WeekLoad> weeks(long userId, LocalDate from, int count) {
         LocalDate first = time.weekStartOf(from);
         return store.findBetween(userId, first, first.plusWeeks(count - 1L));
