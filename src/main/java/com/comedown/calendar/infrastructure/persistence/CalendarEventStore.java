@@ -45,6 +45,11 @@ public class CalendarEventStore {
         return result;
     }
 
+    /** 사용자의 모든 일정을 지운다(제안의 일정 참조를 먼저 끊은 뒤). */
+    public int deleteAll(long userId) {
+        return jdbc.sql("DELETE FROM calendar_events WHERE user_id = ?").params(userId).update();
+    }
+
     /** 마지막 동기화 시각과 (취소 제외) 전체·분류된 일정 수. */
     public Overview overview(long userId) {
         return jdbc.sql("""

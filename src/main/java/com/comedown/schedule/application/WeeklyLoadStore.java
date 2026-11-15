@@ -16,4 +16,7 @@ public interface WeeklyLoadStore {
 
     /** 같은 (userId, weekStart) 행이 있으면 갱신한다. */
     void save(long userId, WeekLoad load, Instant computedAt);
+
+    /** 사용자의 모든 행을 지운다. @return 지운 행 수 */
+    int deleteAll(long userId);
 }

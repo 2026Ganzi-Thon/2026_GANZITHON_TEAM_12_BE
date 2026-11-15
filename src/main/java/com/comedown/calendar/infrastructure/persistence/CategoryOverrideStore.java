@@ -20,6 +20,10 @@ public class CategoryOverrideStore {
         this.jdbc = jdbc;
     }
 
+    public void deleteAll(long userId) {
+        jdbc.sql("DELETE FROM event_category_overrides WHERE user_id = ?").params(userId).update();
+    }
+
     public List<CategoryOverride> findAll(long userId) {
         return jdbc.sql("""
                         SELECT scope, match_key, category, burden, adjustable, is_deadline

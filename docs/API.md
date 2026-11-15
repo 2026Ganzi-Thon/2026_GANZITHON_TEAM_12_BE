@@ -151,6 +151,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 
 ### `DELETE /api/me` → 204 — 회원 탈퇴
 모든 사용자 데이터·로그인 세션 및 CSRF 인증 상태를 제거합니다. 구글 토큰 철회는 실패 시 재시도합니다. 외부 정리가 진행 중이면 202 + `{ "status": "DELETING" }`, 완료 후 204. 새 로그인으로 삭제 작업을 취소하지 않습니다. Come-down이 캘린더에 넣은 일정을 지울지는 열린 항목 4.
+- **현재 구현 범위**: 구글 철회가 성공하면(이미 철회된 토큰 포함) 제안의 일정 참조 해제 → 일정·분류 규칙·주간 부하 → 세션 → 사용자 순으로 한 트랜잭션에서 지웁니다. 철회가 실패하면 202이고, `DELETING` 표시와 암호화 토큰이 남아 재시도 작업(기본 5분)이나 같은 API 재호출이 이어서 끝냅니다. 끝나면 `SESSION`·`XSRF-TOKEN` 쿠키를 지우는 204입니다. Come-down이 만든 구글 일정은 지우지 않습니다(열린 항목 4).
 
 ---
 
@@ -580,6 +581,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 
 - `GET /api/me/settings`는 measureTime·sleepStart·sleepEnd·preferredActivities·hrvEnabled를 반환합니다. `PUT /api/me/settings`는 앞의 생활 정보 4필드 전체 교체이며 hrvEnabled 변경은 동의 API로만 처리합니다. 시간 HH:mm, 수면 시작≠종료, 활동 중복·미등록 코드 불가입니다.
 - `DELETE /api/hrv/data`와 `deleteData=true`는 측정·일별 회복 상태·컨디션 및 교란 요인·CBI 응답·회복 AI 캐시·회복 기반 미승인 추천·안전 안내를 삭제하고 기준선과 카운터를 초기화합니다. morning_checks에는 호흡 완료 등 비건강 메타데이터만 남길 수 있습니다. 승인된 일정·이력의 건강 근거는 제거합니다. CBI로 이미 통과한 온보딩 단계는 되돌리지 않습니다. "건강 기록 전체 삭제"로 UI에 표시하며 사용자가 삭제 범위를 확인하게 합니다.
+- 응답: `DELETE /api/hrv/data`, `DELETE /api/me/consents/SENSITIVE_HRV[?deleteData=true]`는 204입니다(이미 철회·삭제돼 있어도 204, 재시도 안전). 캘린더 연결 해제(`DELETE /api/calendar/connection`)는 철회 요청으로 연결이 즉시 끊기고(동기화 409 `CALENDAR_NOT_CONNECTED`), 구글 철회가 끝나면 204, 아직이면 202 `{ "status": "DELETING" }`입니다. **구현 해석(확인 필요)**: 삭제하는 "미승인 제안"은 `PRE_START` 중 `APPROVING`·`APPROVED`가 아닌 것이고, 나머지 제안은 `relatedEvent`만 null로 둡니다. 구글 철회는 refresh token(없으면 access token)을 철회하므로 구글 쪽 허용 전체가 해제됩니다(캘린더만 철회하는 방식은 열린 항목).
 - 기능별 삭제 계약(조율은 `experience.accountlifecycle`, 한 트랜잭션): `SuggestionDataDeletion.removeHealthBasis` → `SafetyDataDeletion.deleteAll` → `CbiDataDeletion.deleteAll` → `RecoveryDataDeletion.deleteAll` → `CheckinDataDeletion.eraseHealthData` → `IdempotencyService.deleteForUser(userId, "hrv-")`·`("cbi-")`. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. 회복 AI 캐시(`ai_outputs`)는 ai 구현 때 같은 순서에 추가합니다.
 - **구현 해석(확인 필요)** 아침 체크는 호흡 기록이 있으면 건강 필드(컨디션·교란 요인)와 `completed_at`만 비우고 남기며, 남을 것이 없는 체크는 지웁니다. "회복 기반 미승인 추천"은 RECOVERY 중 `APPROVING`·`APPROVED`가 아닌 것이며 지웁니다(`APPROVING`은 외부 등록 확인 전이라 남김). 남는 RECOVERY 제안은 "건강 근거 제거"로 `judgment_state`·`message`를 비우고 `reason_code`를 `HEALTH_DATA_DELETED`로 바꾸며, PRE_START는 `judgment_state`만 비웁니다(제목·시간·Google 일정·승인 상태는 유지). 안전 안내는 `LOW_RECOVERY_2W`·`CBI_HIGH` 모두 건강 근거이므로 지웁니다.
 - 민감정보 비동의/철회 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.

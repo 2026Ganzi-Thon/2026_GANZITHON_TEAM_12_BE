@@ -75,7 +75,10 @@ public class GoogleAccountWriter {
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) AS v
                         ON DUPLICATE KEY UPDATE
                             access_token_enc = v.access_token_enc,
-                            refresh_token_enc = COALESCE(v.refresh_token_enc, oauth_tokens.refresh_token_enc),
+                            refresh_token_enc = IF(oauth_tokens.revoke_requested_at IS NOT NULL,
+                                v.refresh_token_enc,
+                                COALESCE(v.refresh_token_enc, oauth_tokens.refresh_token_enc)),
+                            revoke_requested_at = NULL,
                             access_token_issued_at = v.access_token_issued_at,
                             access_token_expires_at = v.access_token_expires_at,
                             scopes = v.scopes,
@@ -86,6 +89,17 @@ public class GoogleAccountWriter {
                         issuedAt == null ? null : utc(issuedAt), expiresAt == null ? null : utc(expiresAt),
                         scopes, utc(now))
                 .update();
+    }
+
+    /** 철회 요청 표시(연결이 숨겨진다). 토큰 행이 없으면 아무 일도 하지 않는다. */
+    public void requestRevoke(long userId, Instant now) {
+        jdbc.sql("UPDATE oauth_tokens SET revoke_requested_at = COALESCE(revoke_requested_at, ?) WHERE user_id = ?")
+                .params(utc(now), userId).update();
+    }
+
+    /** 철회가 끝났으므로 토큰을 지운다. */
+    public void deleteTokens(long userId) {
+        jdbc.sql("DELETE FROM oauth_tokens WHERE user_id = ?").params(userId).update();
     }
 
     /** 갱신한 access token만 바꾼다(refresh token·scopes는 그대로). */

@@ -35,4 +35,7 @@ public interface AccountCommands {
      * @return 처리 후 현재 단계
      */
     String replaceSettings(long userId, Settings settings);
+
+    /** 건강정보(SENSITIVE_HRV) 동의를 철회하고 측정을 끈다. 유효한 동의가 없어도 측정은 꺼 둔다(재시도 안전). */
+    void withdrawHealthConsent(long userId);
 }

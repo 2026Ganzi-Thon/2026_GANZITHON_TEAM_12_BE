@@ -114,8 +114,39 @@ public class AccountStore {
                 .params(userId, enabled, utc(now)).update();
     }
 
+    /** 사용자 행을 잠근다(트랜잭션 안에서). 없는 사용자는 false. */
+    public boolean lockUser(long userId) {
+        return jdbc.sql("SELECT id FROM users WHERE id = ? FOR UPDATE").params(userId).query(Long.class)
+                .optional().isPresent();
+    }
+
+    public void markDeleting(long userId, Instant now) {
+        jdbc.sql("UPDATE users SET deletion_status = 'DELETING', deletion_requested_at = ? "
+                        + "WHERE id = ? AND deletion_status = 'ACTIVE'")
+                .params(utc(now), userId).update();
+    }
+
+    public List<Long> deletingUsers(int limit) {
+        return jdbc.sql("SELECT id FROM users WHERE deletion_status = 'DELETING' "
+                        + "ORDER BY deletion_requested_at LIMIT ?")
+                .params(limit).query(Long.class).list();
+    }
+
+    public void deleteUser(long userId) {
+        jdbc.sql("DELETE FROM users WHERE id = ?").params(userId).update();
+    }
+
+    /** 가장 최근 동의가 유효하면 철회 시각을 기록한다. */
+    public void withdrawLatestConsent(long userId, String type, Instant now) {
+        jdbc.sql("""
+                        UPDATE user_consents SET withdrawn_at = ?
+                         WHERE user_id = ? AND consent_type = ? AND withdrawn_at IS NULL
+                        """)
+                .params(utc(now), userId, type).update();
+    }
+
     public boolean hasToken(long userId) {
-        Integer n = jdbc.sql("SELECT COUNT(*) FROM oauth_tokens WHERE user_id = ?").params(userId)
+        Integer n = jdbc.sql("SELECT COUNT(*) FROM oauth_tokens WHERE user_id = ? AND revoke_requested_at IS NULL").params(userId)
                 .query(Integer.class).single();
         return n != null && n > 0;
     }

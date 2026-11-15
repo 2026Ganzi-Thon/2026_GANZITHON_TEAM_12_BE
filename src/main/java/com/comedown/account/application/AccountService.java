@@ -132,6 +132,13 @@ public class AccountService implements AccountCommands {
         }
     }
 
+    @Override
+    @Transactional
+    public void withdrawHealthConsent(long userId) {
+        store.withdrawLatestConsent(userId, SENSITIVE_HRV, time.now());
+        store.setHrvEnabled(userId, false, time.now());
+    }
+
     private static String validNickname(String raw, List<FieldError> errors) {
         String nickname = raw == null ? "" : raw.trim();
         int length = nickname.codePointCount(0, nickname.length());

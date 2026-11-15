@@ -3,10 +3,8 @@ package com.comedown.experience.calendarflow.application;
 import com.comedown.account.contract.CalendarCredential;
 import com.comedown.account.contract.CalendarCredentialProvider;
 import com.comedown.calendar.contract.CalendarEventSource;
-import com.comedown.calendar.contract.CalendarEventSync;
 import com.comedown.calendar.contract.SyncResult;
 import com.comedown.calendar.contract.SyncedEvent;
-import com.comedown.schedule.contract.WeekLoads;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
 import com.comedown.shared.error.ExternalServiceException;
@@ -30,16 +28,14 @@ public class CalendarSyncFlow {
 
     private final CalendarCredentialProvider credentials;
     private final CalendarEventSource source;
-    private final CalendarEventSync sync;
-    private final WeekLoads weekLoads;
+    private final CalendarSyncCommit commit;
     private final ServiceTime time;
 
     public CalendarSyncFlow(CalendarCredentialProvider credentials, CalendarEventSource source,
-            CalendarEventSync sync, WeekLoads weekLoads, ServiceTime time) {
+            CalendarSyncCommit commit, ServiceTime time) {
         this.credentials = credentials;
         this.source = source;
-        this.sync = sync;
-        this.weekLoads = weekLoads;
+        this.commit = commit;
         this.time = time;
     }
 
@@ -60,8 +56,7 @@ public class CalendarSyncFlow {
                 case FAILURE -> new ApiException(ErrorCode.CALENDAR_API_ERROR);
             };
         }
-        SyncResult saved = sync.apply(userId, range, fetched);
-        weekLoads.recalculate(userId, mondaysBetween(fromDate, toDate));
+        SyncResult saved = commit.commit(userId, range, fetched, mondaysBetween(fromDate, toDate));
         return new Result(range.start(), range.endExclusive(), fetched.size(), saved);
     }
 
