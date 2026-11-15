@@ -13,6 +13,9 @@ public interface HrvDailyStateRepository extends JpaRepository<HrvDailyState, Hr
 
     Optional<HrvDailyState> findByUserIdAndStateDate(long userId, LocalDate stateDate);
 
+    Optional<HrvDailyState> findFirstByUserIdAndStateDateLessThanEqualOrderByStateDateDesc(long userId,
+            LocalDate date);
+
     List<HrvDailyState> findByUserIdAndStateDateBetweenOrderByStateDateAsc(long userId, LocalDate from, LocalDate to);
 
     /** from 이후 결과를 지운다. 범위 삭제가 잠금을 잡아 같은 사용자의 동시 재계산을 직렬화한다. */

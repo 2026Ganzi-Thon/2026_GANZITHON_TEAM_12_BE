@@ -46,6 +46,20 @@ public class MorningAccessGuard {
         return serviceTime.toServiceDate(requireHealthDataAccess(userId).onboardingCompletedAt());
     }
 
+    /**
+     * 조회(오늘 체크 등): 온보딩 완료만 본다. 동의·측정 켜짐이 없어도 저장된 기록이 없을 뿐 조회는 막지 않는다.
+     *
+     * @return 온보딩 완료 서울 날짜(n일차 기준)
+     */
+    public LocalDate requireOnboarded(long userId) {
+        HealthDataAccess access = accountAccess.findHealthDataAccess(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED));
+        if (!access.onboardingCompleted()) {
+            throw new ApiException(ErrorCode.ONBOARDING_REQUIRED);
+        }
+        return serviceTime.toServiceDate(access.onboardingCompletedAt());
+    }
+
     private HealthDataAccess requireHealthDataAccess(long userId) {
         HealthDataAccess access = accountAccess.findHealthDataAccess(userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED));
