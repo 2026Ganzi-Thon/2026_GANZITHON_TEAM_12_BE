@@ -142,6 +142,8 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 }
 ```
 - `dayIndex`: 온보딩 완료일을 1일차로 센 오늘 n일차. 온보딩 전이면 null.
+- `plan`: 온보딩 완료 때 체험(28일)이 시작되며 그 전에는 null. `daysLeft`는 서울 날짜 기준 남은 일수이고, 체험이 끝나면 `FREE`·0으로 내려갑니다(MVP는 막지 않음). `calendar.connected`는 구글 토큰 행이 있는지, `scopeGranted`는 캘린더 범위가 허용됐는지입니다.
+- 온보딩 단계 전이: profile → `CBI`, CBI 제출·건너뛰기 → `LIFESTYLE`, 생활 정보 저장 → `SCHEDULE_REPORT`, complete → `DONE`. 선행 단계가 안 끝났으면 409 `ONBOARDING_STEP_INVALID`입니다. 동의(`POST /api/me/consents`)는 이미 유효하면 그대로 두고, `SENSITIVE_HRV`면 측정을 켭니다. 동의 철회·건강 기록 삭제는 라이프사이클 작업에서 구현합니다.
 - `onboardingStep`: `PROFILE` `CBI` `LIFESTYLE` `SCHEDULE_REPORT` `DONE`.
 
 ### `POST /api/auth/logout` → 204
@@ -293,7 +295,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 - `todayCheck.status`: 오늘 체크가 없으면 `NOT_STARTED`, 있으나 컨디션 전이면 `IN_PROGRESS`, 컨디션까지 저장했으면 `DONE`.
 - `todaySuggestions`: 오늘 날짜(`targetDate`)의 PRE_START·RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것(시작 시각 순).
 - **구현 해석(확인 필요)** `recovery.status`·`changePct`·`baseline`은 오늘 이하에서 가장 최근 회복 상태 기준입니다(오늘 기록 전이면 어제까지 계산값). 기록이 없으면 `BUILDING`. `excludedToday`는 오늘 컨디션까지 입력했는데 적격일이 아닐 때(교란 요인·대표값 없음) true입니다.
-- **현재 구현 범위**: `thisWeekLoad`(schedule 읽기 계약)·`plan`(subscription 읽기 계약)은 일정축 계약이 생기기 전까지 null, `judgment`는 추천 임계값 확정 전까지 null입니다.
+- **현재 구현 범위**: `thisWeekLoad`는 캘린더를 동기화해 이번 주 부하가 계산되기 전까지, `plan`은 온보딩을 완료해 체험을 시작하기 전까지 null이며, `judgment`는 추천 임계값 확정 전까지 null입니다.
 
 ---
 
@@ -557,7 +559,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - `load`: 온보딩 기준 1주차(1~7일차)와 4주차(22~28일차)의 일정 부하 평소 대비(각 주차의 직전 4개 주차 평균 대비, %). 못 구한 값은 null, 캘린더 미연결이면 `load`가 null입니다.
 - `suggestions`: 1~28일차에 날짜가 걸린 제안 중 `approved` = 상태가 APPROVED인 수, `done` = "했어요"를 누른 수.
 - **구현 해석(확인 필요)** `recovery`: 첫 주 = 1~7일차, 마지막 주 = 22~28일차. 각 주에서 대표값이 있고 교란일이 아닌 날의 ln 평균을 exp로 바꾼 값(ms, 단순 RMSSD 산술 평균 아님)이며, `changePct` = (exp(마지막 주 − 첫 주) − 1) × 100입니다. 어느 한 주라도 값이 없으면 그 값과 `changePct`는 null입니다.
-- **현재 구현 범위**: `load`는 schedule의 `ProgramWeekLoadQuery` 계약 구현(일정축) 전까지, `plan`(subscription 읽기 계약)은 일정축 계약 전까지 null, `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
+- **현재 구현 범위**: `load`는 캘린더가 연결되지 않았거나 표본이 부족하면 null, `plan`은 체험 시작 전이면 null, `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
 
 ---
 
