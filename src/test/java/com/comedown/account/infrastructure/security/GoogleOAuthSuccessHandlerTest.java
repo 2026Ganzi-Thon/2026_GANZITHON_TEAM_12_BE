@@ -1,0 +1,108 @@
+package com.comedown.account.infrastructure.security;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.comedown.account.application.GoogleAccountService;
+import com.comedown.account.application.GoogleAccountService.TokenGrant;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.OAuth2RefreshToken;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+
+class GoogleOAuthSuccessHandlerTest {
+
+    private static final Instant ISSUED = Instant.parse("2026-11-11T22:30:00Z");
+
+    private final OAuth2AuthorizedClientService clients = mock(OAuth2AuthorizedClientService.class);
+    private final GoogleAccountService accounts = mock(GoogleAccountService.class);
+    private final GoogleOAuthSuccessHandler handler = new GoogleOAuthSuccessHandler(clients, accounts);
+
+    private OAuth2AuthenticationToken authentication(String registrationId) {
+        OidcIdToken idToken = new OidcIdToken("t", ISSUED, ISSUED.plusSeconds(60), Map.of("sub", "google-sub"));
+        ComeDownOidcUser user = new ComeDownOidcUser(42, List.of(new SimpleGrantedAuthority("OIDC_USER")),
+                idToken, null);
+        return new OAuth2AuthenticationToken(user, user.getAuthorities(), registrationId);
+    }
+
+    private OAuth2AuthorizedClient client(String registrationId, String refresh, String... scopes) {
+        ClientRegistration registration = GoogleOAuthConfig.registration(registrationId, "id", "secret", scopes);
+        OAuth2AccessToken access = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "access-value",
+                ISSUED, ISSUED.plusSeconds(3600), Set.of(scopes));
+        OAuth2RefreshToken refreshToken = refresh == null ? null : new OAuth2RefreshToken(refresh, ISSUED);
+        return new OAuth2AuthorizedClient(registration, "42", access, refreshToken);
+    }
+
+    @Test
+    void 로그인_성공은_토큰을_저장하고_메모리_클라이언트를_지우고_루트로_보낸다() throws Exception {
+        when(clients.loadAuthorizedClient("google", "42")).thenReturn(client("google", null, "openid", "email"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google"));
+
+        ArgumentCaptor<TokenGrant> grant = ArgumentCaptor.forClass(TokenGrant.class);
+        verify(accounts).saveTokens(eq(42L), eq("google-sub"), grant.capture());
+        assertThat(grant.getValue().accessToken()).isEqualTo("access-value");
+        assertThat(grant.getValue().refreshToken()).isNull();
+        assertThat(grant.getValue().scopes()).containsExactlyInAnyOrder("openid", "email");
+        verify(clients).removeAuthorizedClient("google", "42");
+        assertThat(response.getRedirectedUrl()).isEqualTo("/");
+    }
+
+    @Test
+    void 캘린더_연결_성공은_refresh_token까지_저장하고_온보딩_CBI로_보낸다() throws Exception {
+        String calendar = GoogleOAuthConfig.CALENDAR_SCOPE;
+        when(clients.loadAuthorizedClient("google-calendar", "42"))
+                .thenReturn(client("google-calendar", "refresh-value", "openid", "email", calendar));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google-calendar"));
+
+        ArgumentCaptor<TokenGrant> grant = ArgumentCaptor.forClass(TokenGrant.class);
+        verify(accounts).saveTokens(eq(42L), eq("google-sub"), grant.capture());
+        assertThat(grant.getValue().refreshToken()).isEqualTo("refresh-value");
+        assertThat(grant.getValue().scopes()).contains(calendar);
+        assertThat(response.getRedirectedUrl()).isEqualTo("/onboarding/cbi");
+    }
+
+    @Test
+    void 토큰_저장에_실패해도_로그인은_유지하고_클라이언트는_지운다() throws Exception {
+        when(clients.loadAuthorizedClient("google-calendar", "42"))
+                .thenReturn(client("google-calendar", "r", "openid"));
+        doThrow(new IllegalStateException("db down")).when(accounts).saveTokens(any(Long.class), any(), any());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google-calendar"));
+
+        verify(clients).removeAuthorizedClient("google-calendar", "42");
+        assertThat(response.getRedirectedUrl()).isEqualTo("/onboarding/cbi");
+    }
+
+    @Test
+    void 인증_클라이언트가_없으면_저장하지_않고_리다이렉트만_한다() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google"));
+
+        verify(accounts, never()).saveTokens(any(Long.class), any(), any());
+        assertThat(response.getRedirectedUrl()).isEqualTo("/");
+    }
+}
