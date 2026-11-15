@@ -317,12 +317,16 @@
 <td>shared.security + account + integration.google</td>
 </tr>
 <tr>
+<td><code>POST /api/dev/login</code></td>
+<td>local 전용 개발 지원; shared.security 테스트 로그인(세션만 생성, 사용자 행은 만들지 않음)</td>
+</tr>
+<tr>
 <td><code>POST /api/dev/seed</code></td>
-<td>local 전용 개발 지원; 기능별 contract로 시드 입력</td>
+<td>local 전용 개발 지원; experience.devseed가 기능별 contract로 시드 입력(계정 준비는 account의 local 전용 DemoAccountSetup 계약)</td>
 </tr>
 <tr>
 <td><code>POST /api/dev/clock</code></td>
-<td>local 전용 개발 지원; shared.time의 테스트 시계 경계</td>
+<td>local 전용 개발 지원; shared.time의 날짜 이동 시계(AdjustableClock, local 프로필 Clock 빈)</td>
 </tr>
 <tr>
 <td><code>DELETE /api/dev/data</code></td>

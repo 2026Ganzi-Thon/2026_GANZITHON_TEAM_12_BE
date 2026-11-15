@@ -19,12 +19,16 @@ public class ErrorResponseWriter {
     }
 
     public void write(HttpServletResponse response, ErrorCode code) throws IOException {
+        write(response, code, code.defaultMessage());
+    }
+
+    public void write(HttpServletResponse response, ErrorCode code, String message) throws IOException {
         if (response.isCommitted()) {
             return;
         }
         response.setStatus(code.status().value());
         response.setCharacterEncoding("UTF-8");
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        jsonMapper.writeValue(response.getOutputStream(), ErrorResponse.of(code));
+        jsonMapper.writeValue(response.getOutputStream(), ErrorResponse.of(code, message));
     }
 }
