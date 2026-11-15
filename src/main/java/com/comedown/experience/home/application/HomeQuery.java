@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 /**
  * 홈(B1) 조합. account·checkin·recovery·recommendation·safety 읽기 계약의 스냅샷만 쓰고 테이블을 직접 읽지 않는다.
  * 읽기 전용이라 회복 상태·추천을 계산하거나 만들지 않는다.
+ * 건강정보 동의가 유효하지 않으면(철회하고 기록을 남긴 경우 포함) 회복·컨디션·기준선은 기록이 없을 때와 같게 준다.
  * <p>
  * 아직 비어 있는 값: judgment(추천 임계값 확정 후).
  */
@@ -64,8 +65,12 @@ public class HomeQuery {
             throw new ApiException(ErrorCode.ONBOARDING_REQUIRED);
         }
         LocalDate today = serviceTime.today();
-        Optional<CheckinDay> todayCheck = checkinQuery.findDay(userId, today);
-        Optional<DailyRecoverySnapshot> latest = recoveryQuery.findLatestOnOrBefore(userId, today);
+        boolean healthDataVisible = access.sensitiveHrvConsented();
+        Optional<CheckinDay> day = checkinQuery.findDay(userId, today);
+        // 동의가 없으면 건강 기록 삭제 뒤와 같게 본다: 호흡 기록이 있는 체크만 남고 컨디션·측정은 없는 상태.
+        Optional<CheckinDay> todayCheck = healthDataVisible ? day : Optional.empty();
+        Optional<DailyRecoverySnapshot> latest = healthDataVisible
+                ? recoveryQuery.findLatestOnOrBefore(userId, today) : Optional.empty();
         boolean established = latest.map(DailyRecoverySnapshot::baselineEstablished).orElse(false);
 
         List<SuggestionPayload> suggestions = suggestionQuery.search(userId, null, null, today).stream()
@@ -77,7 +82,7 @@ public class HomeQuery {
                 accountAccess.findNickname(userId).orElse(null),
                 DayIndex.of(serviceTime.toServiceDate(access.onboardingCompletedAt()), today),
                 established ? "ESTABLISHED" : "BUILDING",
-                new HomeView.TodayCheck(checkStatus(todayCheck)),
+                new HomeView.TodayCheck(healthDataVisible ? checkStatus(todayCheck) : breathingOnlyStatus(day)),
                 recovery(latest, todayCheck, today),
                 weekLoads.find(userId, serviceTime.weekStartOf(today))
                         .map(w -> new HomeView.ThisWeekLoad(w.vsUsualPct(), w.riskLevel())).orElse(null),
@@ -92,6 +97,11 @@ public class HomeQuery {
             return "NOT_STARTED";
         }
         return day.get().conditionCompleted() ? "DONE" : "IN_PROGRESS";
+    }
+
+    /** 건강정보 동의가 없을 때: 호흡만 한 체크는 진행 중, 그 외는 시작 전(컨디션 완료 여부는 드러내지 않는다). */
+    private static String breathingOnlyStatus(Optional<CheckinDay> day) {
+        return day.filter(d -> d.breathingCompletedAt() != null).isPresent() ? "IN_PROGRESS" : "NOT_STARTED";
     }
 
     private static HomeView.Recovery recovery(Optional<DailyRecoverySnapshot> latest, Optional<CheckinDay> todayCheck,
