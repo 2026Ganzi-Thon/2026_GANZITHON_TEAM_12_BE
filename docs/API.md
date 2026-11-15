@@ -284,6 +284,11 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 - `todayCheck.status`: `NOT_STARTED` `IN_PROGRESS` `DONE` → `NOT_STARTED`면 "측정하러 가기"를 위에 크게.
 - `recovery.status`: `BUILDING` `NORMAL` `LOW` `INSUFFICIENT`. 0~100 회복 점수는 쓰지 않고 "평소 대비 %"(`changePct`) + 상태로 표시합니다(예: "평소보다 6% 낮아요").
 - `judgment`: `OK` `OVERLOAD_OK` `OVERLOAD_LOW` `NORMAL_LOW` `BUILDING` `INSUFFICIENT`. 기준선이 있어도 최근 자료가 부족하면 `INSUFFICIENT`이며 HRV에 근거한 LOW/NORMAL 판단을 하지 않습니다.
+- 온보딩 완료 후에만 조회합니다(403 `ONBOARDING_REQUIRED`). 읽기 전용이라 회복 상태·추천을 계산하거나 만들지 않습니다.
+- `todayCheck.status`: 오늘 체크가 없으면 `NOT_STARTED`, 있으나 컨디션 전이면 `IN_PROGRESS`, 컨디션까지 저장했으면 `DONE`.
+- `todaySuggestions`: 오늘 날짜(`targetDate`)의 PRE_START·RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것(시작 시각 순).
+- **구현 해석(확인 필요)** `recovery.status`·`changePct`·`baseline`은 오늘 이하에서 가장 최근 회복 상태 기준입니다(오늘 기록 전이면 어제까지 계산값). 기록이 없으면 `BUILDING`. `excludedToday`는 오늘 컨디션까지 입력했는데 적격일이 아닐 때(교란 요인·대표값 없음) true입니다.
+- **현재 구현 범위**: `thisWeekLoad`(schedule 읽기 계약)·`plan`(subscription 읽기 계약)은 일정축 계약이 생기기 전까지 null, `judgment`는 추천 임계값 확정 전까지 null입니다.
 
 ---
 

@@ -52,4 +52,11 @@ public class AccountAccessReader {
                 })
                 .optional();
     }
+
+    public Optional<String> findNickname(long userId) {
+        return jdbc.sql("SELECT nickname FROM users WHERE id = ? AND nickname IS NOT NULL")
+                .params(userId)
+                .query(String.class)
+                .optional();
+    }
 }
