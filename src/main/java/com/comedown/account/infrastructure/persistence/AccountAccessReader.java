@@ -26,6 +26,7 @@ public class AccountAccessReader {
     public Optional<HealthDataAccess> find(long userId) {
         return jdbc.sql("""
                         SELECT u.id,
+                               u.onboarding_step,
                                u.onboarding_completed_at,
                                u.deletion_status,
                                COALESCE(s.hrv_enabled, FALSE) AS hrv_enabled,
@@ -43,6 +44,7 @@ public class AccountAccessReader {
                     LocalDateTime completed = rs.getObject("onboarding_completed_at", LocalDateTime.class);
                     return new HealthDataAccess(
                             rs.getLong("id"),
+                            rs.getString("onboarding_step"),
                             completed == null ? null : completed.toInstant(ZoneOffset.UTC),
                             rs.getBoolean("hrv_consented"),
                             rs.getBoolean("hrv_enabled"),
