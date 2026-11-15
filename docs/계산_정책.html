@@ -196,6 +196,9 @@
 <li><code>risk_reasons</code>에는 1점 이상 받은 조건을 모두 넣습니다(부분 점수 1점 포함).</li>
 <li><code>total_hours</code>는 겹친 시간을 한 번만 센 집계 대상 일정 시간 합(가중치 미적용)입니다.</li>
 <li>&quot;22시~07시&quot;, &quot;토·일&quot;은 서울 시간 기준이며 사용자 수면 설정(<code>sleep_start/end</code>)과 무관한 고정 구간입니다.</li>
+<li><code>weekend_hours</code>는 토·일에 속한 집계 대상 일정 시간 합(겹침은 한 번만, 가중치 미적용)입니다.</li>
+<li>연속 일정일은 대상 주의 날을 하나라도 포함하는 연속 구간 중 가장 긴 길이입니다. 종일 일정만 있는 날은 일정 없는 날입니다(Q9).</li>
+<li>위험 점수의 <code>vs_usual_pct</code> 비교는 소수 첫째 자리로 반올림한 값 기준입니다.</li>
 </ul>
 <h2>2. CBI 채점 (<code>cbi-ko-2026.11.2</code>)</h2>
 <table>
