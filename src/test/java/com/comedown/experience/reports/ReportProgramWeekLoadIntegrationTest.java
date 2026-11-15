@@ -30,6 +30,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -54,6 +55,7 @@ class ReportProgramWeekLoadIntegrationTest {
         static final Set<Long> DISCONNECTED = ConcurrentHashMap.newKeySet();
 
         @Bean
+        @Primary // 실제 schedule 구현이 있어도 이 테스트는 대체 구현으로 리포트 조합만 검증한다.
         ProgramWeekLoadQuery programWeekLoadQuery() {
             return (userId, onboardingDate, fromWeek, toWeek) -> {
                 if (DISCONNECTED.contains(userId)) {
