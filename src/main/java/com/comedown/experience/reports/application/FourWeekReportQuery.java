@@ -9,6 +9,8 @@ import com.comedown.recommendation.contract.SuggestionQuery;
 import com.comedown.recommendation.contract.SuggestionView;
 import com.comedown.recovery.contract.DailyRecoverySnapshot;
 import com.comedown.recovery.contract.RecoveryQuery;
+import com.comedown.schedule.contract.ProgramWeekLoad;
+import com.comedown.schedule.contract.ProgramWeekLoadQuery;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
 import com.comedown.shared.time.ServiceTime;
@@ -18,12 +20,16 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 /**
  * 28일차 비교 리포트 조합. cbi·recovery·recommendation 읽기 계약의 스냅샷만 쓴다.
  * <p>
- * 아직 비어 있는 값: load(schedule 계약), plan(subscription 계약), AI 해석(규칙 기반 문구로 대체).
+ * 일정 부하는 schedule의 {@link ProgramWeekLoadQuery}(온보딩 기준 n주차)로 읽고, 일정축 구현 전(bean 없음)·캘린더
+ * 미연결이면 null이다.
+ * <p>
+ * 아직 비어 있는 값: plan(subscription 계약), AI 해석(규칙 기반 문구로 대체).
  */
 @Service
 public class FourWeekReportQuery {
@@ -37,14 +43,16 @@ public class FourWeekReportQuery {
     private final RecoveryQuery recoveryQuery;
     private final SuggestionQuery suggestionQuery;
     private final ServiceTime serviceTime;
+    private final ObjectProvider<ProgramWeekLoadQuery> weekLoads;
 
     public FourWeekReportQuery(AccountAccessQuery accountAccess, CbiQuery cbiQuery, RecoveryQuery recoveryQuery,
-            SuggestionQuery suggestionQuery, ServiceTime serviceTime) {
+            SuggestionQuery suggestionQuery, ServiceTime serviceTime, ObjectProvider<ProgramWeekLoadQuery> weekLoads) {
         this.accountAccess = accountAccess;
         this.cbiQuery = cbiQuery;
         this.recoveryQuery = recoveryQuery;
         this.suggestionQuery = suggestionQuery;
         this.serviceTime = serviceTime;
+        this.weekLoads = weekLoads;
     }
 
     /** 온보딩 완료 후에만(403). */
@@ -72,7 +80,7 @@ public class FourWeekReportQuery {
         FourWeekReport.Cbi cbi = cbi(initialCbi, day28Cbi.get());
         FourWeekReport.Recovery recovery = recovery(userId, day1, day28);
         FourWeekReport.Suggestions suggestions = suggestions(userId, day1, day28);
-        return new FourWeekReport(true, false, day28, null, cbi, recovery, null, suggestions,
+        return new FourWeekReport(true, false, day28, null, cbi, recovery, load(userId, day1), suggestions,
                 interpretation(cbi, recovery), null);
     }
 
@@ -105,6 +113,22 @@ public class FourWeekReportQuery {
                 first.isPresent() ? round1(Math.exp(first.getAsDouble())) : null,
                 last.isPresent() ? round1(Math.exp(last.getAsDouble())) : null,
                 change);
+    }
+
+    /** 1주차·4주차 평소 대비. 일정축 구현 전·캘린더 미연결이면 null. */
+    private FourWeekReport.Load load(long userId, LocalDate day1) {
+        ProgramWeekLoadQuery query = weekLoads.getIfAvailable();
+        if (query == null) {
+            return null;
+        }
+        int lastWeek = DAY28 / WEEK;
+        return query.find(userId, day1, 1, lastWeek)
+                .map(weeks -> new FourWeekReport.Load(vsUsual(weeks, 1), vsUsual(weeks, lastWeek)))
+                .orElse(null);
+    }
+
+    private static BigDecimal vsUsual(List<ProgramWeekLoad> weeks, int week) {
+        return weeks.stream().filter(w -> w.week() == week).findFirst().map(ProgramWeekLoad::vsUsualPct).orElse(null);
     }
 
     /** 기간 안 대표값이 있고 교란일이 아닌 날의 ln 평균(단순 RMSSD 산술 평균은 쓰지 않음). */
