@@ -8,10 +8,10 @@ import java.util.List;
  * {@code GET /api/home} 응답(API 명세 3절).
  *
  * @param phase            BUILDING(적격 측정 7일 미만) / ESTABLISHED
- * @param thisWeekLoad     이번 주 일정 부하. schedule 읽기 계약(일정축)이 생기기 전까지 null
+ * @param thisWeekLoad     이번 주 일정 부하. 아직 계산된 적 없으면(캘린더 동기화 전) null
  * @param judgment         2축 판단. 추천 임계값이 확정되기 전까지 null
  * @param todaySuggestions 오늘 날짜의 제안(건너뜀·만료·되돌림 제외)
- * @param plan             이용 자격. subscription 읽기 계약(일정축)이 생기기 전까지 null
+ * @param plan             이용 자격. 체험을 시작하기 전이면 null
  */
 public record HomeView(
         String nickname,
@@ -19,11 +19,19 @@ public record HomeView(
         String phase,
         TodayCheck todayCheck,
         Recovery recovery,
-        Object thisWeekLoad,
+        ThisWeekLoad thisWeekLoad,
         String judgment,
         List<SuggestionPayload> todaySuggestions,
         Safety safety,
-        Object plan) {
+        Plan plan) {
+
+    /** @param vsUsualPct 평소 대비 %. 못 구하면 null */
+    public record ThisWeekLoad(java.math.BigDecimal vsUsualPct, String riskLevel) {
+    }
+
+    public record Plan(String plan, int daysLeft) {
+    }
+
 
     /** @param status NOT_STARTED·IN_PROGRESS·DONE */
     public record TodayCheck(String status) {

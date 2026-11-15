@@ -10,7 +10,7 @@ import java.time.LocalDate;
  * @param availableFrom     공개 가능 날짜(온보딩 서울 날짜 + 27일)
  * @param unavailableReason 건강정보 동의가 없으면 CONSENT_REQUIRED, 그 외 null
  * @param load              일정 부하 비교(온보딩 기준 1주차·4주차). 캘린더 미연결·schedule 계약 구현(일정축) 전에는 null
- * @param plan              이용 자격. subscription 읽기 계약(일정축) 전까지 null
+ * @param plan              이용 자격. 체험을 시작하기 전이면 null
  */
 public record FourWeekReport(
         boolean available,
@@ -22,7 +22,11 @@ public record FourWeekReport(
         Load load,
         Suggestions suggestions,
         RecoveryReport.Interpretation interpretation,
-        Object plan) {
+        Plan plan) {
+
+    public record Plan(String plan, int daysLeft) {
+    }
+
 
     /** @param initial 가입 때 응답(건너뛰었으면 null), diff = day28 − initial(initial이 없으면 null) */
     public record Cbi(Scores initial, Scores day28, Scores diff) {

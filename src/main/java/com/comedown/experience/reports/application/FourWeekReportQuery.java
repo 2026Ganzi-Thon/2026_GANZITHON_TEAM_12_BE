@@ -14,6 +14,7 @@ import com.comedown.schedule.contract.ProgramWeekLoadQuery;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
 import com.comedown.shared.time.ServiceTime;
+import com.comedown.subscription.contract.SubscriptionQuery;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -29,7 +30,7 @@ import org.springframework.stereotype.Service;
  * 일정 부하는 schedule의 {@link ProgramWeekLoadQuery}(온보딩 기준 n주차)로 읽고, 일정축 구현 전(bean 없음)·캘린더
  * 미연결이면 null이다.
  * <p>
- * 아직 비어 있는 값: plan(subscription 계약), AI 해석(규칙 기반 문구로 대체).
+ * 아직 비어 있는 값: AI 해석(규칙 기반 문구로 대체).
  */
 @Service
 public class FourWeekReportQuery {
@@ -43,10 +44,13 @@ public class FourWeekReportQuery {
     private final RecoveryQuery recoveryQuery;
     private final SuggestionQuery suggestionQuery;
     private final ServiceTime serviceTime;
+    private final SubscriptionQuery subscriptionQuery;
     private final ObjectProvider<ProgramWeekLoadQuery> weekLoads;
 
     public FourWeekReportQuery(AccountAccessQuery accountAccess, CbiQuery cbiQuery, RecoveryQuery recoveryQuery,
-            SuggestionQuery suggestionQuery, ServiceTime serviceTime, ObjectProvider<ProgramWeekLoadQuery> weekLoads) {
+            SuggestionQuery suggestionQuery, ServiceTime serviceTime, ObjectProvider<ProgramWeekLoadQuery> weekLoads,
+            SubscriptionQuery subscriptionQuery) {
+        this.subscriptionQuery = subscriptionQuery;
         this.accountAccess = accountAccess;
         this.cbiQuery = cbiQuery;
         this.recoveryQuery = recoveryQuery;
@@ -81,7 +85,11 @@ public class FourWeekReportQuery {
         FourWeekReport.Recovery recovery = recovery(userId, day1, day28);
         FourWeekReport.Suggestions suggestions = suggestions(userId, day1, day28);
         return new FourWeekReport(true, false, day28, null, cbi, recovery, load(userId, day1), suggestions,
-                interpretation(cbi, recovery), null);
+                interpretation(cbi, recovery), plan(userId));
+    }
+
+    private FourWeekReport.Plan plan(long userId) {
+        return subscriptionQuery.find(userId).map(p -> new FourWeekReport.Plan(p.plan(), p.daysLeft())).orElse(null);
     }
 
     private static FourWeekReport unavailable(boolean cbiDue, LocalDate availableFrom, String reason) {

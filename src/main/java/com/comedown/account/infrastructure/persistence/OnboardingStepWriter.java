@@ -28,4 +28,12 @@ public class OnboardingStepWriter {
                 .query(String.class)
                 .single();
     }
+
+    /** SCHEDULE_REPORT일 때만 DONE으로 바꾸고 완료 시각(UTC)을 기록한다. @return 바뀐 행 수 */
+    public int complete(long userId, java.time.Instant completedAt) {
+        return jdbc.sql("UPDATE users SET onboarding_step = 'DONE', onboarding_completed_at = ? "
+                        + "WHERE id = ? AND onboarding_step = 'SCHEDULE_REPORT'")
+                .params(java.time.LocalDateTime.ofInstant(completedAt, java.time.ZoneOffset.UTC), userId)
+                .update();
+    }
 }

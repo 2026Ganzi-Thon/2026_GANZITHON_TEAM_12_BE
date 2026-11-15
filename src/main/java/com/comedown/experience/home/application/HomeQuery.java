@@ -12,7 +12,9 @@ import com.comedown.recovery.contract.RecoveryQuery;
 import com.comedown.safety.contract.SafetyQuery;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
+import com.comedown.schedule.contract.WeekLoads;
 import com.comedown.shared.time.ServiceTime;
+import com.comedown.subscription.contract.SubscriptionQuery;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -23,7 +25,7 @@ import org.springframework.stereotype.Service;
  * 홈(B1) 조합. account·checkin·recovery·recommendation·safety 읽기 계약의 스냅샷만 쓰고 테이블을 직접 읽지 않는다.
  * 읽기 전용이라 회복 상태·추천을 계산하거나 만들지 않는다.
  * <p>
- * 아직 비어 있는 값: thisWeekLoad(schedule 계약), plan(subscription 계약), judgment(추천 임계값 확정 후).
+ * 아직 비어 있는 값: judgment(추천 임계값 확정 후).
  */
 @Service
 public class HomeQuery {
@@ -38,9 +40,14 @@ public class HomeQuery {
     private final SuggestionQuery suggestionQuery;
     private final SafetyQuery safetyQuery;
     private final ServiceTime serviceTime;
+    private final WeekLoads weekLoads;
+    private final SubscriptionQuery subscriptionQuery;
 
     public HomeQuery(AccountAccessQuery accountAccess, CheckinQuery checkinQuery, RecoveryQuery recoveryQuery,
-            SuggestionQuery suggestionQuery, SafetyQuery safetyQuery, ServiceTime serviceTime) {
+            SuggestionQuery suggestionQuery, SafetyQuery safetyQuery, ServiceTime serviceTime, WeekLoads weekLoads,
+            SubscriptionQuery subscriptionQuery) {
+        this.weekLoads = weekLoads;
+        this.subscriptionQuery = subscriptionQuery;
         this.accountAccess = accountAccess;
         this.checkinQuery = checkinQuery;
         this.recoveryQuery = recoveryQuery;
@@ -72,11 +79,12 @@ public class HomeQuery {
                 established ? "ESTABLISHED" : "BUILDING",
                 new HomeView.TodayCheck(checkStatus(todayCheck)),
                 recovery(latest, todayCheck, today),
-                null,
+                weekLoads.find(userId, serviceTime.weekStartOf(today))
+                        .map(w -> new HomeView.ThisWeekLoad(w.vsUsualPct(), w.riskLevel())).orElse(null),
                 null,
                 suggestions,
                 new HomeView.Safety(safetyQuery.shouldShow(userId)),
-                null);
+                subscriptionQuery.find(userId).map(p -> new HomeView.Plan(p.plan(), p.daysLeft())).orElse(null));
     }
 
     private static String checkStatus(Optional<CheckinDay> day) {
