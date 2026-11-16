@@ -284,6 +284,46 @@ class LoadCalculatorTest {
     }
 
     @Test
+    void 평소_대비가_저장_한계_안이면_그대로_둔다() {
+        // 직전 평균 0.05(0.1 두 주 ÷ 4), 이번 주 50.0 → (50.0 ÷ 0.05 − 1) × 100 = 99900.0
+        WeekLoad load = LoadCalculator.calculate(MON, weekdayHours(10), nearEmptyPriors());
+
+        assertThat(load.loadScore()).isEqualByComparingTo(d("50.0"));
+        assertThat(load.vsUsualPct()).isEqualByComparingTo(d("99900.0"));
+    }
+
+    @Test
+    void 평소_대비가_저장_한계를_넘으면_한계값으로_자른다() {
+        // 이번 주 50.1 → 100100.0%는 DECIMAL(6,1)에 들어가지 않으므로 99999.9로 자른다. 위험 판정은 그대로다.
+        List<LoadEvent> events = new ArrayList<>(weekdayHours(10));
+        events.add(LoadEvent.timed(at(0, 19, 0), at(0, 19, 6), LoadCategory.CLASS));
+
+        WeekLoad load = LoadCalculator.calculate(MON, events, nearEmptyPriors());
+
+        assertThat(load.loadScore()).isEqualByComparingTo(d("50.1"));
+        assertThat(load.vsUsualPct()).isEqualByComparingTo(d("99999.9"));
+        assertThat(load.vsUsualPct().precision()).isLessThanOrEqualTo(6);
+        assertThat(load.vsUsualUnavailableReason()).isNull();
+        assertThat(load.riskReasons()).containsExactly(RiskReason.LOAD_HIGH);
+        assertThat(load.riskLevel()).isEqualTo(RiskLevel.WATCH);
+    }
+
+    @Test
+    void 월요일이_아닌_7일_구간도_평소_대비를_저장_한계로_자른다() {
+        // 목요일(11/12)부터 7일. 목·금·월·화·수 낮 11시간씩 = 55.0(주말 없음)
+        LocalDate thursday = MON.plusDays(3);
+        List<LoadEvent> events = new ArrayList<>();
+        for (int day : new int[] {3, 4, 7, 8, 9}) {
+            events.add(event(day, 8, 19, LoadCategory.CLASS));
+        }
+
+        WeekLoad load = LoadCalculator.calculateWindow(thursday, events, nearEmptyPriors());
+
+        assertThat(load.loadScore()).isEqualByComparingTo(d("55.0"));
+        assertThat(load.vsUsualPct()).isEqualByComparingTo(d("99999.9"));
+    }
+
+    @Test
     void 부하_30퍼센트_이상은_2점_WATCH() {
         WeekLoad load = LoadCalculator.calculate(MON, weeklyHours(13), priors(true, 10, 10, 10, 10));
 
@@ -379,6 +419,21 @@ class LoadCalculatorTest {
 
     private static LoadEvent deadline(int day) {
         return LoadEvent.allDay(MON.plusDays(day), MON.plusDays(day + 1), LoadCategory.ASSIGNMENT, true);
+    }
+
+    /** 일정이 거의 없던 직전 4주: 두 주만 0.1(6분)씩이라 평균이 0.05다. */
+    private static List<PriorWeek> nearEmptyPriors() {
+        return List.of(new PriorWeek(d("0.1"), true), new PriorWeek(d("0.1"), true),
+                new PriorWeek(BigDecimal.ZERO, false), new PriorWeek(BigDecimal.ZERO, false));
+    }
+
+    /** 월~금 08시부터 매일 {@code hoursPerDay}시간(평일·낮이라 가중치 없음, 주말은 쉼). */
+    private static List<LoadEvent> weekdayHours(int hoursPerDay) {
+        List<LoadEvent> events = new ArrayList<>();
+        for (int day = 0; day < 5; day++) {
+            events.add(event(day, 8, 8 + hoursPerDay, LoadCategory.CLASS));
+        }
+        return events;
     }
 
     /** 월~목 낮 시간에 총 {@code hours}시간(평일·낮이라 가중치 없음, 마감·심야 없음)을 만든다. */
