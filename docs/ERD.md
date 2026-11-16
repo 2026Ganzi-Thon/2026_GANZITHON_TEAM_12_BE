@@ -90,6 +90,7 @@ erDiagram
         text access_token_enc
         text refresh_token_enc
         varchar scopes
+        datetime calendar_synced_at
     }
     subscriptions {
         bigint user_id PK
@@ -123,6 +124,7 @@ erDiagram
         boolean all_day
         boolean created_by_app
         varchar category
+        varchar custom_category
         varchar category_source
         tinyint burden
         boolean adjustable
@@ -134,6 +136,7 @@ erDiagram
         varchar scope
         varchar match_key
         varchar category
+        varchar custom_category
         boolean is_deadline
     }
     weekly_loads {
@@ -275,6 +278,7 @@ erDiagram
 | access_token_issued_at / access_token_expires_at | DATETIME(6) | Y | |
 | scopes | VARCHAR(1000) | | 구글이 돌려준 실제 허용 범위(공백 구분). 캘린더 범위(`…/auth/calendar.events`) 유무로 캘린더 연결을 판단. 새 refresh token이 없으면 기존 값 유지 |
 | revoke_requested_at | DATETIME(6) | Y | 캘린더 연결 해제·탈퇴로 구글 철회를 요청한 시각. 값이 있으면 연결이 끊긴 것으로 보고(자격정보 제공·연결 판정에서 제외), 구글 철회가 끝나면 행을 지운다. 철회 실패 때 재시도하려고 암호화 토큰을 그때까지만 보관. 캘린더 연결을 다시 허용하면 null로 돌아가고 이전 refresh token은 쓰지 않음(일반 로그인은 값이 있는 행을 바꾸지 않음) |
+| calendar_synced_at | DATETIME(6) | Y | 마지막 일정 동기화 시각(`GET /api/schedule/report`의 `syncedAt`). 동기화 저장이 끝날 때 기록하며 일정이 0건이어도 남긴다. 철회를 요청하면 null |
 | updated_at | DATETIME(6) | | 토큰을 저장·갱신한 시각. 철회 대기 중에는 구글 철회가 실패할 때마다 갱신해 재시도 순서(오래된 것부터)로 쓴다 |
 
 #### `subscriptions` — 무료 체험·구독 (1:1, MVP는 체험 기간만)
@@ -328,6 +332,7 @@ erDiagram
 | transparency | VARCHAR(20) | | `opaque`(바쁨) `transparent`(한가함) |
 | created_by_app | BOOLEAN | | Come-down이 넣은 일정(회복 일정·작업 블록). 부하 계산에서 제외 |
 | category | VARCHAR(30) | Y | 3절 일정 카테고리. 분류 전이면 null |
+| custom_category | VARCHAR(20) | Y | "기타"(`OTHER`)를 고르고 사용자가 직접 입력한 카테고리 이름. 그 외에는 null |
 | category_source | VARCHAR(10) | Y | `AI` `RULE`(AI 실패 시 규칙) `USER`(직접 수정) |
 | burden | TINYINT | Y | 부담 정도 1~3 |
 | adjustable | BOOLEAN | Y | 미리 시작할 수 있는 일인지(과제·발표 준비 등) |
@@ -349,6 +354,7 @@ erDiagram
 | match_key | VARCHAR(255) | | THIS면 google_event_id, SERIES면 recurring_event_id, TITLE이면 title_hash |
 | calendar_id | VARCHAR(255) | | 기본 primary. UK는 (user_id, calendar_id, scope, match_key) |
 | category | VARCHAR(30) | | |
+| custom_category | VARCHAR(20) | Y | 직접 입력한 카테고리 이름(`OTHER`일 때만) |
 | burden | TINYINT | Y | |
 | adjustable | BOOLEAN | Y | |
 | is_deadline | BOOLEAN | | 직접 수정한 마감 여부 |

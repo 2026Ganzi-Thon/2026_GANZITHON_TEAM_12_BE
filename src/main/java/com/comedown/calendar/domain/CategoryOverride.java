@@ -9,7 +9,8 @@ public record CategoryOverride(
         EventCategory category,
         Integer burden,
         Boolean adjustable,
-        boolean deadline) {
+        boolean deadline,
+        String customCategory) {
 
     public CategoryOverride {
         Objects.requireNonNull(scope, "scope");
@@ -17,7 +18,12 @@ public record CategoryOverride(
         Objects.requireNonNull(category, "category");
     }
 
+    public CategoryOverride(CategoryScope scope, String matchKey, EventCategory category, Integer burden,
+            Boolean adjustable, boolean deadline) {
+        this(scope, matchKey, category, burden, adjustable, deadline, null);
+    }
+
     Classification toClassification() {
-        return new Classification(category, burden, adjustable, deadline, CategorySource.USER);
+        return new Classification(category, burden, adjustable, deadline, CategorySource.USER, customCategory);
     }
 }

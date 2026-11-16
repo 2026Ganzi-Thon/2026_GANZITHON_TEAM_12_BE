@@ -122,9 +122,13 @@ public class GoogleAccountWriter {
                 .update();
     }
 
-    /** 철회 요청 표시(연결이 숨겨진다). 토큰 행이 없으면 아무 일도 하지 않는다. */
+    /**
+     * 철회 요청 표시(연결이 숨겨진다). 토큰 행이 없으면 아무 일도 하지 않는다. 동기화한 일정도 함께 지워지므로
+     * 마지막 동기화 시각을 비운다(철회 대기 중에 다시 연결해도 이전 시각이 남지 않는다).
+     */
     public void requestRevoke(long userId, Instant now) {
-        jdbc.sql("UPDATE oauth_tokens SET revoke_requested_at = COALESCE(revoke_requested_at, ?) WHERE user_id = ?")
+        jdbc.sql("UPDATE oauth_tokens SET revoke_requested_at = COALESCE(revoke_requested_at, ?), "
+                        + "calendar_synced_at = NULL WHERE user_id = ?")
                 .params(utc(now), userId).update();
     }
 

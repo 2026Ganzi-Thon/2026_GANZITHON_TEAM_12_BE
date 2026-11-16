@@ -63,7 +63,7 @@
   &quot;consentversion&quot;: &quot;2026-11-01&quot;
 }
 ```
-- 검증: 닉네임 1~20자. `terms` `privacy` `age_14` `calendar` `ai_notice`는 true 필수(`ai_notice`: 인공지능기본법상 ai 기반 운용 사실 사전 고지). `sensitive_hrv`가 false면 가입은 되지만 측정이 꺼집니다(열린 항목 3).
+- 검증: 닉네임 1~20자. 동의 6개(`terms` `privacy` `age_14` `sensitive_hrv` `calendar` `ai_notice`)는 모두 true 필수이며 하나라도 빠지면 400 `validation_failed`(`fielderrors[].field`: `consents.&lt;종류&gt;`)입니다(`ai_notice`: 인공지능기본법상 ai 기반 운용 사실 사전 고지). 건강정보 동의(`sensitive_hrv`)는 2026-11-17 결정으로 가입 때 필수이고, 가입 뒤에는 마이페이지에서 철회할 수 있습니다(8절, 철회하면 측정 꺼짐).
 - 응답 200: `{ &quot;onboardingstep&quot;: &quot;cbi&quot;, &quot;calendarauthurl&quot;: &quot;/oauth2/authorization/google-calendar&quot; }` — `calendarauthurl`이 있으면(아직 캘린더 권한이 없으면) 그 주소로 이동합니다.
 
 " data-group="g1"><summary><span class="method PUT">PUT</span><div><div class="path">/api/onboarding/profile</div><div class="description">닉네임 · 약관 · 동의 저장</div></div></summary><div class="detail-body"><pre><code class="language-json">{
@@ -73,7 +73,7 @@
 }
 </code></pre>
 <ul>
-<li>검증: 닉네임 1~20자. <code>TERMS</code> <code>PRIVACY</code> <code>AGE_14</code> <code>CALENDAR</code> <code>AI_NOTICE</code>는 true 필수(<code>AI_NOTICE</code>: 인공지능기본법상 AI 기반 운용 사실 사전 고지). <code>SENSITIVE_HRV</code>가 false면 가입은 되지만 측정이 꺼집니다(열린 항목 3).</li>
+<li>검증: 닉네임 1~20자. 동의 6개(<code>TERMS</code> <code>PRIVACY</code> <code>AGE_14</code> <code>SENSITIVE_HRV</code> <code>CALENDAR</code> <code>AI_NOTICE</code>)는 모두 true 필수이며 하나라도 빠지면 400 <code>VALIDATION_FAILED</code>(<code>fieldErrors[].field</code>: <code>consents.&lt;종류&gt;</code>)입니다(<code>AI_NOTICE</code>: 인공지능기본법상 AI 기반 운용 사실 사전 고지). 건강정보 동의(<code>SENSITIVE_HRV</code>)는 2026-11-17 결정으로 가입 때 필수이고, 가입 뒤에는 마이페이지에서 철회할 수 있습니다(8절, 철회하면 측정 꺼짐).</li>
 <li>응답 200: <code>{ &quot;onboardingStep&quot;: &quot;CBI&quot;, &quot;calendarAuthUrl&quot;: &quot;/oauth2/authorization/google-calendar&quot; }</code> — <code>calendarAuthUrl</code>이 있으면(아직 캘린더 권한이 없으면) 그 주소로 이동합니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="get /api/cbi/questions cbi 문항 조회 ```json
@@ -316,8 +316,7 @@
 }
 ```
 - `enoughdata: false`면 일정이 너무 적은 경우 → 빈 상태 화면.
-- 캘린더가 연결되지 않았으면 409 `calendar_not_connected`. 동기화 전이면 `syncedat`·`thisweek`는 null, `upcomingweeks`는 빈 배열입니다.
-- **구현 해석(확인 필요)**: 마지막 동기화 시각을 따로 저장하는 컬럼이 없어, `syncedat`은 ① 저장된(취소 제외) 일정이 마지막으로 동기화된 시각과 ② 이 응답에 싣는 주(이번 주 + 다음 4주)의 주간 부하를 계산한 시각 중 늦은 쪽입니다. 동기화는 일정이 0건이어도 주간 부하를 저장하므로, 일정 0건으로 동기화한 사용자도 `syncedat`이 null이 아니고 `thisweek`·`upcomingweeks`가 함께 나옵니다(`classification.total: 0`, `enoughdata: false`). ①·②가 모두 없을 때만 null(동기화 전)이며, `thisweek`나 `upcomingweeks`가 있는 응답의 `syncedat`은 null이 아닙니다. 분류 직접 수정(`patch …/category`)으로 이 주들의 부하를 다시 계산하면 ②가 그 시각이 되므로, 구글 일정을 다시 읽지 않았어도 `syncedat`이 그 시각으로 늦어질 수 있습니다(정확한 동기화 시각이 필요해지면 저장 컬럼을 추가해야 함).
+- 캘린더가 연결되지 않았으면 409 `calendar_not_connected`. 동기화 전이면 `syncedat`·`thisweek`는 null, `upcomingweeks`는 빈 배열입니다. `syncedat`은 **마지막 일정 동기화 시각**입니다(2026-11-17 결정). 일정이 0건인 동기화도 시각을 남기고, 분류 직접 수정으로 주간 부하를 다시 계산해도 바뀌지 않으며, 캘린더 연결을 해제하면 null로 돌아갑니다.
 - **구현 해석(확인 필요)**: `pastmonth` = [오늘 − 1개월, 어제]이며 집계 규칙은 주간 부하와 같고, `enoughdata` = 그 기간에 집계 대상 일정이 1건 이상입니다. &quot;너무 적은&quot; 기준 수는 확정되면 갱신합니다.
 - 과부하 대비 제안은 `get /api/suggestions?type=pre_start`로 따로 받습니다.
 
@@ -335,8 +334,7 @@
 </code></pre>
 <ul>
 <li><code>enoughData: false</code>면 일정이 너무 적은 경우 → 빈 상태 화면.</li>
-<li>캘린더가 연결되지 않았으면 409 <code>CALENDAR_NOT_CONNECTED</code>. 동기화 전이면 <code>syncedAt</code>·<code>thisWeek</code>는 null, <code>upcomingWeeks</code>는 빈 배열입니다.</li>
-<li><strong>구현 해석(확인 필요)</strong>: 마지막 동기화 시각을 따로 저장하는 컬럼이 없어, <code>syncedAt</code>은 ① 저장된(취소 제외) 일정이 마지막으로 동기화된 시각과 ② 이 응답에 싣는 주(이번 주 + 다음 4주)의 주간 부하를 계산한 시각 중 늦은 쪽입니다. 동기화는 일정이 0건이어도 주간 부하를 저장하므로, 일정 0건으로 동기화한 사용자도 <code>syncedAt</code>이 null이 아니고 <code>thisWeek</code>·<code>upcomingWeeks</code>가 함께 나옵니다(<code>classification.total: 0</code>, <code>enoughData: false</code>). ①·②가 모두 없을 때만 null(동기화 전)이며, <code>thisWeek</code>나 <code>upcomingWeeks</code>가 있는 응답의 <code>syncedAt</code>은 null이 아닙니다. 분류 직접 수정(<code>PATCH …/category</code>)으로 이 주들의 부하를 다시 계산하면 ②가 그 시각이 되므로, 구글 일정을 다시 읽지 않았어도 <code>syncedAt</code>이 그 시각으로 늦어질 수 있습니다(정확한 동기화 시각이 필요해지면 저장 컬럼을 추가해야 함).</li>
+<li>캘린더가 연결되지 않았으면 409 <code>CALENDAR_NOT_CONNECTED</code>. 동기화 전이면 <code>syncedAt</code>·<code>thisWeek</code>는 null, <code>upcomingWeeks</code>는 빈 배열입니다. <code>syncedAt</code>은 <strong>마지막 일정 동기화 시각</strong>입니다(2026-11-17 결정). 일정이 0건인 동기화도 시각을 남기고, 분류 직접 수정으로 주간 부하를 다시 계산해도 바뀌지 않으며, 캘린더 연결을 해제하면 null로 돌아갑니다.</li>
 <li><strong>구현 해석(확인 필요)</strong>: <code>pastMonth</code> = [오늘 − 1개월, 어제]이며 집계 규칙은 주간 부하와 같고, <code>enoughData</code> = 그 기간에 집계 대상 일정이 1건 이상입니다. &quot;너무 적은&quot; 기준 수는 확정되면 갱신합니다.</li>
 <li>과부하 대비 제안은 <code>GET /api/suggestions?type=PRE_START</code>로 따로 받습니다.</li>
 </ul>
@@ -449,6 +447,8 @@
 </div></details><details class="endpoint" data-search="patch /api/calendar/events/{id}/category 일정 분류 · 부담 · 마감 여부 직접 수정 ```json
 { &quot;category&quot;: &quot;assignment&quot;, &quot;burden&quot;: 2, &quot;adjustable&quot;: true, &quot;isdeadline&quot;: true, &quot;scope&quot;: &quot;series&quot; }
 ```
+- 카테고리 화면(b2-1, 2026-11-17 확정): 일·공부(부하 계산에 포함) = `class` 수업 · `assignment` 과제 · `study` 공부 · `exam` 시험 · `presentation` 발표 · `part_time` 아르바이트 · `club` 동아리·대외활동 · `work_meeting` 회의·팀플, 개인(부하 계산 제외) = `exercise` 운동 · `appointment` 약속 · `personal` 개인, 그 외 = `other` 기타.
+- &quot;기타&quot;를 고르면 사용자가 카테고리 이름을 직접 입력할 수 있습니다: `{ &quot;category&quot;: &quot;other&quot;, &quot;customcategory&quot;: &quot;봉사활동&quot;, &quot;isdeadline&quot;: false, &quot;scope&quot;: &quot;title&quot; }`. `customcategory`는 선택이며 앞뒤 공백을 떼고 1~20자입니다(비어 있으면 이름 없는 기타). `other`가 아닌 카테고리에 보내거나 20자를 넘으면 400 `validation_failed`입니다. 다른 카테고리로 바꾸면 이름은 지워집니다. **구현 해석(확인 필요)**: 직접 입력한 카테고리도 `other`이므로 부하 계산에는 기존 `other` 규칙대로 포함합니다([계산_정책.md](계산_정책.md) 1절).
 - `scope`: `this`(이 일정만) `series`(반복 일정 전체, 반복 일정일 때만) `title`(같은 제목 일정 전체).
 - 필드 category·isdeadline·scope는 필수입니다. burden(1~3)·adjustable은 선택입니다(카테고리 변경 화면 b2-1에 입력이 없음). burden을 보내지 않으면 null로 두고, adjustable을 보내지 않으면 카테고리 기본값(`assignment`·`presentation`만 true, 제목 규칙 분류와 같음)을 씁니다. 우선순위는 this &gt; series &gt; title &gt; ai &gt; rule. 범위 규칙은 현재 동기화된 일정과 이후 들어오는 일정에 적용하며 원본 google 일정은 변경하지 않습니다.
 - 응답 200: `{ &quot;updatedcount&quot;: 12, &quot;weeks&quot;: [weekload] }` — 바뀐 주의 부하를 다시 계산해 돌려줍니다.
@@ -456,6 +456,8 @@
 " data-group="g3"><summary><span class="method PATCH">PATCH</span><div><div class="path">/api/calendar/events/{id}/category</div><div class="description">일정 분류 · 부담 · 마감 여부 직접 수정</div></div></summary><div class="detail-body"><pre><code class="language-json">{ &quot;category&quot;: &quot;ASSIGNMENT&quot;, &quot;burden&quot;: 2, &quot;adjustable&quot;: true, &quot;isDeadline&quot;: true, &quot;scope&quot;: &quot;SERIES&quot; }
 </code></pre>
 <ul>
+<li>카테고리 화면(B2-1, 2026-11-17 확정): 일·공부(부하 계산에 포함) = <code>CLASS</code> 수업 · <code>ASSIGNMENT</code> 과제 · <code>STUDY</code> 공부 · <code>EXAM</code> 시험 · <code>PRESENTATION</code> 발표 · <code>PART_TIME</code> 아르바이트 · <code>CLUB</code> 동아리·대외활동 · <code>WORK_MEETING</code> 회의·팀플, 개인(부하 계산 제외) = <code>EXERCISE</code> 운동 · <code>APPOINTMENT</code> 약속 · <code>PERSONAL</code> 개인, 그 외 = <code>OTHER</code> 기타.</li>
+<li>&quot;기타&quot;를 고르면 사용자가 카테고리 이름을 직접 입력할 수 있습니다: <code>{ &quot;category&quot;: &quot;OTHER&quot;, &quot;customCategory&quot;: &quot;봉사활동&quot;, &quot;isDeadline&quot;: false, &quot;scope&quot;: &quot;TITLE&quot; }</code>. <code>customCategory</code>는 선택이며 앞뒤 공백을 떼고 1~20자입니다(비어 있으면 이름 없는 기타). <code>OTHER</code>가 아닌 카테고리에 보내거나 20자를 넘으면 400 <code>VALIDATION_FAILED</code>입니다. 다른 카테고리로 바꾸면 이름은 지워집니다. <strong>구현 해석(확인 필요)</strong>: 직접 입력한 카테고리도 <code>OTHER</code>이므로 부하 계산에는 기존 <code>OTHER</code> 규칙대로 포함합니다(<a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a> 1절).</li>
 <li><code>scope</code>: <code>THIS</code>(이 일정만) <code>SERIES</code>(반복 일정 전체, 반복 일정일 때만) <code>TITLE</code>(같은 제목 일정 전체).</li>
 <li>필드 category·isDeadline·scope는 필수입니다. burden(1~3)·adjustable은 선택입니다(카테고리 변경 화면 B2-1에 입력이 없음). burden을 보내지 않으면 null로 두고, adjustable을 보내지 않으면 카테고리 기본값(<code>ASSIGNMENT</code>·<code>PRESENTATION</code>만 true, 제목 규칙 분류와 같음)을 씁니다. 우선순위는 THIS &gt; SERIES &gt; TITLE &gt; AI &gt; RULE. 범위 규칙은 현재 동기화된 일정과 이후 들어오는 일정에 적용하며 원본 Google 일정은 변경하지 않습니다.</li>
 <li>응답 200: <code>{ &quot;updatedCount&quot;: 12, &quot;weeks&quot;: [WeekLoad] }</code> — 바뀐 주의 부하를 다시 계산해 돌려줍니다.</li>
@@ -1000,7 +1002,7 @@
 <li>기능별 삭제 계약(조율은 <code>experience.accountlifecycle</code>, 한 트랜잭션): <code>SuggestionDataDeletion.removeHealthBasis</code> → <code>SafetyDataDeletion.deleteAll</code> → <code>CbiDataDeletion.deleteAll</code> → <code>RecoveryDataDeletion.deleteAll</code> → <code>CheckinDataDeletion.eraseHealthData</code> → <code>IdempotencyService.deleteForUser(userId, &quot;hrv-&quot;)</code>·<code>(&quot;cbi-&quot;)</code>. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. 회복 AI 캐시(<code>ai_outputs</code>)는 ai 구현 때 같은 순서에 추가합니다.</li>
 <li>측정·컨디션·CBI 저장은 저장 트랜잭션에서 사용자 행을 잠근 뒤 접근 조건(탈퇴 진행 → 건강정보 동의 → 측정 켜짐)을 한 번 더 확인합니다. 건강 기록 삭제·동의 철회·탈퇴도 같은 행을 잠그므로 저장과 겹치지 않고, 요청을 받은 뒤 철회·탈퇴가 먼저 끝났다면 저장은 아무것도 쓰지 않고 403 <code>HRV_CONSENT_REQUIRED</code>(탈퇴 진행 중이면 409 <code>INVALID_STATE</code>)로 끝납니다. 동의가 유효한 채 기록만 지운 경우(<code>DELETE /api/hrv/data</code>)에는 삭제가 끝난 뒤의 저장을 새 기록으로 받습니다.</li>
 <li><strong>구현 해석(확인 필요)</strong> 아침 체크는 호흡 기록이 있으면 건강 필드(컨디션·교란 요인)와 <code>completed_at</code>만 비우고 남기며, 남을 것이 없는 체크는 지웁니다. &quot;회복 기반 미승인 추천&quot;은 RECOVERY 중 <code>APPROVING</code>·<code>APPROVED</code>가 아닌 것이며 지웁니다(<code>APPROVING</code>은 외부 등록 확인 전이라 남김). 남는 RECOVERY 제안은 &quot;건강 근거 제거&quot;로 <code>judgment_state</code>·<code>message</code>를 비우고 <code>reason_code</code>를 <code>HEALTH_DATA_DELETED</code>로 바꾸며, PRE_START는 <code>judgment_state</code>만 비웁니다(제목·시간·Google 일정·승인 상태는 유지). 안전 안내는 <code>LOW_RECOVERY_2W</code>·<code>CBI_HIGH</code> 모두 건강 근거이므로 지웁니다.</li>
-<li>민감정보 비동의/철회 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 <code>SENSITIVE_HRV</code> 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: <code>POST /api/onboarding/cbi/skip</code> → 200 <code>{ &quot;onboardingStep&quot;: &quot;LIFESTYLE&quot; }</code> (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 <code>unavailableReason: CONSENT_REQUIRED</code>, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.</li>
+<li>건강정보 동의는 가입 때 필수이므로 동의가 없는 경우는 가입 뒤 철회한 사용자입니다. 철회한 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 <code>SENSITIVE_HRV</code> 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: <code>POST /api/onboarding/cbi/skip</code> → 200 <code>{ &quot;onboardingStep&quot;: &quot;LIFESTYLE&quot; }</code> (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 <code>unavailableReason: CONSENT_REQUIRED</code>, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.</li>
 </ul>
 </div></details></section><section class="api-group" id="g8"><h2>9. 도움 받을 수 있는 곳 (C3)</h2><details class="endpoint" data-search="get /api/safety 도움 받을 수 있는 곳 · 안전 안내 ```json
 {
@@ -1286,12 +1288,13 @@
   &quot;id&quot;: 812, &quot;googleEventId&quot;: &quot;abc_20261118&quot;, &quot;recurring&quot;: true, &quot;startDate&quot;: null, &quot;endDateExclusive&quot;: null,
   &quot;start&quot;: &quot;2026-11-18T14:00:00+09:00&quot;, &quot;end&quot;: &quot;2026-11-18T15:30:00+09:00&quot;, &quot;allDay&quot;: false,
   &quot;title&quot;: &quot;캡스톤 중간발표&quot;,
-  &quot;category&quot;: &quot;PRESENTATION&quot;, &quot;categorySource&quot;: &quot;AI&quot;, &quot;burden&quot;: 3, &quot;adjustable&quot;: true, &quot;isDeadline&quot;: true,
+  &quot;category&quot;: &quot;PRESENTATION&quot;, &quot;customCategory&quot;: null, &quot;categorySource&quot;: &quot;AI&quot;, &quot;burden&quot;: 3, &quot;adjustable&quot;: true, &quot;isDeadline&quot;: true,
   &quot;createdByApp&quot;: false
 }
 </code></pre>
 <ul>
 <li><code>title</code>은 <strong>DB에 저장하지 않고</strong> 응답할 때 구글에서 읽어 붙입니다(열린 항목 1).</li>
+<li><code>customCategory</code>는 사용자가 &quot;기타&quot;를 고르고 직접 입력한 카테고리 이름입니다(<code>category: OTHER</code>일 때만, 없으면 null). 값이 있으면 화면에 &quot;기타&quot; 대신 이 이름을 보여 줍니다.</li>
 </ul>
 <hr />
 </div></details></section><section id="reference"><h2>화면 매핑 · 개발 참고</h2><details class="block"><summary>10. 화면 → API</summary><div class="content"><table>
@@ -1425,7 +1428,7 @@
 </div></details><details class="block"><summary>13. 열린 항목</summary><div class="content"><ol>
 <li>캘린더 탭에서 일정 제목을 보여줄지, 보여준다면 매번 구글에서 읽을지(지금 명세) 저장할지.</li>
 <li>측정 알림을 캘린더 반복 일정으로 할지 → 하면 <code>PUT /api/me/settings</code>에 <code>reminder: true</code> 추가.</li>
-<li>건강정보 동의를 필수로 할지. 현재 선택으로 유지하고 CBI 건너뛰기·일정 전용 흐름을 v0.2 제안으로 명시.</li>
+<li>~~건강정보 동의를 필수로 할지~~ → 2026-11-17 확정: 가입 때 필수. 가입 뒤 철회한 사용자를 위한 CBI 건너뛰기·일정 전용 흐름은 유지.</li>
 <li>탈퇴할 때 Come-down이 넣은 캘린더 일정도 지울지.</li>
 <li>~~회복 점수를 숫자로 보여줄지~~ → v0.3 확정: 0~100 점수를 쓰지 않음(평소 대비 % + 상태).</li>
 <li>~~안전 안내를 닫은 뒤 다시 보여줄 기준~~ → v0.3 확정: 조건 해제 후 재충족 시 새 안내.</li>
