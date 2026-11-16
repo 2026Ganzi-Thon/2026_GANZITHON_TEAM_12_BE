@@ -9,6 +9,7 @@ import com.comedown.calendar.domain.CategorySource;
 import com.comedown.calendar.domain.Classification;
 import com.comedown.calendar.domain.ClassificationResolver;
 import com.comedown.calendar.domain.EventCategory;
+import com.comedown.calendar.domain.RuleClassifier;
 import com.comedown.calendar.infrastructure.persistence.CalendarEventStore;
 import com.comedown.calendar.infrastructure.persistence.CategoryOverrideStore;
 import com.comedown.calendar.infrastructure.persistence.StoredEvent;
@@ -44,9 +45,13 @@ public class CategoryChangeService implements CalendarCategoryCommands {
     public CategoryChangeResult change(long userId, long eventId, CategoryChange change) {
         EventCategory category = parse(EventCategory.class, change.category(), "알 수 없는 카테고리예요.");
         CategoryScope scope = parse(CategoryScope.class, change.scope(), "알 수 없는 적용 범위예요.");
-        if (change.burden() < 1 || change.burden() > 3) {
+        if (change.burden() != null && (change.burden() < 1 || change.burden() > 3)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "부담 정도는 1~3이어야 해요.");
         }
+        // 카테고리 변경 화면에는 부담 정도·미리 시작 가능 여부 입력이 없다. 안 보내면 부담 정도는 비워 두고,
+        // 미리 시작 가능 여부는 제목 규칙 분류와 같은 카테고리 기본값(과제·발표만 true)을 쓴다.
+        boolean adjustable = change.adjustable() != null
+                ? change.adjustable() : RuleClassifier.adjustableByDefault(category);
         StoredEvent target = store.findById(userId, eventId).orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
         String matchKey = switch (scope) {
             case THIS -> target.googleEventId();
@@ -55,7 +60,7 @@ public class CategoryChangeService implements CalendarCategoryCommands {
         };
         Instant now = time.now();
         overrides.upsert(userId, new CategoryOverride(scope, matchKey, category, change.burden(),
-                change.adjustable(), change.deadline()), now);
+                adjustable, change.deadline()), now);
 
         List<StoredEvent> affected = switch (scope) {
             case THIS -> List.of(target);
