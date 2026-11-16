@@ -23,7 +23,8 @@ public record StoredEvent(
         Integer burden,
         Boolean adjustable,
         Boolean deadline,
-        Instant googleUpdatedAt) {
+        Instant googleUpdatedAt,
+        String customCategory) {
 
     public EventKeys keys() {
         return new EventKeys(googleEventId, recurringEventId, titleHash);
@@ -35,6 +36,7 @@ public record StoredEvent(
             return null;
         }
         return new Classification(EventCategory.valueOf(category), burden, adjustable, deadline,
-                categorySource == null ? CategorySource.RULE : CategorySource.valueOf(categorySource));
+                categorySource == null ? CategorySource.RULE : CategorySource.valueOf(categorySource),
+                customCategory);
     }
 }

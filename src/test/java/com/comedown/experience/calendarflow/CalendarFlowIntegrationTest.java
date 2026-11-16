@@ -304,6 +304,44 @@ class CalendarFlowIntegrationTest {
     }
 
     @Test
+    void 기타를_고르면_직접_입력한_카테고리_이름을_저장하고_다시_동기화해도_유지한다() throws Exception {
+        long user = newUser();
+        when(source.fetch(any(), any())).thenReturn(List.of(
+                timed("k1", null, "교회 봉사", "2026-11-18T05:00:00Z", "2026-11-18T06:00:00Z"),
+                timed("k2", null, "교회 봉사", "2026-11-19T05:00:00Z", "2026-11-19T06:00:00Z")));
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+        long k1 = eventId(user, "k1");
+
+        patchCustom(user, k1, "OTHER", "  봉사활동  ", "TITLE").andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedCount").value(2));
+        assertThat(jdbc.queryForMap("SELECT category, custom_category, category_source FROM calendar_events "
+                + "WHERE id = ?", eventId(user, "k2")))
+                .containsEntry("category", "OTHER").containsEntry("custom_category", "봉사활동")
+                .containsEntry("category_source", "USER");
+
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+        mvc.perform(get("/api/calendar/events?from=2026-11-16&to=2026-11-22").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.events[0].category").value("OTHER"))
+                .andExpect(jsonPath("$.events[0].customCategory").value("봉사활동"))
+                .andExpect(jsonPath("$.events[1].customCategory").value("봉사활동"));
+
+        // 이름을 비우면 그냥 기타가 되고, 다른 카테고리로 바꾸면 이름이 지워진다.
+        patchCustom(user, k1, "OTHER", " ", "THIS").andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT custom_category FROM calendar_events WHERE id = ?", String.class, k1))
+                .isNull();
+        patchCategoryOnly(user, eventId(user, "k2"), "CLUB", false).andExpect(status().isOk());
+        assertThat(jdbc.queryForMap("SELECT category, custom_category FROM calendar_events WHERE id = ?",
+                eventId(user, "k2"))).containsEntry("category", "CLUB").containsEntry("custom_category", null);
+
+        // 기타가 아닌 카테고리에 이름을 붙이거나 20자를 넘기면 400.
+        patchCustom(user, k1, "CLUB", "봉사활동", "THIS").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        patchCustom(user, k1, "OTHER", "가".repeat(21), "THIS").andExpect(status().isBadRequest());
+        patchCustom(user, k1, "OTHER", "가".repeat(20), "THIS").andExpect(status().isOk());
+    }
+
+    @Test
     void 분류_수정_검증_실패와_남의_일정() throws Exception {
         long owner = newUser();
         long other = newUser();
@@ -371,6 +409,14 @@ class CalendarFlowIntegrationTest {
         return mvc.perform(patch("/api/calendar/events/" + eventId + "/category").with(loginAs(user)).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"category\":\"" + category + "\",\"isDeadline\":" + deadline + ",\"scope\":\"THIS\"}"));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions patchCustom(long user, long eventId, String category,
+            String customCategory, String scope) throws Exception {
+        return mvc.perform(patch("/api/calendar/events/" + eventId + "/category").with(loginAs(user)).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"category\":\"" + category + "\",\"customCategory\":\"" + customCategory
+                        + "\",\"isDeadline\":false,\"scope\":\"" + scope + "\"}"));
     }
 
     private SyncedEvent timed(String id, String recurring, String title, String startUtc, String endUtc) {

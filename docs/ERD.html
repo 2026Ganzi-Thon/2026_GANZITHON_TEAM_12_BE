@@ -524,6 +524,7 @@
 | transparency | varchar(20) | | `opaque`(바쁨) `transparent`(한가함) |
 | created_by_app | boolean | | come-down이 넣은 일정(회복 일정·작업 블록). 부하 계산에서 제외 |
 | category | varchar(30) | y | 3절 일정 카테고리. 분류 전이면 null |
+| custom_category | varchar(20) | y | &quot;기타&quot;(`other`)를 고르고 사용자가 직접 입력한 카테고리 이름. 그 외에는 null |
 | category_source | varchar(10) | y | `ai` `rule`(ai 실패 시 규칙) `user`(직접 수정) |
 | burden | tinyint | y | 부담 정도 1~3 |
 | adjustable | boolean | y | 미리 시작할 수 있는 일인지(과제·발표 준비 등) |
@@ -619,6 +620,12 @@
 <td>3절 일정 카테고리. 분류 전이면 null</td>
 </tr>
 <tr>
+<td>custom_category</td>
+<td>VARCHAR(20)</td>
+<td>Y</td>
+<td>&quot;기타&quot;(<code>OTHER</code>)를 고르고 사용자가 직접 입력한 카테고리 이름. 그 외에는 null</td>
+</tr>
+<tr>
 <td>category_source</td>
 <td>VARCHAR(10)</td>
 <td>Y</td>
@@ -675,6 +682,7 @@
 | match_key | varchar(255) | | this면 google_event_id, series면 recurring_event_id, title이면 title_hash |
 | calendar_id | varchar(255) | | 기본 primary. uk는 (user_id, calendar_id, scope, match_key) |
 | category | varchar(30) | | |
+| custom_category | varchar(20) | y | 직접 입력한 카테고리 이름(`other`일 때만) |
 | burden | tinyint | y | |
 | adjustable | boolean | y | |
 | is_deadline | boolean | | 직접 수정한 마감 여부 |
@@ -728,6 +736,12 @@
 <td>VARCHAR(30)</td>
 <td></td>
 <td></td>
+</tr>
+<tr>
+<td>custom_category</td>
+<td>VARCHAR(20)</td>
+<td>Y</td>
+<td>직접 입력한 카테고리 이름(<code>OTHER</code>일 때만)</td>
 </tr>
 <tr>
 <td>burden</td>

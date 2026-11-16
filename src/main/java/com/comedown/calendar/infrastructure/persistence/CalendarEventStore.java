@@ -111,13 +111,14 @@ public class CalendarEventStore {
         jdbc.sql("""
                         INSERT INTO calendar_events (user_id, calendar_id, google_event_id, recurring_event_id,
                             title_hash, start_at, end_at, all_day, event_status, transparency, created_by_app,
-                            category, category_source, burden, adjustable, is_deadline, classified_at,
-                            google_updated_at, synced_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            category, custom_category, category_source, burden, adjustable, is_deadline,
+                            classified_at, google_updated_at, synced_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """)
                 .params(userId, CALENDAR_ID, googleEventId, recurringEventId, titleHash, utc(startAt), utc(endAt),
                         allDay, status, transparency, createdByApp,
                         classification == null ? null : classification.category().name(),
+                        classification == null ? null : classification.customCategory(),
                         classification == null ? null : classification.source().name(),
                         classification == null ? null : classification.burden(),
                         classification == null ? null : classification.adjustable(),
@@ -136,13 +137,14 @@ public class CalendarEventStore {
                         UPDATE calendar_events
                            SET recurring_event_id = ?, title_hash = ?, start_at = ?, end_at = ?, all_day = ?,
                                event_status = ?, transparency = ?, created_by_app = ?, category = ?,
-                               category_source = ?, burden = ?, adjustable = ?, is_deadline = ?,
-                               classified_at = ?, google_updated_at = ?, synced_at = ?
+                               custom_category = ?, category_source = ?, burden = ?, adjustable = ?,
+                               is_deadline = ?, classified_at = ?, google_updated_at = ?, synced_at = ?
                          WHERE id = ?
                         """)
                 .params(recurringEventId, titleHash, utc(startAt), utc(endAt), allDay, status, transparency,
                         createdByApp,
                         classification == null ? null : classification.category().name(),
+                        classification == null ? null : classification.customCategory(),
                         classification == null ? null : classification.source().name(),
                         classification == null ? null : classification.burden(),
                         classification == null ? null : classification.adjustable(),
@@ -156,11 +158,12 @@ public class CalendarEventStore {
     public void updateClassification(long id, Classification classification, Instant now) {
         jdbc.sql("""
                         UPDATE calendar_events
-                           SET category = ?, category_source = ?, burden = ?, adjustable = ?, is_deadline = ?,
-                               classified_at = ?
+                           SET category = ?, custom_category = ?, category_source = ?, burden = ?,
+                               adjustable = ?, is_deadline = ?, classified_at = ?
                          WHERE id = ?
                         """)
-                .params(classification.category().name(), classification.source().name(), classification.burden(),
+                .params(classification.category().name(), classification.customCategory(),
+                        classification.source().name(), classification.burden(),
                         classification.adjustable(), classification.deadline(), utc(now), id)
                 .update();
     }
@@ -209,7 +212,7 @@ public class CalendarEventStore {
     private static final String SELECT = """
             SELECT id, google_event_id, recurring_event_id, title_hash, start_at, end_at, all_day, event_status,
                    transparency, created_by_app, category, category_source, burden, adjustable, is_deadline,
-                   google_updated_at
+                   google_updated_at, custom_category
               FROM calendar_events""";
 
     private static StoredEvent map(java.sql.ResultSet rs, int n) throws java.sql.SQLException {
@@ -220,7 +223,7 @@ public class CalendarEventStore {
                 rs.getObject("burden") == null ? null : rs.getInt("burden"),
                 rs.getObject("adjustable") == null ? null : rs.getBoolean("adjustable"),
                 rs.getObject("is_deadline") == null ? null : rs.getBoolean("is_deadline"),
-                instant(rs, "google_updated_at"));
+                instant(rs, "google_updated_at"), rs.getString("custom_category"));
     }
 
     private static Instant instant(java.sql.ResultSet rs, String column) throws java.sql.SQLException {

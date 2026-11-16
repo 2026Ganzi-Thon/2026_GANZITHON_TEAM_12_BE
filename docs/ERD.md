@@ -124,6 +124,7 @@ erDiagram
         boolean all_day
         boolean created_by_app
         varchar category
+        varchar custom_category
         varchar category_source
         tinyint burden
         boolean adjustable
@@ -135,6 +136,7 @@ erDiagram
         varchar scope
         varchar match_key
         varchar category
+        varchar custom_category
         boolean is_deadline
     }
     weekly_loads {
@@ -330,6 +332,7 @@ erDiagram
 | transparency | VARCHAR(20) | | `opaque`(바쁨) `transparent`(한가함) |
 | created_by_app | BOOLEAN | | Come-down이 넣은 일정(회복 일정·작업 블록). 부하 계산에서 제외 |
 | category | VARCHAR(30) | Y | 3절 일정 카테고리. 분류 전이면 null |
+| custom_category | VARCHAR(20) | Y | "기타"(`OTHER`)를 고르고 사용자가 직접 입력한 카테고리 이름. 그 외에는 null |
 | category_source | VARCHAR(10) | Y | `AI` `RULE`(AI 실패 시 규칙) `USER`(직접 수정) |
 | burden | TINYINT | Y | 부담 정도 1~3 |
 | adjustable | BOOLEAN | Y | 미리 시작할 수 있는 일인지(과제·발표 준비 등) |
@@ -351,6 +354,7 @@ erDiagram
 | match_key | VARCHAR(255) | | THIS면 google_event_id, SERIES면 recurring_event_id, TITLE이면 title_hash |
 | calendar_id | VARCHAR(255) | | 기본 primary. UK는 (user_id, calendar_id, scope, match_key) |
 | category | VARCHAR(30) | | |
+| custom_category | VARCHAR(20) | Y | 직접 입력한 카테고리 이름(`OTHER`일 때만) |
 | burden | TINYINT | Y | |
 | adjustable | BOOLEAN | Y | |
 | is_deadline | BOOLEAN | | 직접 수정한 마감 여부 |

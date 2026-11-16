@@ -37,7 +37,7 @@ class CalendarEventController {
         StoredEvent e = view.event();
         return new EventResponse(e.id(), e.googleEventId(), e.recurringEventId() != null, view.startDate(),
                 view.endDateExclusive(), time.toResponse(e.startAt()), time.toResponse(e.endAt()), e.allDay(),
-                view.title(), view.title() == null, e.category(), e.categorySource(), e.burden(), e.adjustable(),
+                view.title(), view.title() == null, e.category(), e.customCategory(), e.categorySource(), e.burden(), e.adjustable(),
                 Boolean.TRUE.equals(e.deadline()), e.createdByApp());
     }
 
@@ -46,7 +46,7 @@ class CalendarEventController {
 
     record EventResponse(long id, String googleEventId, boolean recurring, LocalDate startDate,
             LocalDate endDateExclusive, OffsetDateTime start, OffsetDateTime end, boolean allDay, String title,
-            boolean titleUnavailable, String category, String categorySource, Integer burden, Boolean adjustable,
+            boolean titleUnavailable, String category, String customCategory, String categorySource, Integer burden, Boolean adjustable,
             boolean isDeadline, boolean createdByApp) {
     }
 }

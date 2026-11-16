@@ -29,7 +29,7 @@ class CategoryChangeController {
     ChangeResponse change(CurrentUser user, @PathVariable long id, @Valid @RequestBody ChangeRequest body) {
         CategoryChangeFlow.Result r = flow.change(user.id(), id,
                 new CategoryChange(body.category(), body.burden(), body.adjustable(), body.isDeadline(),
-                        body.scope()));
+                        body.scope(), body.customCategory()));
         return new ChangeResponse(r.updatedCount(), r.weeks());
     }
 
@@ -38,7 +38,8 @@ class CategoryChangeController {
             @Min(1) @Max(3) Integer burden,
             Boolean adjustable,
             @NotNull Boolean isDeadline,
-            @NotBlank String scope) {
+            @NotBlank String scope,
+            String customCategory) {
     }
 
     record ChangeResponse(int updatedCount, List<WeekLoadView> weeks) {

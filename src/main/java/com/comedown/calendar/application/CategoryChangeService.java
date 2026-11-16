@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CategoryChangeService implements CalendarCategoryCommands {
 
+    static final int CUSTOM_CATEGORY_MAX = 20;
+
     private final CalendarEventStore store;
     private final CategoryOverrideStore overrides;
     private final ServiceTime time;
@@ -48,6 +50,7 @@ public class CategoryChangeService implements CalendarCategoryCommands {
         if (change.burden() != null && (change.burden() < 1 || change.burden() > 3)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "부담 정도는 1~3이어야 해요.");
         }
+        String customCategory = customCategory(category, change.customCategory());
         // 카테고리 변경 화면에는 부담 정도·미리 시작 가능 여부 입력이 없다. 안 보내면 부담 정도는 비워 두고,
         // 미리 시작 가능 여부는 제목 규칙 분류와 같은 카테고리 기본값(과제·발표만 true)을 쓴다.
         boolean adjustable = change.adjustable() != null
@@ -60,7 +63,7 @@ public class CategoryChangeService implements CalendarCategoryCommands {
         };
         Instant now = time.now();
         overrides.upsert(userId, new CategoryOverride(scope, matchKey, category, change.burden(),
-                adjustable, change.deadline()), now);
+                adjustable, change.deadline(), customCategory), now);
 
         List<StoredEvent> affected = switch (scope) {
             case THIS -> List.of(target);
@@ -92,6 +95,22 @@ public class CategoryChangeService implements CalendarCategoryCommands {
             weeks.add(week);
         }
         return weeks;
+    }
+
+    /** 직접 입력한 카테고리 이름: 앞뒤 공백을 떼고 비어 있으면 없음. "기타"에서만 쓸 수 있고 20자까지. */
+    private static String customCategory(EventCategory category, String raw) {
+        String name = raw == null ? "" : raw.strip();
+        if (name.isEmpty()) {
+            return null;
+        }
+        if (category != EventCategory.OTHER) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "직접 입력한 카테고리는 기타에서만 쓸 수 있어요.");
+        }
+        if (name.codePointCount(0, name.length()) > CUSTOM_CATEGORY_MAX) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                    "카테고리 이름은 " + CUSTOM_CATEGORY_MAX + "자까지 쓸 수 있어요.");
+        }
+        return name;
     }
 
     private static String required(String value, String message) {
