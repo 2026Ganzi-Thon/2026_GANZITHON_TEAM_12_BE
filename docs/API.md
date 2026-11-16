@@ -337,7 +337,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 { "category": "ASSIGNMENT", "burden": 2, "adjustable": true, "isDeadline": true, "scope": "SERIES" }
 ```
 - `scope`: `THIS`(이 일정만) `SERIES`(반복 일정 전체, 반복 일정일 때만) `TITLE`(같은 제목 일정 전체).
-- 필드 category·burden(1~3)·adjustable·isDeadline은 필수입니다. 우선순위는 THIS > SERIES > TITLE > AI > RULE. 범위 규칙은 현재 동기화된 일정과 이후 들어오는 일정에 적용하며 원본 Google 일정은 변경하지 않습니다.
+- 필드 category·isDeadline·scope는 필수입니다. burden(1~3)·adjustable은 선택입니다(카테고리 변경 화면 B2-1에 입력이 없음). burden을 보내지 않으면 null로 두고, adjustable을 보내지 않으면 카테고리 기본값(`ASSIGNMENT`·`PRESENTATION`만 true, 제목 규칙 분류와 같음)을 씁니다. 우선순위는 THIS > SERIES > TITLE > AI > RULE. 범위 규칙은 현재 동기화된 일정과 이후 들어오는 일정에 적용하며 원본 Google 일정은 변경하지 않습니다.
 - 응답 200: `{ "updatedCount": 12, "weeks": [WeekLoad] }` — 바뀐 주의 부하를 다시 계산해 돌려줍니다.
 
 ### `GET /api/schedule/weeks?from=2026-10-12&count=9` → 200
