@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class SafetyController {
 
-    static final String DISCLAIMER = "Come-down은 의료 서비스가 아니며 질병 유무를 판단하지 않아요.";
+    static final String DISCLAIMER = "Come & Down은 의료 서비스가 아니며 질병 유무를 판단하지 않아요.";
 
     /** 안내 문구(와이어프레임 C3 문구). */
     static final Map<String, String> MESSAGES = Map.of(

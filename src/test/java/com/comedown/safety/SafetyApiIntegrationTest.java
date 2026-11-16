@@ -76,7 +76,7 @@ class SafetyApiIntegrationTest {
                            {"id":"mental-health-crisis-1577-0199","name":"정신건강 위기상담전화","phone":"1577-0199",
                             "url":"https://www.mohw.go.kr/menu.es?mid=a10706040100",
                             "verifiedAt":"2026-11-17T00:00:00+09:00"}],
-                         "disclaimer":"Come-down은 의료 서비스가 아니며 질병 유무를 판단하지 않아요."}
+                         "disclaimer":"Come & Down은 의료 서비스가 아니며 질병 유무를 판단하지 않아요."}
                         """, JsonCompareMode.STRICT));
     }
 

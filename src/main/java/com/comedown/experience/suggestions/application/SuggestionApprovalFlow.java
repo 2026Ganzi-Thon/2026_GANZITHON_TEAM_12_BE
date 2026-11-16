@@ -102,7 +102,7 @@ public class SuggestionApprovalFlow {
         try {
             DeleteResult result = writer.deleteAppEvent(credential, s.googleEventId());
             if (result == DeleteResult.NOT_APP_OWNED) {
-                throw new ApiException(ErrorCode.INVALID_STATE, "Come-down이 만든 일정이 아니라 지울 수 없어요.");
+                throw new ApiException(ErrorCode.INVALID_STATE, "Come & Down이 만든 일정이 아니라 지울 수 없어요.");
             }
         } catch (ExternalServiceException e) {
             throw mapped(e);

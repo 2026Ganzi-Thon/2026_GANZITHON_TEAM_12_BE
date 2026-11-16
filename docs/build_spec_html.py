@@ -32,7 +32,7 @@ let saved;window.addEventListener('beforeprint',()=>{saved=[...document.querySel
 
 def page(kind, title, sub, body):
     nav=''.join(f'<a class="{"current" if kind==k else ""}" href="{file}">{label}</a>' for k,file,label in [('api','API.html','API 명세'),('erd','ERD.html','ERD · 데이터 구조'),('review','검토결과.html','검토 결과'),('policy','계산_정책.html','계산 정책'),('architecture','백엔드_구조설계.html','백엔드 구조'),('mapping','책임_매핑.html','책임 매핑'),('guide','백엔드_협업가이드.html','협업 가이드')])
-    return f'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Come-down · {title}</title><style>{CSS} article.tile{{overflow-x:auto;min-width:0}}</style></head><body><header><div class="eyebrow">COME-DOWN / PRODUCT & ENGINEERING</div><h1>{title}</h1><p>{sub}</p><nav aria-label="문서 이동">{nav}<button class="print-button" type="button" onclick="window.print()">인쇄 / PDF</button></nav></header><main>{body}</main><footer>명세 v0.2 / 구조 v1.0 · 2026.11.12 · 서비스 요구사항·API·ERD·IA 기준 · 구현 완료를 의미하지 않는 설계 명세 · 외부 라이브러리/네트워크 요청 없는 HTML</footer><script>{JS}</script></body></html>'''
+    return f'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Come &amp; Down · {title}</title><style>{CSS} article.tile{{overflow-x:auto;min-width:0}}</style></head><body><header><div class="eyebrow">COME-DOWN / PRODUCT & ENGINEERING</div><h1>{title}</h1><p>{sub}</p><nav aria-label="문서 이동">{nav}<button class="print-button" type="button" onclick="window.print()">인쇄 / PDF</button></nav></header><main>{body}</main><footer>명세 v0.2 / 구조 v1.0 · 2026.11.12 · 서비스 요구사항·API·ERD·IA 기준 · 구현 완료를 의미하지 않는 설계 명세 · 외부 라이브러리/네트워크 요청 없는 HTML</footer><script>{JS}</script></body></html>'''
 
 api=(ROOT/'API.md').read_text(encoding='utf-8')
 sections=re.split(r'^## ',api,flags=re.M)[1:]
@@ -127,7 +127,7 @@ columns=[['user_settings','user_preferred_activities','user_consents'],['oauth_t
 W=1560;cardw=234;h=128;pos={'users':(663,38)}
 for col,names in enumerate(columns):
     for row,name in enumerate(names):pos[name]=(20+col*256,280+row*210)
-svg=f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 940" role="img" aria-labelledby="erdtitle erddesc"><title id="erdtitle">Come-down ERD 관계도</title><desc id="erddesc">users를 중심으로 {len(tables)}개 테이블이 연결됩니다. 테이블을 클릭하면 컬럼 정의로 이동합니다. 전체 관계는 아래 표에서 확인할 수 있습니다.</desc>'
+svg=f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 940" role="img" aria-labelledby="erdtitle erddesc"><title id="erdtitle">Come &amp; Down ERD 관계도</title><desc id="erddesc">users를 중심으로 {len(tables)}개 테이블이 연결됩니다. 테이블을 클릭하면 컬럼 정의로 이동합니다. 전체 관계는 아래 표에서 확인할 수 있습니다.</desc>'
 svg+='<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="#8aa696"/></marker></defs>'
 # user FKs routed through horizontal lanes; four child relations retain direct paths.
 for n,(src,card,dst,label) in enumerate(relations):
@@ -187,7 +187,7 @@ modules = {'account','cbi','calendar','schedule','checkin','recovery','recommend
 for owner in list(mapping['httpOwners'].values())+list(mapping['tableOwners'].values()):
     if owner.split('.')[0] not in modules:
         raise ValueError(f'Unknown target module: {owner}')
-mapping_md = '''# Come-down(캄다운) API·테이블 책임 매핑
+mapping_md = '''# Come & Down(캄다운) API·테이블 책임 매핑
 
 설계 v1.0 · 기존 구현을 기준으로 하지 않은 목표 책임이다. 원본은 architecture-map.json이며 API.md·ERD.md의 모든 항목과 대조해 생성한다. API/테이블을 추가하면 JSON을 갱신하고 문서를 다시 생성한다.
 
@@ -211,7 +211,7 @@ mapping_md += f'\n## 문서 대조 결과\n\nAPI {len(specified_routes)}개와 �
 (ROOT/'책임_매핑.md').write_text(mapping_md,encoding='utf-8')
 
 extra_pages = [
-    ('architecture','백엔드_구조설계','백엔드 구조 설계','서비스 전체·API·ERD에서 도출한 Come-down의 신규 목표 구조입니다.'),
+    ('architecture','백엔드_구조설계','백엔드 구조 설계','서비스 전체·API·ERD에서 도출한 Come & Down의 신규 목표 구조입니다.'),
     ('mapping','책임_매핑','API · 테이블 책임 매핑','39개 HTTP API와 18개 테이블의 책임을 한 곳에서 확인하세요.'),
     ('guide','백엔드_협업가이드','백엔드 2인 협업 가이드','구조의 경계와 환경·작업·리뷰·DB 규칙을 함께 맞춥니다.'),
     ('policy','계산_정책','계산 정책 v1','일정 부하·CBI·HRV 측정·회복·안전·범위 위치의 확정 산식입니다.')

@@ -1,5 +1,5 @@
 {
-  "service": "Come-down(캄다운)",
+  "service": "Come & Down(캄다운)",
   "version": "1.0",
   "basis": ["서비스_요구사항.md", "API.md", "ERD.md", "IA_초안.png"],
   "packageProposal": "com.comedown",
