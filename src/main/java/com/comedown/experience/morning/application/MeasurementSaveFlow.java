@@ -4,6 +4,7 @@ import com.comedown.checkin.contract.MeasurementCommands;
 import com.comedown.checkin.contract.RecordCameraMeasurement;
 import com.comedown.checkin.contract.RecordManualMeasurement;
 import com.comedown.checkin.contract.RecordedMeasurement;
+import com.comedown.experience.suggestions.application.RecoverySuggestionFlow;
 import com.comedown.recovery.contract.RecoveryCommands;
 import com.comedown.shared.idempotency.IdempotencyService;
 import com.comedown.shared.idempotency.IdempotentResponse;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Service;
  * 컨디션 저장 뒤의 재측정도 같은 체크에 연결되고, 그날 이후 회복 상태가 다시 계산된다.
  * 저장 전에 사용자 행을 잠그고 접근 조건을 다시 확인해 건강 기록 삭제·동의 철회·탈퇴와 겹치지 않게 한다.
  * <p>
- * 아직 하지 않는 일: 미승인 RECOVERY 추천 재계산(추천 구현 후 연결).
+ * 컨디션까지 입력한 날의 재측정으로 회복이 낮음이 되면 오늘의 회복 추천도 만든다(이미 있으면 그대로 둔다).
  */
 @Service
 public class MeasurementSaveFlow {
@@ -32,16 +33,18 @@ public class MeasurementSaveFlow {
     private final LowRecoverySafetyCheck lowRecoverySafety;
     private final IdempotencyService idempotency;
     private final ServiceTime serviceTime;
+    private final RecoverySuggestionFlow recoverySuggestions;
 
     public MeasurementSaveFlow(MorningAccessGuard accessGuard, MeasurementCommands measurementCommands,
             RecoveryCommands recoveryCommands, LowRecoverySafetyCheck lowRecoverySafety,
-            IdempotencyService idempotency, ServiceTime serviceTime) {
+            IdempotencyService idempotency, ServiceTime serviceTime, RecoverySuggestionFlow recoverySuggestions) {
         this.accessGuard = accessGuard;
         this.measurementCommands = measurementCommands;
         this.recoveryCommands = recoveryCommands;
         this.lowRecoverySafety = lowRecoverySafety;
         this.idempotency = idempotency;
         this.serviceTime = serviceTime;
+        this.recoverySuggestions = recoverySuggestions;
     }
 
     /**
@@ -54,6 +57,7 @@ public class MeasurementSaveFlow {
             RecordedMeasurement recorded = record(userId, onboardingDate, measurement);
             recoveryCommands.recalculate(userId, recorded.checkDate(), serviceTime.today());
             lowRecoverySafety.evaluate(userId);
+            recoverySuggestions.refresh(userId);
             return IdempotentResponse.of(201, toResult(recorded));
         });
     }

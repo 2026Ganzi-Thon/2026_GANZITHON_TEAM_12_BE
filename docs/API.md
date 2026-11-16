@@ -310,7 +310,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 - `todaySuggestions`: 오늘 날짜(`targetDate`)의 PRE_START·RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것(시작 시각 순).
 - **구현 해석(확인 필요)** `recovery.status`·`changePct`·`baseline`은 오늘 이하에서 가장 최근 회복 상태 기준입니다(오늘 기록 전이면 어제까지 계산값). 기록이 없으면 `BUILDING`. `excludedToday`는 오늘 컨디션까지 입력했는데 적격일이 아닐 때(교란 요인·대표값 없음) true입니다.
 - **구현 해석(확인 필요)** 건강정보 동의가 유효하지 않으면(동의를 철회하고 기록을 남긴 경우 포함) `phase`·`recovery`는 기록이 없을 때와 같은 값입니다(`BUILDING`, `changePct` null, `baseline.validDays` 0, `conditionScore` null, `excludedToday` false). `todayCheck.status`는 호흡 기록이 있으면 `IN_PROGRESS`, 없으면 `NOT_STARTED`입니다(컨디션 완료 여부는 드러내지 않음). 다시 동의하면 남아 있던 기록 기준으로 돌아옵니다. `todaySuggestions`·`safety`·`thisWeekLoad`·`plan`은 동의와 무관하게 그대로입니다.
-- **현재 구현 범위**: `thisWeekLoad`는 캘린더를 동기화해 이번 주 부하가 계산되기 전까지, `plan`은 온보딩을 완료해 체험을 시작하기 전까지 null이며, `judgment`는 추천 임계값 확정 전까지 null입니다.
+- **현재 구현 범위**: `thisWeekLoad`는 캘린더를 동기화해 이번 주 부하가 계산되기 전까지, `plan`은 온보딩을 완료해 체험을 시작하기 전까지 null입니다. `judgment`는 가장 최근 회복 상태와 이번 주(월~일) 주간 부하로 정하며([계산_정책.md](계산_정책.md) "회복 추천"), 회복 기록이 없거나 건강정보 동의가 없으면 `BUILDING`입니다.
 
 ---
 
@@ -393,7 +393,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). `type=RECOVERY` 조회는 온보딩 완료 후(403 `ONBOARDING_REQUIRED`), PRE_START는 온보딩 중에도 조회합니다. `type`·`status`가 정의된 값이 아니거나 `date`가 `YYYY-MM-DD`가 아니면 400입니다. 목록은 시작 시각 순입니다.
 - done을 일정 종료 전에 부르면 409 `INVALID_STATE`("일정이 끝난 뒤에 체크할 수 있어요.")입니다. `message`는 문구가 없으면 null입니다.
 - 제안의 등록 키(`registration_key`)는 생성 때 서버가 만드는 Google event id(`cd` + 32자, base32hex 문자만)이며 응답에 내보내지 않습니다. 승인 시작 때 같은 사용자의 다른 APPROVING·APPROVED 예약과 겹치면 409 `SLOT_CONFLICT`입니다. 만료 시각이 지난 PROPOSED는 서버가 주기적으로 `EXPIRED`로 바꿉니다. 건너뛰기·했어요·되돌리기·만료·승인 확정은 승인 시작과 같은 사용자별 잠금으로 직렬화합니다. 승인이 먼저 시작된 제안을 동시에 건너뛰면 409 `INVALID_STATE`이고 만료 대상에서도 빠집니다(`APPROVING`을 덮어쓰지 않음).
-- **현재 구현 범위**: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) "과부하 대비 제안"). `generate`는 `type: PRE_START`만 되고 `RECOVERY`는 "1~7일 컨디션 기반 추천 임계값" 확정 전까지 422 `CALCULATION_POLICY_PENDING`입니다. `relatedEvent`는 제안을 내보내는 모든 응답(목록·생성·승인·건너뛰기·했어요·되돌리기·홈의 `todaySuggestions`)에 들어갑니다. `start`는 일정 시작(종일 일정이면 그 날 00:00, 서울 시각), `category`는 저장된 분류(분류 전이면 null)이고, `title`은 응답할 때 구글에서 읽으며 읽지 못하면(연결 만료·구글 오류 등) `title`만 null입니다. 일정 참조가 없는 제안(RECOVERY, 캘린더 연결 해제 뒤 남은 이력)은 `relatedEvent` 자체가 null이고 이때는 구글을 부르지 않습니다. 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `FAILED`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `APPROVING` + 202, 서버의 재확인 작업이 1분마다 돌며 이어서 확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `INVALID_STATE`입니다. 구글 403은 권한 범위 부족일 때만 `CALENDAR_SCOPE_MISSING`이고, 사용량 제한 등 그 외 403은 확정 실패(`FAILED`, `CALENDAR_API_ERROR`)입니다.
+- **현재 구현 범위**: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) "과부하 대비 제안"). `generate`의 `type: RECOVERY`는 오늘의 회복 추천을 규칙대로 다시 확인해 만들고(이미 있으면 그대로) 오늘의 `PROPOSED` RECOVERY 제안을 돌려줍니다. 온보딩 완료(403 `ONBOARDING_REQUIRED`)와 건강정보 동의(403 `HRV_CONSENT_REQUIRED`)가 필요하며 `date`는 쓰지 않습니다(항상 오늘). RECOVERY 규칙은 [계산_정책.md](계산_정책.md) "회복 추천"입니다. `relatedEvent`는 제안을 내보내는 모든 응답(목록·생성·승인·건너뛰기·했어요·되돌리기·홈의 `todaySuggestions`)에 들어갑니다. `start`는 일정 시작(종일 일정이면 그 날 00:00, 서울 시각), `category`는 저장된 분류(분류 전이면 null)이고, `title`은 응답할 때 구글에서 읽으며 읽지 못하면(연결 만료·구글 오류 등) `title`만 null입니다. 일정 참조가 없는 제안(RECOVERY, 캘린더 연결 해제 뒤 남은 이력)은 `relatedEvent` 자체가 null이고 이때는 구글을 부르지 않습니다. 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `FAILED`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `APPROVING` + 202, 서버의 재확인 작업이 1분마다 돌며 이어서 확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `INVALID_STATE`입니다. 구글 403은 권한 범위 부족일 때만 `CALENDAR_SCOPE_MISSING`이고, 사용량 제한 등 그 외 403은 확정 실패(`FAILED`, `CALENDAR_API_ERROR`)입니다.
 - **구현 해석(확인 필요)** 시간을 바꾸지 않는 승인의 재확인(0절 "Google의 최신 빈 시간을 재확인"): 구글을 새로 조회하지 않고 저장된(마지막으로 동기화한) 일정으로 확인합니다. 충돌은 제안 구간 `[start, end)`과 실제로 겹치는 시간 일정이 있을 때이며, 종일·취소·"한가함" 일정과 구간에 맞닿기만 한 일정은 충돌이 아닙니다. 제안을 만들 때의 조건인 앞뒤 10분 간격·수면 시간대는 다시 적용하지 않고, 다른 제안과의 겹침은 기존대로 APPROVING·APPROVED 예약만 봅니다. "지났다"는 시작 시각이 현재보다 이전인 경우입니다(만료 전이어도 409). 이미 `APPROVING`인 제안의 재승인은 이전 시도가 구글에 반영됐을 수 있으므로 재확인하지 않고 같은 등록 키로 이어 갑니다.
 - **구현 해석(확인 필요)** 승인 재확인 순서: 재확인 작업은 한 번에 오래된 순으로 20건을 봅니다. 재확인하고도 `APPROVING`이면 `updated_at`을 갱신해 순서를 맨 뒤로 보내고, 그 제안은 2분(`comedown.suggestions.recheck-after`) 뒤에 다시 확인합니다. 풀리지 않는 제안(연결 해제·미재인증 사용자)이 새 제안의 재확인을 막지 않게 하려는 것이며, 재확인 횟수 제한이나 간격 늘리기는 없습니다(확인할 수 없는 `APPROVING`을 언제 정리할지는 미정).
 - **구현 해석(확인 필요)** PRE_START 재제안: 같은 마감 일정에 `PROPOSED`·`APPROVING`·`APPROVED`·`FAILED`(재시도 가능)·`DISMISSED`·`UNDONE` 제안이 있으면 동기화·`generate`가 새 제안을 만들지 않습니다. 사용자가 건너뛰거나 되돌린 마감은 다시 권하지 않고, `EXPIRED`(응답 없이 날짜가 지남)만 다시 제안합니다.
@@ -503,7 +503,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - `interpretation`(B6-2 해석 한 줄, 0절 "AI 문구 표시" 모양): 기준선 확정 후(`ESTABLISHED`)에만 주고 `BUILDING`이면 null입니다(7일 확보 전 HRV로 판단하지 않음). 추천 카드의 `message`와 별개입니다.
 - 표시값 반올림: `trendRmssdMs`·`normalRange`·`rmssdMs`·`heartRateBpm`은 소수 첫째 자리, `changePct`는 저장값(소수 첫째 자리) 그대로입니다.
 - `qualityLevel`·`rmssdMs`·`heartRateBpm`은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. B6의 "HRV 41 ms"는 `rmssdMs`(소수 첫째 자리)이며 기준선 만드는 중(`BUILDING`)에도 표시용으로 줍니다(판단·추천 근거로는 쓰지 않음). 재측정해도 결과 화면 값은 마지막 측정이 아니라 대표값입니다. `excludedFromBaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
-- **현재 구현 범위**: `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`, 회복 리포트와 같은 문구)입니다. `judgment`는 null, `suggestions`는 빈 배열입니다. 2축 판단과 RECOVERY 추천은 "1~7일 컨디션 기반 추천 임계값"(14절 남은 항목)과 추천 기능이 정해진 뒤 채웁니다. 2주 연속 낮음 안전 평가도 safety 구현 후 연결합니다.
+- **현재 구현 범위**: `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`, 회복 리포트와 같은 문구)입니다. `judgment`와 `suggestions`는 [계산_정책.md](계산_정책.md) "회복 추천" 규칙(2026-11-17 결정)으로 채웁니다: 기준선을 만드는 동안(`BUILDING`)에는 `judgment: BUILDING`이고 추천이 없으며, 기준선 확정 뒤 회복이 `LOW`면 선호 활동 하나를 오늘의 빈 시간에 추천합니다(하루 하나, 문구는 규칙 기반 `fallback: true`). `suggestions`는 그날의 RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것입니다.
 
 ### `POST /api/morning-checks/today/breathing` → 204 — ③ 호흡 1분 완료 (건너뛰기 가능)
 ```json
@@ -694,6 +694,6 @@ API URL은 유지하며 내부 패키지는 서비스 책임으로 구분합니�
 v0.3에서 확정(→ [계산_정책.md](계산_정책.md)): 일정 부하 가중치·임계값·OTHER·미분류·종일·겹친 일정 규칙, 회복 계산 단위·기준선·LOW 판정·확정 당일, 2주 연속 낮음, 4주 범위 위치의 최소 표본·백분위, CBI 문항·보기 버전(`cbi-ko-2026.11.2`).
 
 아직 남은 항목:
-- 최근 표본 부족·민감정보 비동의 시 일반 추천 규칙, 컨디션 점수 임계값.
+- ~~1~7일 컨디션 기반 추천 임계값~~ → 2026-11-17 확정: 첫 7일(기준선 만드는 동안)에는 회복 추천을 하지 않고, 기준선 뒤 회복이 낮은 날에 추천([계산_정책.md](계산_정책.md) "회복 추천"). 최근 표본 부족(`INSUFFICIENT`)·건강정보 동의 철회 사용자에게 주는 일반 추천 규칙은 아직 없습니다(추천 없음).
 - 구글 토큰 철회가 로그인용 권한까지 영향을 줄 때 캘린더만 해제하는 처리, 탈퇴 시 앱 생성 일정 보존/삭제 선택.
 - 본 검토는 임상적 유효성이나 법적 적합성을 검증한 것이 아닙니다.

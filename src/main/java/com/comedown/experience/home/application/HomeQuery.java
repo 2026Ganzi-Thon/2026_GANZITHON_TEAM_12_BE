@@ -5,6 +5,7 @@ import com.comedown.account.contract.HealthDataAccess;
 import com.comedown.checkin.contract.CheckinDay;
 import com.comedown.checkin.contract.CheckinQuery;
 import com.comedown.checkin.contract.DayIndex;
+import com.comedown.experience.suggestions.application.RecoveryJudgment;
 import com.comedown.recommendation.contract.SuggestionPayload;
 import com.comedown.recommendation.contract.SuggestionPayloads;
 import com.comedown.recommendation.contract.SuggestionQuery;
@@ -26,8 +27,6 @@ import org.springframework.stereotype.Service;
  * 홈(B1) 조합. account·checkin·recovery·recommendation·safety 읽기 계약의 스냅샷만 쓰고 테이블을 직접 읽지 않는다.
  * 읽기 전용이라 회복 상태·추천을 계산하거나 만들지 않는다.
  * 건강정보 동의가 유효하지 않으면(철회하고 기록을 남긴 경우 포함) 회복·컨디션·기준선은 기록이 없을 때와 같게 준다.
- * <p>
- * 아직 비어 있는 값: judgment(추천 임계값 확정 후).
  */
 @Service
 public class HomeQuery {
@@ -45,13 +44,15 @@ public class HomeQuery {
     private final WeekLoads weekLoads;
     private final SubscriptionQuery subscriptionQuery;
     private final SuggestionPayloads suggestionPayloads;
+    private final RecoveryJudgment judgment;
 
     public HomeQuery(AccountAccessQuery accountAccess, CheckinQuery checkinQuery, RecoveryQuery recoveryQuery,
             SuggestionQuery suggestionQuery, SafetyQuery safetyQuery, ServiceTime serviceTime, WeekLoads weekLoads,
-            SubscriptionQuery subscriptionQuery, SuggestionPayloads suggestionPayloads) {
+            SubscriptionQuery subscriptionQuery, SuggestionPayloads suggestionPayloads, RecoveryJudgment judgment) {
         this.weekLoads = weekLoads;
         this.subscriptionQuery = subscriptionQuery;
         this.suggestionPayloads = suggestionPayloads;
+        this.judgment = judgment;
         this.accountAccess = accountAccess;
         this.checkinQuery = checkinQuery;
         this.recoveryQuery = recoveryQuery;
@@ -89,7 +90,7 @@ public class HomeQuery {
                 recovery(latest, todayCheck, today),
                 weekLoads.find(userId, serviceTime.weekStartOf(today))
                         .map(w -> new HomeView.ThisWeekLoad(w.vsUsualPct(), w.riskLevel())).orElse(null),
-                null,
+                judgment.of(userId, latest),
                 suggestions,
                 new HomeView.Safety(safetyQuery.shouldShow(userId)),
                 subscriptionQuery.find(userId).map(p -> new HomeView.Plan(p.plan(), p.daysLeft())).orElse(null));

@@ -1,6 +1,9 @@
 package com.comedown.experience.suggestions.api;
 
+import com.comedown.account.contract.AccountAccessQuery;
+import com.comedown.account.contract.HealthDataAccess;
 import com.comedown.experience.suggestions.application.PreStartGenerationFlow;
+import com.comedown.experience.suggestions.application.RecoverySuggestionFlow;
 import com.comedown.experience.suggestions.application.SuggestionApprovalFlow;
 import com.comedown.recommendation.contract.SuggestionPayload;
 import com.comedown.recommendation.contract.SuggestionPayloads;
@@ -33,20 +36,25 @@ class SuggestionFlowController {
     private final SuggestionQuery query;
     private final ServiceTime time;
     private final SuggestionPayloads payloads;
+    private final RecoverySuggestionFlow recovery;
+    private final AccountAccessQuery accountAccess;
 
     SuggestionFlowController(PreStartGenerationFlow generation, SuggestionApprovalFlow approval,
-            SuggestionQuery query, ServiceTime time, SuggestionPayloads payloads) {
+            SuggestionQuery query, ServiceTime time, SuggestionPayloads payloads, RecoverySuggestionFlow recovery,
+            AccountAccessQuery accountAccess) {
         this.generation = generation;
         this.approval = approval;
         this.query = query;
         this.time = time;
         this.payloads = payloads;
+        this.recovery = recovery;
+        this.accountAccess = accountAccess;
     }
 
     @PostMapping("/api/suggestions/generate")
     SuggestionsResponse generate(CurrentUser user, @Valid @RequestBody GenerateRequest body) {
         if ("RECOVERY".equals(body.type())) {
-            throw new ApiException(ErrorCode.CALCULATION_POLICY_PENDING);
+            return generateRecovery(user.id());
         }
         if (!"PRE_START".equals(body.type())) {
             throw FieldValidationException.of("type", "PRE_START 또는 RECOVERY여야 해요.");
@@ -54,6 +62,21 @@ class SuggestionFlowController {
         generation.refresh(user.id());
         return new SuggestionsResponse(
                 payloads.of(user.id(), query.search(user.id(), "PRE_START", "PROPOSED", null)));
+    }
+
+    /** 오늘의 회복 추천: 온보딩 완료·건강정보 동의가 필요하다(회복 상태가 근거라서). */
+    private SuggestionsResponse generateRecovery(long userId) {
+        HealthDataAccess access = accountAccess.findHealthDataAccess(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED));
+        if (!access.onboardingCompleted()) {
+            throw new ApiException(ErrorCode.ONBOARDING_REQUIRED);
+        }
+        if (!access.sensitiveHrvConsented()) {
+            throw new ApiException(ErrorCode.HRV_CONSENT_REQUIRED);
+        }
+        recovery.refresh(userId);
+        return new SuggestionsResponse(
+                payloads.of(userId, query.search(userId, "RECOVERY", "PROPOSED", time.today())));
     }
 
     @GetMapping("/api/suggestions/{id}/slots")
