@@ -3,6 +3,7 @@ package com.comedown.schedule.application;
 import com.comedown.schedule.contract.WeekLoadView;
 import com.comedown.schedule.contract.WeekLoads;
 import com.comedown.schedule.domain.WeekLoad;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -32,6 +33,11 @@ class WeekLoadsAdapter implements WeekLoads {
     @Override
     public List<WeekLoadView> range(long userId, LocalDate from, int count) {
         return service.weeks(userId, from, count).stream().map(WeekLoadsAdapter::view).toList();
+    }
+
+    @Override
+    public Optional<Instant> lastComputedAt(long userId, LocalDate from, int count) {
+        return service.lastComputedAt(userId, from, count);
     }
 
     static WeekLoadView view(WeekLoad load) {

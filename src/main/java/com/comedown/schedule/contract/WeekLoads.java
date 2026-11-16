@@ -1,5 +1,6 @@
 package com.comedown.schedule.contract;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -16,4 +17,10 @@ public interface WeekLoads {
 
     /** {@code from}이 속한 주부터 {@code count}주의 저장된 부하(계산된 적 없는 주는 빠진다). */
     List<WeekLoadView> range(long userId, LocalDate from, int count);
+
+    /**
+     * {@code from}이 속한 주부터 {@code count}주의 저장된 부하 중 가장 늦게 계산한 시각. 저장된 주가 없으면 비어 있다.
+     * 동기화는 일정이 0건이어도 이 주들의 부하를 계산해 저장하므로, 일정 행이 하나도 없는 사용자도 분석한 적이 있는지 알 수 있다.
+     */
+    Optional<Instant> lastComputedAt(long userId, LocalDate from, int count);
 }

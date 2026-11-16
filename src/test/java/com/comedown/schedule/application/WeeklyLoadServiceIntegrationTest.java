@@ -6,6 +6,7 @@ import com.comedown.schedule.domain.WeekLoad;
 import com.comedown.schedule.domain.WeekLoad.RiskLevel;
 import com.comedown.schedule.domain.WeekLoad.RiskReason;
 import com.comedown.support.FixedClockTestConfig;
+import com.comedown.support.MutableClock;
 import com.comedown.support.MySqlContainerTestConfig;
 import java.time.LocalDate;
 import java.util.List;
@@ -32,6 +33,9 @@ class WeeklyLoadServiceIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    MutableClock clock;
 
     long userId;
     long otherUserId;
@@ -92,6 +96,36 @@ class WeeklyLoadServiceIntegrationTest {
     }
 
     @Test
+    void 직전_주가_거의_비어_있어도_평소_대비를_컬럼_범위_안으로_저장한다() {
+        // 직전 두 주에 6분짜리 수업 하나씩(부하 0.1) → 평균 0.05. 이번 주는 평일 낮 11시간씩 55시간.
+        insertEvent(userId, "p1", "2026-10-26 01:00:00", "2026-10-26 01:06:00", false, "CLASS", null);
+        insertEvent(userId, "p2", "2026-11-02 01:00:00", "2026-11-02 01:06:00", false, "CLASS", null);
+        for (int day = 0; day < 5; day++) {
+            insertEvent(userId, "b" + day, "2026-11-" + pad(9 + day) + " 00:00:00",
+                    "2026-11-" + pad(9 + day) + " 11:00:00", false, "CLASS", null);
+        }
+
+        service.recalculate(userId, List.of(MON.minusWeeks(2), MON.minusWeeks(1), MON));
+
+        // (55.0 ÷ 0.05 − 1) × 100 = 109900.0은 DECIMAL(6,1)에 들어가지 않는다. 저장이 실패하지 않고 한계값으로 남는다.
+        WeekLoad load = service.weeks(userId, MON, 1).get(0);
+        assertThat(load.loadScore()).isEqualByComparingTo("55.0");
+        assertThat(load.vsUsualPct()).isEqualByComparingTo("99999.9");
+        assertThat(jdbc.queryForObject("SELECT vs_usual_pct FROM weekly_loads WHERE user_id = ? AND week_start = ?",
+                java.math.BigDecimal.class, userId, MON)).isEqualByComparingTo("99999.9");
+    }
+
+    @Test
+    void 마지막_계산_시각은_요청한_주_범위의_행만_본다() {
+        clock.set(FixedClockTestConfig.DEFAULT_NOW);
+        service.recalculate(userId, List.of(MON.minusWeeks(1), MON));
+
+        assertThat(service.lastComputedAt(userId, MON, 5)).contains(java.time.Instant.parse("2026-11-11T22:30:00Z"));
+        assertThat(service.lastComputedAt(userId, MON.plusWeeks(1), 4)).isEmpty();
+        assertThat(service.lastComputedAt(otherUserId, MON, 5)).isEmpty();
+    }
+
+    @Test
     void 다른_사용자의_일정과_부하는_섞이지_않는다() {
         insertEvent(otherUserId, "o1", "2026-11-09 01:00:00", "2026-11-09 06:00:00", false, "EXAM", null);
 
@@ -111,6 +145,10 @@ class WeeklyLoadServiceIntegrationTest {
         service.recalculate(userId, List.of(MON));
 
         assertThat(service.weeks(userId, MON, 1).get(0).totalHours()).isEqualByComparingTo("0");
+    }
+
+    private static String pad(int day) {
+        return day < 10 ? "0" + day : String.valueOf(day);
     }
 
     private long insertUser(String sub) {

@@ -8,9 +8,11 @@ import com.comedown.schedule.domain.WeekLoad;
 import com.comedown.shared.time.InstantRange;
 import com.comedown.shared.time.ServiceTime;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +64,13 @@ public class WeeklyLoadService {
     public List<WeekLoad> weeks(long userId, LocalDate from, int count) {
         LocalDate first = time.weekStartOf(from);
         return store.findBetween(userId, first, first.plusWeeks(count - 1L));
+    }
+
+    /** {@code from}이 속한 주부터 {@code count}주의 저장된 부하 중 가장 늦게 계산한 시각. 저장된 주가 없으면 비어 있다. */
+    @Transactional(readOnly = true)
+    public Optional<Instant> lastComputedAt(long userId, LocalDate from, int count) {
+        LocalDate first = time.weekStartOf(from);
+        return store.lastComputedAt(userId, first, first.plusWeeks(count - 1L));
     }
 
     private WeekLoad recalculateWeek(long userId, LocalDate weekStart) {

@@ -364,7 +364,7 @@ erDiagram
 | week_start | DATE | | PK(2). 월요일 |
 | total_hours | DECIMAL(5,1) | | 집계 대상 일정 시간 합(일 관련 + OTHER + 미분류. 개인·앱 생성·한가함·취소·종일 일정 제외) |
 | load_score | DECIMAL(6,1) | | Σ(일정 시간 × 가중치). `load-v1`: 시험·발표 ×1.5, 22~07시·주말 ×1.5, 곱 최대 2.25 |
-| vs_usual_pct | DECIMAL(6,1) | Y | (이번 주 부하 점수 ÷ 직전 4주 평균 − 1) × 100. 계산 불가 시 null |
+| vs_usual_pct | DECIMAL(6,1) | Y | (이번 주 부하 점수 ÷ 직전 4주 평균 − 1) × 100. 계산 불가 시 null. 컬럼 범위를 넘는 값은 ±99999.9로 잘라 저장(계산 정책 1절 구현 해석) |
 | vs_usual_unavailable_reason | VARCHAR(30) | Y | vs_usual_pct가 null인 이유: `ZERO_BASELINE`(직전 4주 평균 0) `INSUFFICIENT_DATA`(직전 데이터 2주 미만) |
 | deadline_count | SMALLINT | | 마감 몰림(과제 마감·시험·발표 수) |
 | late_night_count | SMALLINT | | 22시 이후 끝나거나 07시 이전 시작 |
