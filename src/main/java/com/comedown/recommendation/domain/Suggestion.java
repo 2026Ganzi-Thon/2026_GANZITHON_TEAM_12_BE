@@ -25,6 +25,8 @@ import java.util.Objects;
  *   <li>그 외 전이는 409 INVALID_STATE(승인 시작은 SUGGESTION_NOT_PROPOSED)</li>
  * </ul>
  * registration_key는 생성 때 서버가 만든 Google event id이며 승인 재시도에 그대로 쓴다.
+ * <p>
+ * 버전 컬럼이 없고 갱신은 모든 컬럼을 쓰므로, 상태 전이는 사용자 잠금을 잡고 읽은 뒤에 한다(잠금은 application).
  */
 @Entity
 @Table(name = "suggestions")
@@ -225,6 +227,19 @@ public class Suggestion {
         updatedAt = now;
     }
 
+    /**
+     * 외부 결과를 확인하지 못해 APPROVING으로 남길 때 재확인 순서를 뒤로 미룬다(updatedAt만 갱신, 상태 유지).
+     *
+     * @return true면 미뤘다. APPROVING이 아니면(이미 확정됨) 아무것도 바꾸지 않는다
+     */
+    public boolean deferRecheck(Instant now) {
+        if (status != SuggestionStatus.APPROVING) {
+            return false;
+        }
+        updatedAt = now;
+        return true;
+    }
+
     /** 되돌리기 가능 여부. APPROVED이고 했어요 전. UNDONE은 반복 호출(같은 결과)로 허용. */
     public void requireUndoable() {
         if (status == SuggestionStatus.UNDONE) {
@@ -357,5 +372,9 @@ public class Suggestion {
 
     public Instant getExpiresAt() {
         return expiresAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

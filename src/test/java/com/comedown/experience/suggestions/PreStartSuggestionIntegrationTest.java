@@ -21,6 +21,9 @@ import com.comedown.account.contract.CalendarCredentialProvider;
 import com.comedown.calendar.contract.CalendarEventWriter;
 import com.comedown.calendar.contract.CalendarEventWriter.DeleteResult;
 import com.comedown.experience.suggestions.application.ApprovalRecheckJob;
+import com.comedown.recommendation.contract.NewSuggestion;
+import com.comedown.recommendation.contract.SuggestionApprovalCommands;
+import com.comedown.recommendation.contract.SuggestionCommands;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
 import com.comedown.shared.error.ExternalServiceException;
@@ -28,7 +31,12 @@ import com.comedown.shared.error.ExternalServiceException.Kind;
 import com.comedown.support.FixedClockTestConfig;
 import com.comedown.support.MutableClock;
 import com.comedown.support.MySqlContainerTestConfig;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +73,12 @@ class PreStartSuggestionIntegrationTest {
 
     @Autowired
     ApprovalRecheckJob recheckJob;
+
+    @Autowired
+    SuggestionCommands suggestionCommands;
+
+    @Autowired
+    SuggestionApprovalCommands approvalCommands;
 
     @MockitoBean
     CalendarEventWriter writer;
@@ -200,6 +214,85 @@ class PreStartSuggestionIntegrationTest {
     }
 
     @Test
+    void 제안한_시간에_그_사이_일정이_생겼으면_SLOT_CONFLICT이고_PROPOSED로_남는다() throws Exception {
+        long user = riskUser();
+        long id = suggestionId(user); // 11-17 07:00~07:30 서울
+        registerSucceeds();
+        // 제안을 만든 뒤 동기화된 일정: 11-17 07:15~08:00 서울
+        event(user, "later-" + user, "2026-11-16 22:15:00", "2026-11-16 23:00:00", "CLASS");
+
+        approve(user, id, null).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SLOT_CONFLICT"));
+        assertThat(statusOf(id)).isEqualTo("PROPOSED");
+        verify(writer, never()).register(any(), any());
+
+        // "다른 시간 보기"로 고른 빈 시간으로는 승인된다.
+        approve(user, id, range("2026-11-17T17:00:00+09:00", "2026-11-17T17:30:00+09:00"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    void 맞닿기만_한_일정과_시간을_막지_않는_일정은_제안한_시간의_충돌이_아니다() throws Exception {
+        long user = riskUser();
+        long id = suggestionId(user); // 11-17 07:00~07:30 서울
+        registerSucceeds();
+        event(user, "touch-" + user, "2026-11-16 22:30:00", "2026-11-16 23:30:00", "CLASS"); // 07:30~08:30, 맞닿음
+        event(user, "allday-" + user, "2026-11-16 15:00:00", "2026-11-17 15:00:00", true, "confirmed", "opaque");
+        event(user, "cancelled-" + user, "2026-11-16 22:00:00", "2026-11-16 23:00:00", false, "cancelled", "opaque");
+        event(user, "free-" + user, "2026-11-16 22:00:00", "2026-11-16 23:00:00", false, "confirmed", "transparent");
+
+        approve(user, id, null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    void 제안한_시간이_이미_지났으면_SLOT_CONFLICT이고_구글에_보내지_않는다() throws Exception {
+        long user = riskUser();
+        long id = suggestionId(user); // 11-17 07:00~07:30 서울
+        registerSucceeds();
+        clock.set("2026-11-17T07:10:00+09:00"); // 시작 시각은 지났고 만료(그날 끝) 전
+
+        approve(user, id, null).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SLOT_CONFLICT"));
+        assertThat(statusOf(id)).isEqualTo("PROPOSED");
+        verify(writer, never()).register(any(), any());
+
+        // 아직 남은 시간으로 바꾸면 승인된다.
+        approve(user, id, range("2026-11-17T17:00:00+09:00", "2026-11-17T17:30:00+09:00"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
+    }
+
+    @Test
+    void 확정_실패_뒤_재시도도_제안한_시간을_재확인한다() throws Exception {
+        long user = riskUser();
+        long id = suggestionId(user);
+        when(writer.register(any(), any())).thenThrow(new ExternalServiceException(Kind.FAILURE, "x"));
+        approve(user, id, null).andExpect(status().isBadGateway());
+        assertThat(statusOf(id)).isEqualTo("FAILED");
+
+        reset(writer);
+        registerSucceeds();
+        event(user, "later-" + user, "2026-11-16 22:00:00", "2026-11-16 22:20:00", "CLASS"); // 07:00~07:20 서울
+        approve(user, id, null).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SLOT_CONFLICT"));
+        assertThat(statusOf(id)).isEqualTo("FAILED");
+        verify(writer, never()).register(any(), any());
+    }
+
+    @Test
+    void 승인_중인_제안의_재승인은_시간을_재확인하지_않고_같은_등록_키로_이어_간다() throws Exception {
+        long user = riskUser();
+        long id = uncertainApproval(user);
+        String key = registrationKey(id);
+        // 이전 시도가 구글에 반영됐을 수 있다. 그 사이 일정이 생겼거나 시간이 지났어도 결과를 확정해야 한다.
+        event(user, "later-" + user, "2026-11-16 22:15:00", "2026-11-16 23:00:00", "CLASS");
+        clock.set("2026-11-17T07:10:00+09:00");
+        registerSucceeds();
+
+        approve(user, id, null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.googleEventId").value(key));
+    }
+
+    @Test
     void 등록이_거절되면_FAILED이고_다시_승인할_수_있다() throws Exception {
         long user = riskUser();
         long id = suggestionId(user);
@@ -311,13 +404,57 @@ class PreStartSuggestionIntegrationTest {
         assertThat(statusOf(id)).isEqualTo("APPROVING");
         verify(writer, never()).register(any(), any());
 
-        // 자격이 돌아오면 같은 등록 키로 이어서 끝낸다.
+        // 자격이 돌아오면 같은 등록 키로 이어서 끝낸다. 방금 재확인한 제안은 recheck-after(2분)가 지난 뒤에 다시 본다.
         reset(credentials);
         when(credentials.credentialFor(anyLong())).thenReturn(new CalendarCredential("token"));
-        when(writer.register(any(), any())).thenAnswer(i -> ((CalendarEventWriter.NewEvent) i.getArgument(1))
-                .registrationKey());
+        registerSucceeds();
+        assertThat(recheckJob.recheckStale()).isZero();
+        assertThat(statusOf(id)).isEqualTo("APPROVING");
+
+        clock.advance(Duration.ofMinutes(3));
         assertThat(recheckJob.recheckStale()).isEqualTo(1);
         assertThat(statusOf(id)).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void 풀리지_않는_승인_중_제안이_한_번의_재확인_수를_채워도_다음에는_그_뒤의_제안을_본다() throws Exception {
+        long user = newUser();
+        int batch = 20; // ApprovalRecheckJob.BATCH
+        // 승인 중인 채 오래된 제안 21개. 갱신 시각 21:00~21:20 UTC(기준 시각 22:30 UTC), 번호가 클수록 최근이다.
+        List<Long> ids = new ArrayList<>();
+        for (int i = 0; i <= batch; i++) {
+            Instant start = Instant.parse("2026-11-17T00:00:00Z").plus(Duration.ofMinutes(30L * i));
+            long id = suggestionCommands.propose(new NewSuggestion(user, "PRE_START", LocalDate.of(2026, 11, 17),
+                    start, start.plus(Duration.ofMinutes(20)), "과제 미리 시작하기", null, null, "RISK_WEEK", "load-v1",
+                    null, false, false, null, null, Instant.parse("2026-11-17T15:00:00Z"))).id();
+            approvalCommands.startApproval(user, id, null, null);
+            jdbc.update("UPDATE suggestions SET updated_at = ? WHERE id = ?",
+                    "2026-11-11 21:%02d:00.000000".formatted(i), id);
+            ids.add(id);
+        }
+        long newest = ids.get(batch);
+        String newestKey = registrationKey(newest);
+        // 가장 최근 제안만 구글 등록이 확인되고, 나머지는 계속 결과를 알 수 없다.
+        when(writer.register(any(), any())).thenAnswer(i -> {
+            String key = ((CalendarEventWriter.NewEvent) i.getArgument(1)).registrationKey();
+            if (key.equals(newestKey)) {
+                return key;
+            }
+            throw new ExternalServiceException(Kind.UNCERTAIN, "timeout");
+        });
+        when(writer.exists(any(), any())).thenThrow(new ExternalServiceException(Kind.UNCERTAIN, "timeout"));
+
+        assertThat(recheckJob.recheckStale()).isEqualTo(batch); // 오래된 20개: 모두 풀리지 않음
+        assertThat(statusOf(newest)).isEqualTo("APPROVING");
+
+        assertThat(recheckJob.recheckStale()).isEqualTo(1); // 방금 본 20개는 뒤로 밀려 남은 1개 차례가 온다
+        assertThat(statusOf(newest)).isEqualTo("APPROVED");
+        assertThat(recheckJob.recheckStale()).isZero();
+
+        clock.advance(Duration.ofMinutes(3)); // 밀린 제안은 recheck-after가 지나면 다시 본다
+        assertThat(recheckJob.recheckStale()).isEqualTo(batch);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM suggestions WHERE user_id = ? AND status = 'APPROVING'",
+                Integer.class, user)).isEqualTo(batch);
     }
 
     @Test
@@ -388,6 +525,11 @@ class PreStartSuggestionIntegrationTest {
         return id;
     }
 
+    private void registerSucceeds() {
+        when(writer.register(any(), any())).thenAnswer(i -> ((CalendarEventWriter.NewEvent) i.getArgument(1))
+                .registrationKey());
+    }
+
     private ResultActions generate(long user) throws Exception {
         return mvc.perform(post("/api/suggestions/generate").with(loginAs(user)).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"PRE_START\"}"));
@@ -450,5 +592,14 @@ class PreStartSuggestionIntegrationTest {
                 + "event_status, transparency, created_by_app, category, synced_at) VALUES (?, ?, ?, ?, FALSE, "
                 + "'confirmed', 'opaque', FALSE, ?, '2026-11-11 22:30:00.000000')",
                 user, googleId, startUtc, endUtc, category);
+    }
+
+    /** 분류 전(category null) 일정을 종일·상태·표시 방식까지 정해 넣는다. */
+    private void event(long user, String googleId, String startUtc, String endUtc, boolean allDay,
+            String eventStatus, String transparency) {
+        jdbc.update("INSERT INTO calendar_events (user_id, google_event_id, start_at, end_at, all_day, "
+                + "event_status, transparency, created_by_app, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, "
+                + "'2026-11-11 22:30:00.000000')",
+                user, googleId, startUtc, endUtc, allDay, eventStatus, transparency);
     }
 }

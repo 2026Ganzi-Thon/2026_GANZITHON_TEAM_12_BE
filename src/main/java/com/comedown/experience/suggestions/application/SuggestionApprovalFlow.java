@@ -24,7 +24,10 @@ import org.springframework.stereotype.Service;
  * 제안 승인(구글 캘린더 등록)·되돌리기·다른 시간 조회. 이 클래스는 트랜잭션이 아니다: 상태 전이는 recommendation 계약의
  * 짧은 트랜잭션들이고, 구글 호출은 그 사이에 트랜잭션 밖에서 한다.
  * <pre>
- * 승인: beginApproval(APPROVING, 등록 키) → 구글에 등록 키를 event id로 등록 → confirmApproved
+ * 승인: (시간을 바꾸지 않으면) 제안한 시간이 아직 비어 있는지 재확인 → beginApproval(APPROVING, 등록 키)
+ *       → 구글에 등록 키를 event id로 등록 → confirmApproved
+ *   - 제안한 시간이 지났거나 그 사이 같은 시간에 일정이 생겼으면 409 SLOT_CONFLICT. 제안은 PROPOSED(재시도면 FAILED)
+ *     그대로이고 구글에 아무것도 보내지 않는다.
  *   - 확정된 거절(4xx)·자격 오류: markFailed (재시도는 FAILED → APPROVING)
  *   - 타임아웃·5xx(결과 모름): 실패로 확정하지 않고 등록 키로 조회해 확인. 못 알면 APPROVING으로 두고 202,
  *     재확인 작업({@link ApprovalRecheckJob})이 같은 키로 이어서 확인·재시도한다.
@@ -67,7 +70,9 @@ public class SuggestionApprovalFlow {
 
     /**
      * 승인. {@code start}/{@code end}가 있으면 시간을 바꾼다(같은 날·같은 길이·빈 시간이 아니면 400).
-     * 이미 승인된 제안은 원래 결과를 그대로 돌려준다.
+     * 없으면 제안한 시간 그대로 등록하되, 그 시간이 지났거나 그 사이 일정이 생겼으면 409 SLOT_CONFLICT.
+     * 이미 승인된 제안은 원래 결과를 그대로 돌려주고, 이미 승인 중(APPROVING)인 제안은 재확인 없이 같은 등록 키로 이어 간다
+     * (이전 시도가 구글에 반영됐을 수 있어서, 여기서 막으면 그 결과를 확정하지 못한다).
      */
     public Result approve(long userId, long suggestionId, Instant start, Instant end) {
         SuggestionView s = owned(userId, suggestionId);
@@ -76,6 +81,8 @@ public class SuggestionApprovalFlow {
         }
         if (start != null || end != null) {
             validateChange(s, start, end, userId);
+        } else if (startsNewApproval(s)) {
+            requireStillFree(s);
         }
         ApprovalStart begun = approvals.startApproval(userId, suggestionId, start, end);
         if ("APPROVED".equals(begun.suggestion().status())) {
@@ -196,6 +203,21 @@ public class SuggestionApprovalFlow {
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "같은 날 같은 길이로, 수면 시간과 다른 일정을 피해 정해 주세요.");
         }
+    }
+
+    /** 제안한 시간 그대로 승인하기 전 재확인. 지났거나 그 사이 일정이 생겼으면 409 SLOT_CONFLICT(상태는 바꾸지 않는다). */
+    private void requireStillFree(SuggestionView s) {
+        if (slots.alreadyStarted(s)) {
+            throw new ApiException(ErrorCode.SLOT_CONFLICT, "제안한 시간이 이미 지났어요. 다른 시간을 골라 주세요.");
+        }
+        if (slots.takenByEvent(s)) {
+            throw new ApiException(ErrorCode.SLOT_CONFLICT);
+        }
+    }
+
+    /** 이번 승인이 구글에 처음 보내는 시도가 되는 상태(PROPOSED, 확정 실패 뒤 재시도인 FAILED). */
+    private static boolean startsNewApproval(SuggestionView s) {
+        return "PROPOSED".equals(s.status()) || "FAILED".equals(s.status());
     }
 
     private SuggestionView owned(long userId, long suggestionId) {
