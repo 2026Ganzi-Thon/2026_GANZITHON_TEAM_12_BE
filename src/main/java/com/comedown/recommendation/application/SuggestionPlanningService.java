@@ -83,6 +83,11 @@ class SuggestionPlanningService implements SuggestionPlanning {
     }
 
     @Override
+    public String preStartMessage(LocalDate thisWeekStart, LocalDate riskWeekStart, int deadlineCount) {
+        return policy.message(thisWeekStart, riskWeekStart, deadlineCount);
+    }
+
+    @Override
     public boolean isOverloadedWeek(List<String> weekRiskReasons) {
         return RecoverySuggestionPolicy.isOverloaded(weekRiskReasons);
     }

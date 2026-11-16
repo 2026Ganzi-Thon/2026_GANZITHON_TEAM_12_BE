@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -63,6 +64,33 @@ public final class PrepareAheadPolicy {
     /** 제안은 그 날짜가 지나면(다음 날 00:00 서울) 만료된다. */
     public Instant expiresAt(LocalDate targetDate) {
         return targetDate.plusDays(1).atStartOfDay(zone).toInstant();
+    }
+
+    /**
+     * 규칙 기반 카드 문구(AI 도입 전). 위험 주에 마감이 몇 건 몰렸는지 알리고, 마감은 옮기지 않고 준비 시간만 넣는다는
+     * 점을 밝힌다(앱은 일정을 추가만 한다). 일정 제목은 저장하지 않으므로 넣지 않는다.
+     *
+     * @param thisWeekStart 오늘이 속한 주의 월요일
+     * @param riskWeekStart 마감이 있는 위험 주의 월요일
+     * @param deadlineCount 그 주의 마감 수(주간 부하의 deadline_count)
+     */
+    public String message(LocalDate thisWeekStart, LocalDate riskWeekStart, int deadlineCount) {
+        String week = weekLabel(thisWeekStart, riskWeekStart);
+        String lead = deadlineCount >= 2
+                ? week + "에 마감 " + deadlineCount + "건이 몰려 있어요."
+                : week + "에 일정이 많이 몰려 있어요.";
+        return lead + " 과제를 " + blockLength.toMinutes() + "분만 미리 시작해 볼까요? (마감일은 그대로예요)";
+    }
+
+    private static String weekLabel(LocalDate thisWeekStart, LocalDate riskWeekStart) {
+        long weeksAhead = ChronoUnit.WEEKS.between(thisWeekStart, riskWeekStart);
+        if (weeksAhead <= 0) {
+            return "이번 주";
+        }
+        if (weeksAhead == 1) {
+            return "다음 주";
+        }
+        return riskWeekStart.getMonthValue() + "월 " + riskWeekStart.getDayOfMonth() + "일 주";
     }
 
     public boolean isTarget(String category) {
