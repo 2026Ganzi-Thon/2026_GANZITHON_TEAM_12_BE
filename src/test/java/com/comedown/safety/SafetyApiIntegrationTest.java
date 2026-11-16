@@ -70,8 +70,12 @@ class SafetyApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().json("""
                         {"show":false,"alerts":[],
-                         "resources":[{"id":"verified-support-resource","name":"공식 확인 후 등록한 지원 기관",
-                                       "phone":null,"url":null,"verifiedAt":null}],
+                         "resources":[
+                           {"id":"suicide-prevention-109","name":"자살예방상담전화","phone":"109",
+                            "url":"https://www.129.go.kr/109","verifiedAt":"2026-11-17T00:00:00+09:00"},
+                           {"id":"mental-health-crisis-1577-0199","name":"정신건강 위기상담전화","phone":"1577-0199",
+                            "url":"https://www.mohw.go.kr/menu.es?mid=a10706040100",
+                            "verifiedAt":"2026-11-17T00:00:00+09:00"}],
                          "disclaimer":"Come-down은 의료 서비스가 아니며 질병 유무를 판단하지 않아요."}
                         """, JsonCompareMode.STRICT));
     }

@@ -625,17 +625,18 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
   "show": true,
   "alerts": [{ "id": 3, "triggerType": "LOW_RECOVERY_2W", "triggeredAt": "...", "message": "최근 2주 동안 회복이 평소보다 낮게 이어졌어요." }],
   "resources": [
-    { "id": "verified-support-resource", "name": "공식 확인 후 등록한 지원 기관", "phone": null, "url": null, "verifiedAt": null }
+    { "id": "suicide-prevention-109", "name": "자살예방상담전화", "phone": "109", "url": "https://www.129.go.kr/109", "verifiedAt": "2026-11-17T00:00:00+09:00" },
+    { "id": "mental-health-crisis-1577-0199", "name": "정신건강 위기상담전화", "phone": "1577-0199", "url": "https://www.mohw.go.kr/menu.es?mid=a10706040100", "verifiedAt": "2026-11-17T00:00:00+09:00" }
   ],
   "disclaimer": "Come-down은 의료 서비스가 아니며 질병 유무를 판단하지 않아요."
 }
 ```
-- resources 예시는 구조용 placeholder입니다. 실제 연락처·링크는 출시 전에 공식 기관 정보로 확인하고 verifiedAt을 기록해야 하며 미확인 항목에는 전화 버튼을 노출하지 않습니다.
+- `resources`는 공식 기관 누리집에서 번호를 확인한 항목만 내려주며 `verifiedAt`은 확인한 날입니다. `phone`이 있는 항목에만 전화 버튼을 노출합니다. 지금은 자살예방상담전화 109(24시간, 보건복지부 129.go.kr/109)와 정신건강 위기상담전화 1577-0199(보건복지부 정신건강정책 안내) 2건입니다(2026-11-17 확인).
 - 조건: 회복 낮음 2주 연속(`LOW_RECOVERY_2W`) 또는 CBI 75점 이상(`CBI_HIGH`). 마이페이지 메뉴에서는 `show`와 상관없이 언제든 볼 수 있습니다.
 - 로그인만 필요합니다(온보딩 중·건강정보 동의 없이도 조회). `alerts`는 조건이 아직 풀리지 않은 안내(최신순, 닫은 안내 포함)이고, `show`는 그중 닫지 않은 안내가 있을 때 true입니다.
 - 평가 시점: `LOW_RECOVERY_2W`는 측정 저장·컨디션 저장으로 회복 상태를 다시 계산할 때마다, `CBI_HIGH`는 CBI 제출 때 평가합니다.
 - `message`는 와이어프레임 C3 문구입니다: `LOW_RECOVERY_2W` "최근 2주 동안 회복이 평소보다 낮게 이어졌어요.", `CBI_HIGH` "번아웃 체크에서 많이 지쳐 있는 것으로 나왔어요."(세부 점수는 넣지 않음).
-- **구현 해석(확인 필요)** `resources`는 공식 확인 전까지 위 placeholder 1건(전화·링크 없음)을 그대로 내려줍니다.
+- **구현 해석(확인 필요)** 시안 C3의 "학교 상담센터 찾아보기"는 학교마다 연락처가 달라 확인된 공통 번호·주소가 없으므로 `resources`에 넣지 않았습니다. 필요하면 프론트의 안내 문구로 두거나 연결할 주소를 정해 추가합니다.
 
 ### `POST /api/safety/alerts/{id}/acknowledge` → 204 — "닫기"
 - `LOW_RECOVERY_2W`: 최근 14일 중 대표값이 있는 날이 7일 이상이고 그 날들의 회복 상태가 모두 `LOW`. 측정하지 않은 날은 판정에서 빠집니다(낮음으로도 정상으로도 세지 않음).

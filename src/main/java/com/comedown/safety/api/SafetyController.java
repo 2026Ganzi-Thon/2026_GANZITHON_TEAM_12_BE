@@ -31,12 +31,22 @@ public class SafetyController {
             "LOW_RECOVERY_2W", "최근 2주 동안 회복이 평소보다 낮게 이어졌어요.",
             "CBI_HIGH", "번아웃 체크에서 많이 지쳐 있는 것으로 나왔어요.");
 
+    /** 아래 지원 기관의 번호·주소를 보건복지부 공식 누리집에서 확인한 날(서울). */
+    static final OffsetDateTime RESOURCES_VERIFIED_AT = OffsetDateTime.parse("2026-11-17T00:00:00+09:00");
+
     /**
-     * 지원 기관. 명세의 구조용 placeholder다. 실제 연락처·링크는 출시 전 공식 기관 정보로 확인해 verifiedAt을 기록하고,
-     * 확인하지 않은 항목은 phone·url을 비워 전화 버튼을 노출하지 않는다.
+     * 지원 기관. 번호와 주소는 공식 기관 누리집에서 확인한 것만 넣고 확인한 날을 verifiedAt으로 남긴다.
+     * 확인하지 않은 항목은 넣지 않는다(전화 버튼을 잘못 노출하지 않게). 번호가 바뀌면 다시 확인하고 날짜를 고친다.
+     * <ul>
+     *   <li>자살예방상담전화 109: 보건복지부 129.go.kr/109 (24시간)</li>
+     *   <li>정신건강 위기상담전화 1577-0199: 보건복지부 "정신건강 복지센터 및 정신건강상담전화 운영"</li>
+     * </ul>
      */
     static final List<Resource> RESOURCES = List.of(
-            new Resource("verified-support-resource", "공식 확인 후 등록한 지원 기관", null, null, null));
+            new Resource("suicide-prevention-109", "자살예방상담전화", "109", "https://www.129.go.kr/109",
+                    RESOURCES_VERIFIED_AT),
+            new Resource("mental-health-crisis-1577-0199", "정신건강 위기상담전화", "1577-0199",
+                    "https://www.mohw.go.kr/menu.es?mid=a10706040100", RESOURCES_VERIFIED_AT));
 
     private final SafetyQuery safetyQuery;
     private final SafetyCommands safetyCommands;
