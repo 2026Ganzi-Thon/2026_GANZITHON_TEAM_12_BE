@@ -1,6 +1,7 @@
 package com.comedown.experience.reports.application;
 
 import com.comedown.account.contract.CalendarConnectionQuery;
+import com.comedown.account.contract.CalendarSyncState;
 import com.comedown.calendar.contract.CalendarOverview;
 import com.comedown.calendar.contract.CalendarOverviewQuery;
 import com.comedown.schedule.contract.PeriodLoad;
@@ -20,9 +21,8 @@ import org.springframework.stereotype.Service;
  * <p>
  * 구현 해석(확인 필요): 지난 한 달 = [오늘 − 1개월, 어제], enoughData = 그 기간에 집계 대상 일정이 1건 이상.
  * <p>
- * 구현 해석(확인 필요): 마지막 동기화 시각을 따로 저장하는 곳이 없어 {@code syncedAt}은 저장된 일정의 마지막 동기화 시각과
- * 응답에 싣는 주(이번 주 + 다음 4주)의 주간 부하 계산 시각 중 늦은 쪽으로 한다. 동기화는 일정이 0건이어도 주간 부하를
- * 저장하므로, 주간 부하를 내려주는 응답의 {@code syncedAt}은 null이 아니다.
+ * {@code syncedAt}은 마지막 일정 동기화 시각이다(2026-11-17 결정: 일정 동기화 기준). 일정이 0건인 동기화도 포함하며,
+ * 분류 직접 수정으로 주간 부하를 다시 계산해도 바뀌지 않는다.
  */
 @Service
 public class ScheduleReportQuery {
@@ -34,14 +34,16 @@ public class ScheduleReportQuery {
     private final PeriodLoadQuery periods;
     private final WeekLoads weekLoads;
     private final ServiceTime time;
+    private final CalendarSyncState syncState;
 
     public ScheduleReportQuery(CalendarConnectionQuery connection, CalendarOverviewQuery overview,
-            PeriodLoadQuery periods, WeekLoads weekLoads, ServiceTime time) {
+            PeriodLoadQuery periods, WeekLoads weekLoads, ServiceTime time, CalendarSyncState syncState) {
         this.connection = connection;
         this.overview = overview;
         this.periods = periods;
         this.weekLoads = weekLoads;
         this.time = time;
+        this.syncState = syncState;
     }
 
     public ScheduleReport report(long userId) {
@@ -54,8 +56,7 @@ public class ScheduleReportQuery {
         PeriodLoad month = periods.summarize(userId, today.minusMonths(1), today.minusDays(1));
         WeekLoadView current = weekLoads.find(userId, thisMonday).orElse(null);
         List<WeekLoadView> upcoming = weekLoads.range(userId, thisMonday.plusWeeks(1), UPCOMING_WEEKS);
-        Instant syncedAt = later(o.syncedAt(),
-                weekLoads.lastComputedAt(userId, thisMonday, 1 + UPCOMING_WEEKS).orElse(null));
+        Instant syncedAt = syncState.lastSyncedAt(userId).orElse(null);
         return new ScheduleReport(
                 time.toResponse(syncedAt),
                 new ScheduleReport.Classification(o.total(), o.classified(), o.pending()),
@@ -64,13 +65,5 @@ public class ScheduleReportQuery {
                 current == null ? null
                         : new ScheduleReport.ThisWeek(current.weekStart(), current.vsUsualPct(), current.riskLevel()),
                 upcoming, month.eventCount() > 0);
-    }
-
-    /** 둘 중 늦은 시각. 한쪽이 없으면 다른 쪽, 둘 다 없으면 null. */
-    private static Instant later(Instant a, Instant b) {
-        if (a == null) {
-            return b;
-        }
-        return b == null || a.isAfter(b) ? a : b;
     }
 }

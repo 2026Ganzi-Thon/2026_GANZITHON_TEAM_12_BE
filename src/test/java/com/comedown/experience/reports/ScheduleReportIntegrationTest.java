@@ -87,6 +87,7 @@ class ScheduleReportIntegrationTest {
         event(user, "r3", "2026-11-18 05:00:00", "2026-11-18 06:00:00", "CLASS", false);
         weekLoads.recalculate(user, List.of(LocalDate.of(2026, 11, 9), LocalDate.of(2026, 11, 16),
                 LocalDate.of(2026, 11, 23)));
+        syncedAt(user, "2026-11-11 22:30:00.000000");
 
         mvc.perform(get("/api/schedule/report").with(loginAs(user)))
                 .andExpect(status().isOk())
@@ -119,7 +120,7 @@ class ScheduleReportIntegrationTest {
                 .andExpect(jsonPath("$.fetched").value(0));
         clock.set("2026-11-12T08:05:00+09:00");
 
-        // 일정 행이 하나도 없어도 동기화가 남긴 주간 부하의 계산 시각으로 syncedAt을 채운다.
+        // 일정 행이 하나도 없어도 동기화한 시각이 남는다.
         mvc.perform(get("/api/schedule/report").with(loginAs(user)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncedAt").value("2026-11-12T08:00:00+09:00"))
@@ -134,35 +135,36 @@ class ScheduleReportIntegrationTest {
     }
 
     @Test
-    void syncedAt은_일정_동기화_시각과_주간_부하_계산_시각_중_늦은_쪽이다() throws Exception {
+    void syncedAt은_일정_동기화_시각이며_주간_부하를_다시_계산해도_바뀌지_않는다() throws Exception {
         long user = newUser(true);
-        // 일정은 07:30에 동기화된 것만 남아 있고, 주간 부하는 08:00에 다시 계산됐다.
-        event(user, "s1", "2026-11-10 05:00:00", "2026-11-10 07:00:00", "CLASS", false);
+        jdbc.update("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, 'CALENDAR', "
+                + "'2026-11-01', '2026-09-01 00:00:00')", user);
+        when(source.fetch(any(), any())).thenReturn(List.of());
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+
+        // 08:00에 분류 수정 등으로 주간 부하만 다시 계산된 경우: 동기화 시각은 07:30 그대로다.
         clock.set("2026-11-12T08:00:00+09:00");
         weekLoads.recalculate(user, List.of(LocalDate.of(2026, 11, 9)));
-
         mvc.perform(get("/api/schedule/report").with(loginAs(user)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.syncedAt").value("2026-11-12T08:00:00+09:00"));
+                .andExpect(jsonPath("$.syncedAt").value("2026-11-12T07:30:00+09:00"));
 
-        // 그 뒤 08:10에 동기화된 일정이 있으면 그 시각이 더 늦다.
-        jdbc.update("UPDATE calendar_events SET synced_at = '2026-11-11 23:10:00.000000' WHERE user_id = ?", user);
-
+        // 다시 동기화하면 그 시각으로 바뀐다.
+        clock.set("2026-11-12T08:10:00+09:00");
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
         mvc.perform(get("/api/schedule/report").with(loginAs(user)))
-                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncedAt").value("2026-11-12T08:10:00+09:00"));
     }
 
     @Test
-    void syncedAt은_응답에_싣지_않는_지난_주의_계산_시각은_보지_않는다() throws Exception {
+    void 동기화한_적이_없으면_주간_부하가_있어도_syncedAt은_null이다() throws Exception {
         long user = newUser(true);
-        weekLoads.recalculate(user, List.of(LocalDate.of(2026, 11, 2)));
+        weekLoads.recalculate(user, List.of(LocalDate.of(2026, 11, 9)));
 
         mvc.perform(get("/api/schedule/report").with(loginAs(user)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.syncedAt").value(Matchers.nullValue()))
-                .andExpect(jsonPath("$.thisWeek").value(Matchers.nullValue()))
-                .andExpect(jsonPath("$.upcomingWeeks.length()").value(0));
+                .andExpect(jsonPath("$.thisWeek.weekStart").value("2026-11-09"));
     }
 
     @Test
@@ -191,6 +193,10 @@ class ScheduleReportIntegrationTest {
                     + "'2026-11-11 22:30:00.000000')", id, sub);
         }
         return id;
+    }
+
+    private void syncedAt(long user, String utc) {
+        jdbc.update("UPDATE oauth_tokens SET calendar_synced_at = ? WHERE user_id = ?", utc, user);
     }
 
     private void event(long user, String googleId, String startUtc, String endUtc, String category,
