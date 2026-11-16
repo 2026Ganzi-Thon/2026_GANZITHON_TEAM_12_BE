@@ -10,6 +10,8 @@ import java.time.Instant;
  * 2. calendar에 registrationKey를 event id로 등록(트랜잭션 밖). 타임아웃이면 같은 키로 조회해 확인
  * 3. confirmApproved(성공) 또는 markFailed(확정 실패만)  (트랜잭션 B)
  * </pre>
+ * 상태 전이는 모두 승인 시작과 같은 사용자 잠금을 잡고 읽어 직렬화한다. 승인이 커밋되기 전에 시작한 건너뛰기·만료가
+ * APPROVING을 덮어쓰지 못한다(구글에 등록한 뒤 확정하지 못하는 일정이 남지 않게).
  */
 public interface SuggestionApprovalCommands {
 
@@ -53,4 +55,13 @@ public interface SuggestionApprovalCommands {
 
     /** 승인 중(APPROVING)인 채 {@code cutoff} 이전에 갱신돼 외부 결과를 다시 확인해야 하는 제안(모든 사용자, 오래된 순). */
     java.util.List<SuggestionView> findStaleApproving(Instant cutoff, int limit);
+
+    /**
+     * 재확인하고도 결과를 알 수 없어 APPROVING으로 남은 제안의 재확인 순서를 맨 뒤로 미룬다(갱신 시각만 바꿈).
+     * 다음 재확인은 {@link #findStaleApproving}의 기준 시간이 다시 지난 뒤다. 이미 확정된(APPROVING이 아닌) 제안이나
+     * 없는 제안은 아무것도 바꾸지 않는다.
+     *
+     * @return true면 미뤘다
+     */
+    boolean deferRecheck(long userId, long suggestionId);
 }

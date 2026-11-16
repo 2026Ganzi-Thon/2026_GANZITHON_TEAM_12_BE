@@ -98,6 +98,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```
 - `riskLevel`은 조건 점수 합으로 정합니다(0~1점 `NONE`, 2~3점 `WATCH`, 4점 이상 `RISK`). `riskReasons`: `LOAD_HIGH` `DEADLINES` `NO_REST_DAY` `LATE_NIGHT` `LONG_STREAK`. 산식은 [계산_정책.md](계산_정책.md) 1절.
 - `vsUsualPct`가 null이면 `vsUsualUnavailableReason`이 `ZERO_BASELINE`(직전 4주 평균 0) 또는 `INSUFFICIENT_DATA`(직전 데이터 2주 미만).
+- **구현 해석(확인 필요)** `vsUsualPct`는 저장 범위인 ±99999.9를 넘지 않습니다. 직전 4주 평균이 0에 가까워 비율이 그보다 커지면 99999.9로 자릅니다([계산_정책.md](계산_정책.md) 1절).
 
 **Suggestion** — 과부하 대비 제안 / 회복 일정 추천
 ```json
@@ -268,6 +269,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```
 - `enoughData: false`면 일정이 너무 적은 경우 → 빈 상태 화면.
 - 캘린더가 연결되지 않았으면 409 `CALENDAR_NOT_CONNECTED`. 동기화 전이면 `syncedAt`·`thisWeek`는 null, `upcomingWeeks`는 빈 배열입니다.
+- **구현 해석(확인 필요)**: 마지막 동기화 시각을 따로 저장하는 컬럼이 없어, `syncedAt`은 ① 저장된(취소 제외) 일정이 마지막으로 동기화된 시각과 ② 이 응답에 싣는 주(이번 주 + 다음 4주)의 주간 부하를 계산한 시각 중 늦은 쪽입니다. 동기화는 일정이 0건이어도 주간 부하를 저장하므로, 일정 0건으로 동기화한 사용자도 `syncedAt`이 null이 아니고 `thisWeek`·`upcomingWeeks`가 함께 나옵니다(`classification.total: 0`, `enoughData: false`). ①·②가 모두 없을 때만 null(동기화 전)이며, `thisWeek`나 `upcomingWeeks`가 있는 응답의 `syncedAt`은 null이 아닙니다. 분류 직접 수정(`PATCH …/category`)으로 이 주들의 부하를 다시 계산하면 ②가 그 시각이 되므로, 구글 일정을 다시 읽지 않았어도 `syncedAt`이 그 시각으로 늦어질 수 있습니다(정확한 동기화 시각이 필요해지면 저장 컬럼을 추가해야 함).
 - **구현 해석(확인 필요)**: `pastMonth` = [오늘 − 1개월, 어제]이며 집계 규칙은 주간 부하와 같고, `enoughData` = 그 기간에 집계 대상 일정이 1건 이상입니다. "너무 적은" 기준 수는 확정되면 갱신합니다.
 - 과부하 대비 제안은 `GET /api/suggestions?type=PRE_START`로 따로 받습니다.
 
@@ -340,6 +342,9 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 
 ### `GET /api/schedule/weeks?from=2026-10-12&count=9` → 200
 `{ "weeks": [WeekLoad] }`. 캘린더 탭 맨 위 4주 요약, 리포트 비교에 사용.
+- `from`(날짜)이 속한 주(월요일 시작)부터 `count`주를 주 시작일 오름차순으로 줍니다. `from`·`count`는 필수이며 빠지거나 형식이 틀리면 400 `VALIDATION_FAILED`.
+- 저장된 주간 부하만 돌려주므로, 아직 계산된 적 없는 주는 배열에서 빠집니다(0으로 채운 항목을 만들지 않음). 그래서 `count=9`여도 9개보다 적게 올 수 있고, 동기화 전이면 빈 배열입니다. 주간 부하는 `POST /api/calendar/sync`가 동기화 범위에 걸친 주(범위 시작일이 속한 주 ~ 이번 주 + 4주)를, 분류 직접 수정이 바뀐 주를 계산해 저장합니다. 항목은 순서가 아니라 `weekStart`로 맞춰 씁니다.
+- **구현 해석(확인 필요)** `count`는 1~52입니다(과도한 조회를 막는 입력 상한, 약 1년). 범위를 벗어나면 400 `VALIDATION_FAILED`.
 
 ### `DELETE /api/calendar/connection` → 204 — 마이페이지 "캘린더 연결 해제"
 캘린더 연결 해제 + 동기화한 일정·분류 수정 규칙·주간 부하·미승인 제안 및 해당 일정 기반 AI 캐시 삭제. 승인 이력은 유지하며 relatedEvent는 null. 외부 연결 해제는 캘린더 권한에 한정하고 로그인 세션은 유지합니다. 실패 시 재시도하며 정리 중이면 202, 완료 후 204. 다시 쓰려면 `/oauth2/authorization/google-calendar`.
@@ -371,6 +376,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```
 - 본문은 선택(시간을 바꿀 때만). 응답 200: 상태가 `APPROVED`이고 `googleEventId`가 채워진 Suggestion.
 - 변경 시간은 같은 targetDate·같은 길이·수면 제외 조건을 만족해야 합니다(400). 이미 승인된 동일 요청은 원래 결과 200. 확정 실패는 `FAILED`, 외부 결과 확인 중은 `APPROVING` + 202. 오류: 409 `SUGGESTION_NOT_PROPOSED`, 409 `SLOT_CONFLICT`, 캘린더 오류들.
+- 시간을 바꾸지 않는 승인(본문 없음)은 제안한 시간을 다시 확인합니다. 시작 시각이 이미 지났거나 그 사이 같은 시간에 일정이 생겼으면 409 `SLOT_CONFLICT`이고, 제안은 그대로(`PROPOSED`, 재시도면 `FAILED`) 남으며 구글에 아무것도 보내지 않습니다. 프론트는 "다른 시간 보기"로 안내합니다.
 
 ### `POST /api/suggestions/{id}/dismiss` → 200 — 건너뛰기/나중에
 
@@ -384,8 +390,10 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - generate는 기존 APPROVED를 보존하고 미승인 중복을 만들지 않습니다. 모든 갱신 응답은 최신 Suggestion입니다.
 - 조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). `type=RECOVERY` 조회는 온보딩 완료 후(403 `ONBOARDING_REQUIRED`), PRE_START는 온보딩 중에도 조회합니다. `type`·`status`가 정의된 값이 아니거나 `date`가 `YYYY-MM-DD`가 아니면 400입니다. 목록은 시작 시각 순입니다.
 - done을 일정 종료 전에 부르면 409 `INVALID_STATE`("일정이 끝난 뒤에 체크할 수 있어요.")입니다. `message`는 문구가 없으면 null입니다.
-- 제안의 등록 키(`registration_key`)는 생성 때 서버가 만드는 Google event id(`cd` + 32자, base32hex 문자만)이며 응답에 내보내지 않습니다. 승인 시작 때 같은 사용자의 다른 APPROVING·APPROVED 예약과 겹치면 409 `SLOT_CONFLICT`입니다. 만료 시각이 지난 PROPOSED는 서버가 주기적으로 `EXPIRED`로 바꿉니다.
-- **현재 구현 범위**: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) "과부하 대비 제안"). `generate`는 `type: PRE_START`만 되고 `RECOVERY`는 "1~7일 컨디션 기반 추천 임계값" 확정 전까지 422 `CALCULATION_POLICY_PENDING`입니다. `relatedEvent`는 아직 null입니다(제안의 대상 일정은 `riskWeekStart`로만 알 수 있음). 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `FAILED`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `APPROVING` + 202, 서버가 1분마다 재확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `INVALID_STATE`입니다. 구글 403은 권한 범위 부족일 때만 `CALENDAR_SCOPE_MISSING`이고, 사용량 제한 등 그 외 403은 확정 실패(`FAILED`, `CALENDAR_API_ERROR`)입니다.
+- 제안의 등록 키(`registration_key`)는 생성 때 서버가 만드는 Google event id(`cd` + 32자, base32hex 문자만)이며 응답에 내보내지 않습니다. 승인 시작 때 같은 사용자의 다른 APPROVING·APPROVED 예약과 겹치면 409 `SLOT_CONFLICT`입니다. 만료 시각이 지난 PROPOSED는 서버가 주기적으로 `EXPIRED`로 바꿉니다. 건너뛰기·했어요·되돌리기·만료·승인 확정은 승인 시작과 같은 사용자별 잠금으로 직렬화합니다. 승인이 먼저 시작된 제안을 동시에 건너뛰면 409 `INVALID_STATE`이고 만료 대상에서도 빠집니다(`APPROVING`을 덮어쓰지 않음).
+- **현재 구현 범위**: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) "과부하 대비 제안"). `generate`는 `type: PRE_START`만 되고 `RECOVERY`는 "1~7일 컨디션 기반 추천 임계값" 확정 전까지 422 `CALCULATION_POLICY_PENDING`입니다. `relatedEvent`는 아직 null입니다(제안의 대상 일정은 `riskWeekStart`로만 알 수 있음). 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `FAILED`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `APPROVING` + 202, 서버의 재확인 작업이 1분마다 돌며 이어서 확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `INVALID_STATE`입니다. 구글 403은 권한 범위 부족일 때만 `CALENDAR_SCOPE_MISSING`이고, 사용량 제한 등 그 외 403은 확정 실패(`FAILED`, `CALENDAR_API_ERROR`)입니다.
+- **구현 해석(확인 필요)** 시간을 바꾸지 않는 승인의 재확인(0절 "Google의 최신 빈 시간을 재확인"): 구글을 새로 조회하지 않고 저장된(마지막으로 동기화한) 일정으로 확인합니다. 충돌은 제안 구간 `[start, end)`과 실제로 겹치는 시간 일정이 있을 때이며, 종일·취소·"한가함" 일정과 구간에 맞닿기만 한 일정은 충돌이 아닙니다. 제안을 만들 때의 조건인 앞뒤 10분 간격·수면 시간대는 다시 적용하지 않고, 다른 제안과의 겹침은 기존대로 APPROVING·APPROVED 예약만 봅니다. "지났다"는 시작 시각이 현재보다 이전인 경우입니다(만료 전이어도 409). 이미 `APPROVING`인 제안의 재승인은 이전 시도가 구글에 반영됐을 수 있으므로 재확인하지 않고 같은 등록 키로 이어 갑니다.
+- **구현 해석(확인 필요)** 승인 재확인 순서: 재확인 작업은 한 번에 오래된 순으로 20건을 봅니다. 재확인하고도 `APPROVING`이면 `updated_at`을 갱신해 순서를 맨 뒤로 보내고, 그 제안은 2분(`comedown.suggestions.recheck-after`) 뒤에 다시 확인합니다. 풀리지 않는 제안(연결 해제·미재인증 사용자)이 새 제안의 재확인을 막지 않게 하려는 것이며, 재확인 횟수 제한이나 간격 늘리기는 없습니다(확인할 수 없는 `APPROVING`을 언제 정리할지는 미정).
 - **구현 해석(확인 필요)** PRE_START 재제안: 같은 마감 일정에 `PROPOSED`·`APPROVING`·`APPROVED`·`FAILED`(재시도 가능)·`DISMISSED`·`UNDONE` 제안이 있으면 동기화·`generate`가 새 제안을 만들지 않습니다. 사용자가 건너뛰거나 되돌린 마감은 다시 권하지 않고, `EXPIRED`(응답 없이 날짜가 지남)만 다시 제안합니다.
 
 ---

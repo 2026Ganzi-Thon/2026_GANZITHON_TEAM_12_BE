@@ -758,7 +758,7 @@
 | week_start | date | | pk(2). 월요일 |
 | total_hours | decimal(5,1) | | 집계 대상 일정 시간 합(일 관련 + other + 미분류. 개인·앱 생성·한가함·취소·종일 일정 제외) |
 | load_score | decimal(6,1) | | σ(일정 시간 × 가중치). `load-v1`: 시험·발표 ×1.5, 22~07시·주말 ×1.5, 곱 최대 2.25 |
-| vs_usual_pct | decimal(6,1) | y | (이번 주 부하 점수 ÷ 직전 4주 평균 − 1) × 100. 계산 불가 시 null |
+| vs_usual_pct | decimal(6,1) | y | (이번 주 부하 점수 ÷ 직전 4주 평균 − 1) × 100. 계산 불가 시 null. 컬럼 범위를 넘는 값은 ±99999.9로 잘라 저장(계산 정책 1절 구현 해석) |
 | vs_usual_unavailable_reason | varchar(30) | y | vs_usual_pct가 null인 이유: `zero_baseline`(직전 4주 평균 0) `insufficient_data`(직전 데이터 2주 미만) |
 | deadline_count | smallint | | 마감 몰림(과제 마감·시험·발표 수) |
 | late_night_count | smallint | | 22시 이후 끝나거나 07시 이전 시작 |
@@ -809,7 +809,7 @@
 <td>vs_usual_pct</td>
 <td>DECIMAL(6,1)</td>
 <td>Y</td>
-<td>(이번 주 부하 점수 ÷ 직전 4주 평균 − 1) × 100. 계산 불가 시 null</td>
+<td>(이번 주 부하 점수 ÷ 직전 4주 평균 − 1) × 100. 계산 불가 시 null. 컬럼 범위를 넘는 값은 ±99999.9로 잘라 저장(계산 정책 1절 구현 해석)</td>
 </tr>
 <tr>
 <td>vs_usual_unavailable_reason</td>
