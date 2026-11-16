@@ -6,6 +6,7 @@ import com.comedown.checkin.contract.CheckinDay;
 import com.comedown.checkin.contract.CheckinQuery;
 import com.comedown.checkin.contract.DayIndex;
 import com.comedown.recommendation.contract.SuggestionPayload;
+import com.comedown.recommendation.contract.SuggestionPayloads;
 import com.comedown.recommendation.contract.SuggestionQuery;
 import com.comedown.recovery.contract.DailyRecoverySnapshot;
 import com.comedown.recovery.contract.RecoveryQuery;
@@ -43,12 +44,14 @@ public class HomeQuery {
     private final ServiceTime serviceTime;
     private final WeekLoads weekLoads;
     private final SubscriptionQuery subscriptionQuery;
+    private final SuggestionPayloads suggestionPayloads;
 
     public HomeQuery(AccountAccessQuery accountAccess, CheckinQuery checkinQuery, RecoveryQuery recoveryQuery,
             SuggestionQuery suggestionQuery, SafetyQuery safetyQuery, ServiceTime serviceTime, WeekLoads weekLoads,
-            SubscriptionQuery subscriptionQuery) {
+            SubscriptionQuery subscriptionQuery, SuggestionPayloads suggestionPayloads) {
         this.weekLoads = weekLoads;
         this.subscriptionQuery = subscriptionQuery;
+        this.suggestionPayloads = suggestionPayloads;
         this.accountAccess = accountAccess;
         this.checkinQuery = checkinQuery;
         this.recoveryQuery = recoveryQuery;
@@ -73,10 +76,10 @@ public class HomeQuery {
                 ? recoveryQuery.findLatestOnOrBefore(userId, today) : Optional.empty();
         boolean established = latest.map(DailyRecoverySnapshot::baselineEstablished).orElse(false);
 
-        List<SuggestionPayload> suggestions = suggestionQuery.search(userId, null, null, today).stream()
-                .filter(s -> !HIDDEN_STATUSES.contains(s.status()))
-                .map(SuggestionPayload::of)
-                .toList();
+        List<SuggestionPayload> suggestions = suggestionPayloads.of(userId,
+                suggestionQuery.search(userId, null, null, today).stream()
+                        .filter(s -> !HIDDEN_STATUSES.contains(s.status()))
+                        .toList());
 
         return new HomeView(
                 accountAccess.findNickname(userId).orElse(null),

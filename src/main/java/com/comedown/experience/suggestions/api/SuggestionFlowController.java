@@ -3,6 +3,7 @@ package com.comedown.experience.suggestions.api;
 import com.comedown.experience.suggestions.application.PreStartGenerationFlow;
 import com.comedown.experience.suggestions.application.SuggestionApprovalFlow;
 import com.comedown.recommendation.contract.SuggestionPayload;
+import com.comedown.recommendation.contract.SuggestionPayloads;
 import com.comedown.recommendation.contract.SuggestionQuery;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
@@ -31,13 +32,15 @@ class SuggestionFlowController {
     private final SuggestionApprovalFlow approval;
     private final SuggestionQuery query;
     private final ServiceTime time;
+    private final SuggestionPayloads payloads;
 
     SuggestionFlowController(PreStartGenerationFlow generation, SuggestionApprovalFlow approval,
-            SuggestionQuery query, ServiceTime time) {
+            SuggestionQuery query, ServiceTime time, SuggestionPayloads payloads) {
         this.generation = generation;
         this.approval = approval;
         this.query = query;
         this.time = time;
+        this.payloads = payloads;
     }
 
     @PostMapping("/api/suggestions/generate")
@@ -49,8 +52,8 @@ class SuggestionFlowController {
             throw FieldValidationException.of("type", "PRE_START 또는 RECOVERY여야 해요.");
         }
         generation.refresh(user.id());
-        return new SuggestionsResponse(query.search(user.id(), "PRE_START", "PROPOSED", null).stream()
-                .map(SuggestionPayload::of).toList());
+        return new SuggestionsResponse(
+                payloads.of(user.id(), query.search(user.id(), "PRE_START", "PROPOSED", null)));
     }
 
     @GetMapping("/api/suggestions/{id}/slots")
@@ -66,12 +69,12 @@ class SuggestionFlowController {
                 body == null || body.start() == null ? null : body.start().toInstant(),
                 body == null || body.end() == null ? null : body.end().toInstant());
         return ResponseEntity.status(result.confirmed() ? HttpStatus.OK : HttpStatus.ACCEPTED)
-                .body(SuggestionPayload.of(result.suggestion()));
+                .body(payloads.of(user.id(), result.suggestion()));
     }
 
     @PostMapping("/api/suggestions/{id}/undo")
     SuggestionPayload undo(CurrentUser user, @PathVariable long id) {
-        return SuggestionPayload.of(approval.undo(user.id(), id));
+        return payloads.of(user.id(), approval.undo(user.id(), id));
     }
 
     record GenerateRequest(@NotNull String type, String date) {
