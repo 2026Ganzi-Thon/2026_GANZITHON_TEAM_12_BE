@@ -45,6 +45,18 @@ public class CalendarEventStore {
         return result;
     }
 
+    public List<StoredEvent> findByIds(long userId, Collection<Long> eventIds) {
+        List<StoredEvent> result = new ArrayList<>();
+        List<Long> ids = new ArrayList<>(eventIds);
+        for (int i = 0; i < ids.size(); i += IN_CHUNK) {
+            result.addAll(jdbc.sql(SELECT + " WHERE user_id = :user AND id IN (:ids)")
+                    .param("user", userId)
+                    .param("ids", ids.subList(i, Math.min(i + IN_CHUNK, ids.size())))
+                    .query(CalendarEventStore::map).list());
+        }
+        return result;
+    }
+
     /** 시작이 범위에 드는 과제 일정(id, 시작). */
     public List<StoredEvent> findAssignments(long userId, Instant from, Instant to) {
         return jdbc.sql(SELECT + " WHERE user_id = ? AND calendar_id = ? AND category = 'ASSIGNMENT' "

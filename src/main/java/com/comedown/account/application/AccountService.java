@@ -22,7 +22,9 @@ public class AccountService implements AccountCommands {
     static final String SENSITIVE_HRV = "SENSITIVE_HRV";
     static final Set<String> CONSENT_TYPES =
             Set.of("TERMS", "PRIVACY", "AGE_14", "SENSITIVE_HRV", "CALENDAR", "AI_NOTICE");
-    static final List<String> REQUIRED_CONSENTS = List.of("TERMS", "PRIVACY", "AGE_14", "CALENDAR", "AI_NOTICE");
+    /** 가입 때 6개 모두 필수(2026-11-17 결정: 건강정보 동의도 필수). 건강정보 동의는 가입 뒤 철회할 수 있다. */
+    static final List<String> REQUIRED_CONSENTS =
+            List.of("TERMS", "PRIVACY", "AGE_14", "SENSITIVE_HRV", "CALENDAR", "AI_NOTICE");
     static final Set<String> ACTIVITY_CODES = Set.of("WALK", "STRETCH", "NAP", "YOGA", "MEDITATION", "LIGHT_RUN");
     static final int NICKNAME_MAX = 20;
 

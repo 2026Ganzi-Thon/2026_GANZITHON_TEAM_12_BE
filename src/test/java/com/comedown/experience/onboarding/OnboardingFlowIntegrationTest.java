@@ -3,6 +3,7 @@ package com.comedown.experience.onboarding;
 import static com.comedown.support.TestLogin.loginAs;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -155,10 +156,20 @@ class OnboardingFlowIntegrationTest {
     }
 
     @Test
-    void 건강정보에_동의하지_않으면_가입은_되고_측정은_꺼지며_CBI를_건너뛸_수_있다() throws Exception {
+    void 건강정보_동의는_가입_때_필수이고_가입_뒤_철회하면_측정이_꺼지며_CBI를_건너뛸_수_있다() throws Exception {
         long user = newUser();
 
-        send(put("/api/onboarding/profile"), user, ALL_REQUIRED.formatted(false)).andExpect(status().isOk());
+        send(put("/api/onboarding/profile"), user, ALL_REQUIRED.formatted(false))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("consents.SENSITIVE_HRV"));
+        mvc.perform(get("/api/me").with(loginAs(user)))
+                .andExpect(jsonPath("$.onboardingStep").value("PROFILE"))
+                .andExpect(jsonPath("$.consents.TERMS").value(false)); // 거절되면 아무 동의도 기록하지 않는다
+
+        send(put("/api/onboarding/profile"), user, ALL_REQUIRED.formatted(true)).andExpect(status().isOk());
+        mvc.perform(delete("/api/me/consents/SENSITIVE_HRV").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isNoContent());
         mvc.perform(get("/api/me").with(loginAs(user)))
                 .andExpect(jsonPath("$.consents.SENSITIVE_HRV").value(false))
                 .andExpect(jsonPath("$.hrvEnabled").value(false));

@@ -18,8 +18,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.comedown.account.contract.CalendarCredential;
 import com.comedown.account.contract.CalendarCredentialProvider;
+import com.comedown.calendar.contract.CalendarEventSource;
 import com.comedown.calendar.contract.CalendarEventWriter;
 import com.comedown.calendar.contract.CalendarEventWriter.DeleteResult;
+import com.comedown.calendar.contract.SyncedEvent;
 import com.comedown.experience.suggestions.application.ApprovalRecheckJob;
 import com.comedown.recommendation.contract.NewSuggestion;
 import com.comedown.recommendation.contract.SuggestionApprovalCommands;
@@ -38,6 +40,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,10 +89,14 @@ class PreStartSuggestionIntegrationTest {
     @MockitoBean
     CalendarCredentialProvider credentials;
 
+    /** 제목 읽기(relatedEvent.title)에 쓰는 구글 일정 조회. 따로 정하지 않으면 빈 목록이라 제목은 null. */
+    @MockitoBean
+    CalendarEventSource source;
+
     @BeforeEach
     void setUp() {
         clock.set(FixedClockTestConfig.DEFAULT_NOW);
-        reset(writer, credentials);
+        reset(writer, credentials, source);
         when(credentials.credentialFor(anyLong())).thenReturn(new CalendarCredential("token"));
     }
 
@@ -118,6 +125,58 @@ class PreStartSuggestionIntegrationTest {
 
         generate(user).andExpect(jsonPath("$.suggestions.length()").value(1)); // 다시 불러도 중복 없음
         assertThat(count(user)).isEqualTo(1);
+    }
+
+    @Test
+    void 제안에는_대비할_마감_일정이_붙고_제목은_구글에서_읽는다() throws Exception {
+        long user = riskUser();
+        long eventId = jdbc.queryForObject("SELECT id FROM calendar_events WHERE user_id = ?", Long.class, user);
+        when(source.fetch(any(), any())).thenReturn(List.of(
+                googleEvent("assign-" + user, "캡스톤 중간발표"), googleEvent("other-" + user, "다른 일정")));
+
+        generate(user).andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.id").value(eventId))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.title").value("캡스톤 중간발표"))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.start").value("2026-11-18T14:00:00+09:00"))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.category").value("ASSIGNMENT"));
+        mvc.perform(get("/api/suggestions?type=PRE_START").with(loginAs(user))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.id").value(eventId))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.title").value("캡스톤 중간발표"));
+        long id = jdbc.queryForObject("SELECT id FROM suggestions WHERE user_id = ?", Long.class, user);
+        mvc.perform(post("/api/suggestions/" + id + "/dismiss").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DISMISSED"))
+                .andExpect(jsonPath("$.relatedEvent.title").value("캡스톤 중간발표"));
+    }
+
+    @Test
+    void 구글에서_제목을_읽지_못해도_마감_일정의_나머지_값은_준다() throws Exception {
+        long user = riskUser();
+        when(source.fetch(any(), any())).thenThrow(new ExternalServiceException(Kind.UNCERTAIN, "timeout"));
+
+        generate(user).andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.title").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.start").value("2026-11-18T14:00:00+09:00"))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.category").value("ASSIGNMENT"));
+
+        reset(credentials); // 캘린더 자격이 없는 경우(재인증 필요 등)
+        when(credentials.credentialFor(anyLong())).thenThrow(new ApiException(ErrorCode.CALENDAR_REAUTH_REQUIRED));
+        mvc.perform(get("/api/suggestions").with(loginAs(user))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.title").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent.category").value("ASSIGNMENT"));
+    }
+
+    @Test
+    void 일정_참조가_끊긴_제안은_relatedEvent가_null이고_구글을_부르지_않는다() throws Exception {
+        long user = riskUser();
+        long id = suggestionId(user);
+        reset(source);
+        jdbc.update("UPDATE suggestions SET related_event_id = NULL WHERE id = ?", id);
+
+        mvc.perform(get("/api/suggestions").with(loginAs(user))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions[0].id").value(id))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent").value(Matchers.nullValue()));
+        verify(source, never()).fetch(any(), any());
     }
 
     @Test
@@ -186,7 +245,8 @@ class PreStartSuggestionIntegrationTest {
 
         approve(user, id, null).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVED"))
-                .andExpect(jsonPath("$.googleEventId").value(key));
+                .andExpect(jsonPath("$.googleEventId").value(key))
+                .andExpect(jsonPath("$.relatedEvent.category").value("ASSIGNMENT"));
         approve(user, id, null).andExpect(status().isOk()) // 같은 승인 재시도는 원래 결과
                 .andExpect(jsonPath("$.status").value("APPROVED"));
         verify(writer).register(any(), eq(new CalendarEventWriter.NewEvent(key, "과제 미리 시작하기",
@@ -523,6 +583,12 @@ class PreStartSuggestionIntegrationTest {
         clock.set(OffsetDateTime.parse(FixedClockTestConfig.DEFAULT_NOW).plusMinutes(3).toInstant());
         reset(writer);
         return id;
+    }
+
+    private static SyncedEvent googleEvent(String googleId, String title) {
+        return new SyncedEvent(googleId, null, title, false, Instant.parse("2026-11-18T05:00:00Z"),
+                Instant.parse("2026-11-18T06:00:00Z"), null, null, "confirmed", "opaque", false,
+                Instant.parse("2026-11-10T00:00:00Z"));
     }
 
     private void registerSucceeds() {
