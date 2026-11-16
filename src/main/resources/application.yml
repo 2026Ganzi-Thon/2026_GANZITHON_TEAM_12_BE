@@ -21,6 +21,10 @@ spring:
       initialize-schema: never
 server:
   port: 8080
+  # 프록시(로드밸런서·Cloud Run 등) 뒤에서는 TLS가 프록시에서 끝나 앱이 HTTP로 받는다. framework로 두면 X-Forwarded-*
+  # 헤더로 원래 주소(https·호스트)를 복원해 구글 리디렉션 URI와 쿠키의 Secure가 맞게 나온다. 이 헤더는 누구나 보낼 수
+  # 있으므로, 프록시를 거치지 않고 앱에 직접 닿을 수 있는 환경에서는 켜지 않는다. 기본은 none(로컬에는 프록시가 없다).
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
   servlet:
     session:
       cookie:

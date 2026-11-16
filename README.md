@@ -186,6 +186,16 @@ docker compose up -d        # MySQL 8.4 → localhost:3307
 
 `GOOGLE_CLIENT_ID`를 넣으면 Google 로그인이 켜집니다. 이때 `GOOGLE_CLIENT_SECRET`이나 `COMEDOWN_TOKEN_KEY`(Base64로 인코딩한 32바이트)가 비어 있으면 서버가 시작하지 않습니다(로그인마다 실패하는 상태로 뜨지 않게). 셋 다 비워 두면 Google 로그인 없이 실행됩니다.
 
+### 프록시 뒤에 배포할 때 (GCP 등)
+
+로드밸런서나 Cloud Run 뒤에서는 TLS가 프록시에서 끝나고 앱은 HTTP로 요청을 받습니다. 그대로 두면 구글에 보내는 리디렉션 주소가 `http://…`로 만들어져 로그인이 `redirect_uri_mismatch`로 막히고, 세션·CSRF 쿠키에 `Secure`가 붙지 않습니다.
+
+- 운영 환경 변수에 `SERVER_FORWARD_HEADERS_STRATEGY=framework`를 넣습니다. `X-Forwarded-Proto`·`X-Forwarded-Host`로 원래 주소를 복원합니다. 기본값은 `none`이고 로컬에서는 설정하지 않습니다.
+- 이 헤더는 요청을 보내는 쪽이 마음대로 넣을 수 있습니다. 앱이 프록시를 거치지 않고 직접 노출되는 구성(VM의 공인 IP·포트를 그대로 여는 경우 등)에서는 켜지 마세요.
+- 구글 콘솔의 "승인된 리디렉션 URI"에 운영 주소로 `https://<운영 도메인>/login/oauth2/code/google`과 `https://<운영 도메인>/login/oauth2/code/google-calendar`를 모두 등록합니다.
+- 프론트와 API는 같은 출처로 제공해야 합니다(CORS 설정이 없고 세션 쿠키는 `SameSite=Lax`). 로드밸런서의 경로 규칙으로 `/api/**`, `/oauth2/**`, `/login/oauth2/**`를 백엔드로 보내는 구성을 권장합니다.
+- **Firebase Hosting의 rewrite 뒤에 API를 두면 로그인이 유지되지 않습니다.** Firebase Hosting은 Cloud Run·Functions로 넘길 때 `__session`이라는 이름의 쿠키만 전달하고 나머지를 지우는데, 이 서버는 `SESSION`(세션)과 `XSRF-TOKEN`(CSRF) 두 쿠키를 씁니다.
+
 Google 로그인 없이 API를 시험할 때는 local 전용 테스트 로그인을 씁니다(운영 프로필에는 없음). `GET /api/auth/csrf`로 받은 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더에 넣어 `POST /api/dev/login` `{ "userId": 1 }`을 보내면 그 사용자로 세션이 생깁니다. 사용자 행은 만들지 않으므로 해당 `users` 행이 로컬 DB에 있어야 합니다.
 
 ### 테스트·검증
