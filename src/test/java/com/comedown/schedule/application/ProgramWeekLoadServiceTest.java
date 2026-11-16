@@ -105,6 +105,25 @@ class ProgramWeekLoadServiceTest {
     }
 
     @Test
+    void 직전_주차가_거의_비어_있어도_평소_대비는_저장_한계를_넘지_않는다() {
+        // 0·1주차에 6분짜리 수업 하나씩(부하 0.1) → 평균 0.05. 2주차는 매일 9시간이라 비율이 한계를 넘는다.
+        for (int week = 0; week <= 1; week++) {
+            LocalDate date = ONBOARDING.plusDays(7L * (week - 1));
+            calendar.add(new CalendarEventSnapshot(at(date, 9), at(date, 9).plusSeconds(360), null, null, false,
+                    "CLASS", false, false, false, false));
+        }
+        for (int day = 0; day < 7; day++) {
+            classIn(2, day, 9);
+        }
+
+        ProgramWeekLoad week2 = service.find(USER, ONBOARDING, 2, 2).orElseThrow().get(0);
+
+        assertThat(week2.loadScore()).isGreaterThan(new java.math.BigDecimal("50.1"));
+        assertThat(week2.vsUsualPct()).isEqualByComparingTo("99999.9");
+        assertThat(week2.vsUsualUnavailableReason()).isNull();
+    }
+
+    @Test
     void 직전_자료가_2주_미만이면_INSUFFICIENT_DATA() {
         classIn(1, 0, 4);
 

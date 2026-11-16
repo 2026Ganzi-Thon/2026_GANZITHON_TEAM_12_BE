@@ -1,10 +1,18 @@
 package com.comedown.experience.reports;
 
 import static com.comedown.support.TestLogin.loginAs;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.comedown.account.contract.CalendarCredential;
+import com.comedown.account.contract.CalendarCredentialProvider;
+import com.comedown.calendar.contract.CalendarEventSource;
 import com.comedown.schedule.contract.WeekLoads;
 import com.comedown.support.FixedClockTestConfig;
 import com.comedown.support.MutableClock;
@@ -22,9 +30,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** 일정 리포트 조합(기준 시각 2026-11-12 목 07:30 서울, 지난 한 달 = 10-12 ~ 11-11). */
+/** 일정 리포트 조합(기준 시각 2026-11-12 목 07:30 서울, 지난 한 달 = 10-12 ~ 11-11). 구글은 대체 응답. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -43,9 +52,16 @@ class ScheduleReportIntegrationTest {
     @Autowired
     WeekLoads weekLoads;
 
+    @MockitoBean
+    CalendarEventSource source;
+
+    @MockitoBean
+    CalendarCredentialProvider credentials;
+
     @BeforeEach
     void setUp() {
         clock.set(FixedClockTestConfig.DEFAULT_NOW);
+        when(credentials.credentialFor(anyLong())).thenReturn(new CalendarCredential("token"));
     }
 
     @AfterEach
@@ -92,7 +108,66 @@ class ScheduleReportIntegrationTest {
     }
 
     @Test
+    void 일정_0건으로_동기화한_사용자도_syncedAt과_주간_부하가_함께_나온다() throws Exception {
+        long user = newUser(true);
+        jdbc.update("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, 'CALENDAR', "
+                + "'2026-11-01', '2026-09-01 00:00:00')", user);
+        when(source.fetch(any(), any())).thenReturn(List.of());
+        clock.set("2026-11-12T08:00:00+09:00");
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fetched").value(0));
+        clock.set("2026-11-12T08:05:00+09:00");
+
+        // 일정 행이 하나도 없어도 동기화가 남긴 주간 부하의 계산 시각으로 syncedAt을 채운다.
+        mvc.perform(get("/api/schedule/report").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.syncedAt").value("2026-11-12T08:00:00+09:00"))
+                .andExpect(jsonPath("$.classification.total").value(0))
+                .andExpect(jsonPath("$.thisWeek.weekStart").value("2026-11-09"))
+                .andExpect(jsonPath("$.thisWeek.vsUsualPct").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.thisWeek.riskLevel").value("NONE"))
+                .andExpect(jsonPath("$.upcomingWeeks.length()").value(4))
+                .andExpect(jsonPath("$.upcomingWeeks[0].weekStart").value("2026-11-16"))
+                .andExpect(jsonPath("$.upcomingWeeks[3].weekStart").value("2026-12-07"))
+                .andExpect(jsonPath("$.enoughData").value(false));
+    }
+
+    @Test
+    void syncedAt은_일정_동기화_시각과_주간_부하_계산_시각_중_늦은_쪽이다() throws Exception {
+        long user = newUser(true);
+        // 일정은 07:30에 동기화된 것만 남아 있고, 주간 부하는 08:00에 다시 계산됐다.
+        event(user, "s1", "2026-11-10 05:00:00", "2026-11-10 07:00:00", "CLASS", false);
+        clock.set("2026-11-12T08:00:00+09:00");
+        weekLoads.recalculate(user, List.of(LocalDate.of(2026, 11, 9)));
+
+        mvc.perform(get("/api/schedule/report").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.syncedAt").value("2026-11-12T08:00:00+09:00"));
+
+        // 그 뒤 08:10에 동기화된 일정이 있으면 그 시각이 더 늦다.
+        jdbc.update("UPDATE calendar_events SET synced_at = '2026-11-11 23:10:00.000000' WHERE user_id = ?", user);
+
+        mvc.perform(get("/api/schedule/report").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.syncedAt").value("2026-11-12T08:10:00+09:00"));
+    }
+
+    @Test
+    void syncedAt은_응답에_싣지_않는_지난_주의_계산_시각은_보지_않는다() throws Exception {
+        long user = newUser(true);
+        weekLoads.recalculate(user, List.of(LocalDate.of(2026, 11, 2)));
+
+        mvc.perform(get("/api/schedule/report").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.syncedAt").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.thisWeek").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.upcomingWeeks.length()").value(0));
+    }
+
+    @Test
     void 일정이_없으면_enoughData는_false이고_주간_부하는_비어_있다() throws Exception {
+        // 한 번도 동기화하지 않은 사용자(동기화 전): syncedAt·thisWeek는 null, upcomingWeeks는 빈 배열.
         long user = newUser(true);
 
         mvc.perform(get("/api/schedule/report").with(loginAs(user)))

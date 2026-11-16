@@ -28,11 +28,11 @@ class WeeklyLoadServiceTest {
 
     private final List<CalendarEventSnapshot> calendar = new ArrayList<>();
     private final InMemoryStore store = new InMemoryStore();
+    private final MutableClock clock = MutableClock.at("2026-11-12T07:30:00+09:00");
     private WeeklyLoadService service;
 
     @BeforeEach
     void setUp() {
-        MutableClock clock = MutableClock.at("2026-11-12T07:30:00+09:00");
         CalendarEventReader reader = (userId, range) -> userId != USER ? List.of() : calendar.stream()
                 .filter(e -> e.allDay() ? true : e.start().isBefore(range.endExclusive()) && e.end().isAfter(range.start()))
                 .toList();
@@ -124,6 +124,18 @@ class WeeklyLoadServiceTest {
         assertThat(weeks).extracting(WeekLoad::weekStart).containsExactly(MON, MON.plusWeeks(1));
     }
 
+    @Test
+    void 마지막_계산_시각은_범위_안_행_중_가장_늦은_값이고_행이_없으면_비어_있다() {
+        service.recalculate(USER, List.of(MON.minusWeeks(1), MON, MON.plusWeeks(1)));
+        clock.set("2026-11-12T09:00:00+09:00");
+        service.recalculate(USER, List.of(MON.minusWeeks(1), MON.plusWeeks(1)));
+
+        // 수요일을 넘겨도 그 주(11/9)부터 센다. 범위 밖인 지난주(11/2)의 나중 계산은 보지 않는다.
+        assertThat(service.lastComputedAt(USER, MON.plusDays(2), 1)).contains(Instant.parse("2026-11-11T22:30:00Z"));
+        assertThat(service.lastComputedAt(USER, MON, 2)).contains(Instant.parse("2026-11-12T00:00:00Z"));
+        assertThat(service.lastComputedAt(USER, MON.plusWeeks(2), 4)).isEmpty();
+    }
+
     private static final class InMemoryStore implements WeeklyLoadStore {
         final Map<LocalDate, WeekLoad> rows = new TreeMap<>();
         final Map<LocalDate, Instant> computedAt = new TreeMap<>();
@@ -138,6 +150,13 @@ class WeeklyLoadServiceTest {
             return rows.values().stream()
                     .filter(w -> !w.weekStart().isBefore(from) && !w.weekStart().isAfter(toInclusive))
                     .toList();
+        }
+
+        @Override
+        public Optional<Instant> lastComputedAt(long userId, LocalDate from, LocalDate toInclusive) {
+            return computedAt.entrySet().stream()
+                    .filter(e -> !e.getKey().isBefore(from) && !e.getKey().isAfter(toInclusive))
+                    .map(Map.Entry::getValue).max(Instant::compareTo);
         }
 
         @Override

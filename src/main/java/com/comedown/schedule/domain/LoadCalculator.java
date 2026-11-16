@@ -36,6 +36,11 @@ public final class LoadCalculator {
     private static final double TIME_FACTOR = 1.5;
     private static final int PRIOR_WEEKS = 4;
     private static final int MIN_PRIOR_DATA_WEEKS = 2;
+    /**
+     * 평소 대비(%)의 저장 한계. {@code weekly_loads.vs_usual_pct}가 DECIMAL(6,1)이라 이 범위를 넘으면 저장할 수 없다.
+     * 직전 평균이 0에 가까우면 비율이 한없이 커지므로 계산 결과를 이 범위로 자른다(제품 임계값이 아니라 저장 범위).
+     */
+    static final BigDecimal VS_USUAL_PCT_LIMIT = new BigDecimal("99999.9");
 
     private LoadCalculator() {
     }
@@ -104,10 +109,10 @@ public final class LoadCalculator {
             if (average.signum() == 0) {
                 unavailable = UnavailableReason.ZERO_BASELINE;
             } else {
-                vsUsualPct = loadScore.divide(average, 6, RoundingMode.HALF_UP)
+                vsUsualPct = storable(loadScore.divide(average, 6, RoundingMode.HALF_UP)
                         .subtract(BigDecimal.ONE)
                         .multiply(BigDecimal.valueOf(100))
-                        .setScale(1, RoundingMode.HALF_UP);
+                        .setScale(1, RoundingMode.HALF_UP));
             }
         }
 
@@ -175,6 +180,11 @@ public final class LoadCalculator {
         }
         return new PeriodSummary(from, toExclusive.minusDays(1), round1(hours.totalSeconds / 3600.0),
                 round1(hours.weekendSeconds / 3600.0), deadlineCount, lateNightCount, restDays, eventCount);
+    }
+
+    /** 평소 대비(%)를 저장 가능한 범위(±{@link #VS_USUAL_PCT_LIMIT})로 자른다. */
+    private static BigDecimal storable(BigDecimal vsUsualPct) {
+        return vsUsualPct.min(VS_USUAL_PCT_LIMIT).max(VS_USUAL_PCT_LIMIT.negate());
     }
 
     private static int loadHighPoints(BigDecimal vsUsualPct) {

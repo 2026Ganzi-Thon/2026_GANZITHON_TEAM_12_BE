@@ -94,6 +94,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```
 - `riskLevel`은 조건 점수 합으로 정합니다(0~1점 `NONE`, 2~3점 `WATCH`, 4점 이상 `RISK`). `riskReasons`: `LOAD_HIGH` `DEADLINES` `NO_REST_DAY` `LATE_NIGHT` `LONG_STREAK`. 산식은 [계산_정책.md](계산_정책.md) 1절.
 - `vsUsualPct`가 null이면 `vsUsualUnavailableReason`이 `ZERO_BASELINE`(직전 4주 평균 0) 또는 `INSUFFICIENT_DATA`(직전 데이터 2주 미만).
+- **구현 해석(확인 필요)** `vsUsualPct`는 저장 범위인 ±99999.9를 넘지 않습니다. 직전 4주 평균이 0에 가까워 비율이 그보다 커지면 99999.9로 자릅니다([계산_정책.md](계산_정책.md) 1절).
 
 **Suggestion** — 과부하 대비 제안 / 회복 일정 추천
 ```json
@@ -262,6 +263,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```
 - `enoughData: false`면 일정이 너무 적은 경우 → 빈 상태 화면.
 - 캘린더가 연결되지 않았으면 409 `CALENDAR_NOT_CONNECTED`. 동기화 전이면 `syncedAt`·`thisWeek`는 null, `upcomingWeeks`는 빈 배열입니다.
+- **구현 해석(확인 필요)**: 마지막 동기화 시각을 따로 저장하는 컬럼이 없어, `syncedAt`은 ① 저장된(취소 제외) 일정이 마지막으로 동기화된 시각과 ② 이 응답에 싣는 주(이번 주 + 다음 4주)의 주간 부하를 계산한 시각 중 늦은 쪽입니다. 동기화는 일정이 0건이어도 주간 부하를 저장하므로, 일정 0건으로 동기화한 사용자도 `syncedAt`이 null이 아니고 `thisWeek`·`upcomingWeeks`가 함께 나옵니다(`classification.total: 0`, `enoughData: false`). ①·②가 모두 없을 때만 null(동기화 전)이며, `thisWeek`나 `upcomingWeeks`가 있는 응답의 `syncedAt`은 null이 아닙니다. 분류 직접 수정(`PATCH …/category`)으로 이 주들의 부하를 다시 계산하면 ②가 그 시각이 되므로, 구글 일정을 다시 읽지 않았어도 `syncedAt`이 그 시각으로 늦어질 수 있습니다(정확한 동기화 시각이 필요해지면 저장 컬럼을 추가해야 함).
 - **구현 해석(확인 필요)**: `pastMonth` = [오늘 − 1개월, 어제]이며 집계 규칙은 주간 부하와 같고, `enoughData` = 그 기간에 집계 대상 일정이 1건 이상입니다. "너무 적은" 기준 수는 확정되면 갱신합니다.
 - 과부하 대비 제안은 `GET /api/suggestions?type=PRE_START`로 따로 받습니다.
 
@@ -334,6 +336,9 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 
 ### `GET /api/schedule/weeks?from=2026-10-12&count=9` → 200
 `{ "weeks": [WeekLoad] }`. 캘린더 탭 맨 위 4주 요약, 리포트 비교에 사용.
+- `from`(날짜)이 속한 주(월요일 시작)부터 `count`주를 주 시작일 오름차순으로 줍니다. `from`·`count`는 필수이며 빠지거나 형식이 틀리면 400 `VALIDATION_FAILED`.
+- 저장된 주간 부하만 돌려주므로, 아직 계산된 적 없는 주는 배열에서 빠집니다(0으로 채운 항목을 만들지 않음). 그래서 `count=9`여도 9개보다 적게 올 수 있고, 동기화 전이면 빈 배열입니다. 주간 부하는 `POST /api/calendar/sync`가 동기화 범위에 걸친 주(범위 시작일이 속한 주 ~ 이번 주 + 4주)를, 분류 직접 수정이 바뀐 주를 계산해 저장합니다. 항목은 순서가 아니라 `weekStart`로 맞춰 씁니다.
+- **구현 해석(확인 필요)** `count`는 1~52입니다(과도한 조회를 막는 입력 상한, 약 1년). 범위를 벗어나면 400 `VALIDATION_FAILED`.
 
 ### `DELETE /api/calendar/connection` → 204 — 마이페이지 "캘린더 연결 해제"
 캘린더 연결 해제 + 동기화한 일정·분류 수정 규칙·주간 부하·미승인 제안 및 해당 일정 기반 AI 캐시 삭제. 승인 이력은 유지하며 relatedEvent는 null. 외부 연결 해제는 캘린더 권한에 한정하고 로그인 세션은 유지합니다. 실패 시 재시도하며 정리 중이면 202, 완료 후 204. 다시 쓰려면 `/oauth2/authorization/google-calendar`.

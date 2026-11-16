@@ -114,9 +114,22 @@ class ScheduleControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         mvc.perform(get("/api/schedule/weeks").param("from", "2026-11-16").param("count", "53").with(loginAs(7)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(get("/api/schedule/weeks").param("from", "2026-11-16").with(loginAs(7)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void count는_52주까지_받는다() throws Exception {
+        when(service.weeks(eq(7L), eq(LocalDate.of(2026, 11, 16)), eq(52))).thenReturn(List.of());
+
+        mvc.perform(get("/api/schedule/weeks").param("from", "2026-11-16").param("count", "52").with(loginAs(7)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weeks.length()").value(0));
     }
 
     @Test
@@ -125,7 +138,8 @@ class ScheduleControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         mvc.perform(get("/api/schedule/weeks").param("count", "4").with(loginAs(7)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         verifyNoInteractions(service);
     }

@@ -36,6 +36,11 @@ class JpaWeeklyLoadStore implements WeeklyLoadStore {
     }
 
     @Override
+    public Optional<Instant> lastComputedAt(long userId, LocalDate from, LocalDate toInclusive) {
+        return Optional.ofNullable(repository.lastComputedAt(userId, from, toInclusive));
+    }
+
+    @Override
     public void save(long userId, WeekLoad load, Instant computedAt) {
         WeeklyLoadId id = new WeeklyLoadId(userId, load.weekStart());
         WeeklyLoadEntity entity = repository.findById(id).orElseGet(() -> new WeeklyLoadEntity(id));

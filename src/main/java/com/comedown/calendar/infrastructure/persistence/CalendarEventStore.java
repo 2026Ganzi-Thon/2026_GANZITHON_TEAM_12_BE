@@ -58,7 +58,7 @@ public class CalendarEventStore {
         return jdbc.sql("DELETE FROM calendar_events WHERE user_id = ?").params(userId).update();
     }
 
-    /** 마지막 동기화 시각과 (취소 제외) 전체·분류된 일정 수. */
+    /** (취소 제외) 저장된 일정의 마지막 동기화 시각과 전체·분류된 일정 수. 일정이 없으면 시각은 null. */
     public Overview overview(long userId) {
         return jdbc.sql("""
                         SELECT MAX(synced_at) AS synced_at, COUNT(*) AS total, COUNT(category) AS classified
