@@ -91,6 +91,64 @@ class CalendarFlowIntegrationTest {
 
         assertThat(count("calendar_events", user)).isEqualTo(2);
         assertThat(count("weekly_loads", user)).isEqualTo(9); // 10-12 ~ 12-07 월요일 9개
+        // 직접 수정 규칙이 없으면 제목 규칙으로 분류한다(출처 RULE).
+        assertThat(category(user, "e1")).isEqualTo("WORK_MEETING");
+        assertThat(category(user, "e2")).isEqualTo("STUDY");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM calendar_events WHERE user_id = ? "
+                + "AND category_source = 'RULE'", Integer.class, user)).isEqualTo(2);
+    }
+
+    @Test
+    void 과제_시험_발표는_마감으로_분류되고_제목이_바뀌면_다시_분류한다() throws Exception {
+        long user = newUser();
+        when(source.fetch(any(), any())).thenReturn(List.of(
+                timed("d1", null, "운영체제 과제 제출", "2026-11-18T05:00:00Z", "2026-11-18T06:00:00Z"),
+                timed("d2", null, "기말고사", "2026-11-19T05:00:00Z", "2026-11-19T06:00:00Z"),
+                timed("d3", null, "시험 공부", "2026-11-20T05:00:00Z", "2026-11-20T06:00:00Z"),
+                timed("d4", null, "헬스", "2026-11-20T09:00:00Z", "2026-11-20T10:00:00Z")));
+
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.classified").value(4));
+
+        assertThat(category(user, "d1")).isEqualTo("ASSIGNMENT");
+        assertThat(category(user, "d2")).isEqualTo("EXAM");
+        assertThat(category(user, "d3")).isEqualTo("STUDY");
+        assertThat(category(user, "d4")).isEqualTo("EXERCISE");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM calendar_events WHERE user_id = ? AND is_deadline",
+                Integer.class, user)).isEqualTo(2); // 과제·시험
+        // 마감 2개가 주간 부하의 마감 수에 반영된다.
+        assertThat(jdbc.queryForObject("SELECT deadline_count FROM weekly_loads WHERE user_id = ? "
+                + "AND week_start = '2026-11-16'", Integer.class, user)).isEqualTo(2);
+
+        // 다시 동기화: 그대로면 다시 분류하지 않고, 제목이 바뀐 일정만 새로 분류한다.
+        when(source.fetch(any(), any())).thenReturn(List.of(
+                timed("d1", null, "운영체제 과제 제출", "2026-11-18T05:00:00Z", "2026-11-18T06:00:00Z"),
+                timed("d2", null, "기말고사", "2026-11-19T05:00:00Z", "2026-11-19T06:00:00Z"),
+                timed("d3", null, "시험 공부", "2026-11-20T05:00:00Z", "2026-11-20T06:00:00Z"),
+                timed("d4", null, "팀플 회의", "2026-11-20T09:00:00Z", "2026-11-20T10:00:00Z")));
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.classified").value(1));
+        assertThat(category(user, "d4")).isEqualTo("WORK_MEETING");
+    }
+
+    @Test
+    void 직접_고친_분류는_제목_규칙보다_우선하고_다시_동기화해도_유지된다() throws Exception {
+        long user = newUser();
+        when(source.fetch(any(), any())).thenReturn(List.of(
+                timed("u1", null, "운영체제 과제 제출", "2026-11-18T05:00:00Z", "2026-11-18T06:00:00Z")));
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+        assertThat(category(user, "u1")).isEqualTo("ASSIGNMENT");
+
+        patchCategory(user, eventId(user, "u1"), "CLUB", "THIS").andExpect(status().isOk());
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.classified").value(0));
+
+        assertThat(category(user, "u1")).isEqualTo("CLUB");
+        assertThat(jdbc.queryForObject("SELECT category_source FROM calendar_events WHERE user_id = ?",
+                String.class, user)).isEqualTo("USER");
     }
 
     @Test
@@ -195,7 +253,7 @@ class CalendarFlowIntegrationTest {
         patchCategory(user, a1, "ASSIGNMENT", "SERIES").andExpect(status().isOk())
                 .andExpect(jsonPath("$.updatedCount").value(2))
                 .andExpect(jsonPath("$.weeks.length()").value(2));
-        assertThat(category(user, "a3")).isNull();
+        assertThat(category(user, "a3")).isEqualTo("STUDY"); // 직접 고치지 않은 일정은 제목 규칙 분류 그대로
 
         patchCategory(user, a1, "EXAM", "TITLE").andExpect(status().isOk())
                 .andExpect(jsonPath("$.updatedCount").value(1)); // a1·a2는 더 높은 SERIES 규칙이 있어 a3만 바뀐다
