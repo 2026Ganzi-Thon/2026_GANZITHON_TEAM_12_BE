@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -93,18 +94,23 @@ class SuggestionPlanningService implements SuggestionPlanning {
     }
 
     @Override
-    public String judgment(boolean baselineEstablished, String recoveryStatus, boolean overloaded) {
-        return RecoverySuggestionPolicy.judgment(baselineEstablished, recoveryStatus, overloaded);
+    public int programWeek(int dayIndex) {
+        return RecoverySuggestionPolicy.programWeek(dayIndex);
     }
 
     @Override
-    public boolean recommendsRecovery(String judgment) {
-        return RecoverySuggestionPolicy.recommends(judgment);
+    public String judgment(int programWeek, Double dayLn, List<Double> priorWeekLn, boolean overloaded) {
+        return RecoverySuggestionPolicy.judgment(programWeek, dayLn, priorWeekLn, overloaded);
     }
 
     @Override
-    public String pickRecoveryActivity(List<String> preferredActivities, LocalDate date) {
-        return RecoverySuggestionPolicy.pickActivity(preferredActivities, date);
+    public Optional<String> recoveryReasonCode(String judgment, boolean overloaded) {
+        return RecoverySuggestionPolicy.reasonCode(judgment, overloaded);
+    }
+
+    @Override
+    public String pickRecoveryActivity(String reasonCode, List<String> preferredActivities, LocalDate date) {
+        return RecoverySuggestionPolicy.pickActivity(reasonCode, preferredActivities, date);
     }
 
     @Override
@@ -118,13 +124,8 @@ class SuggestionPlanningService implements SuggestionPlanning {
     }
 
     @Override
-    public String recoveryMessage(String activityCode, String judgment) {
-        return recovery.message(activityCode, judgment);
-    }
-
-    @Override
-    public String recoveryReasonCode() {
-        return RecoverySuggestionPolicy.REASON_CODE;
+    public String recoveryMessage(String activityCode, String reasonCode, String judgment) {
+        return recovery.message(activityCode, reasonCode, judgment);
     }
 
     @Override
