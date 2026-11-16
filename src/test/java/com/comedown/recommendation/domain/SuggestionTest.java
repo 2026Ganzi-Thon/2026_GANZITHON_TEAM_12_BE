@@ -73,6 +73,23 @@ class SuggestionTest {
     }
 
     @Test
+    void 재확인을_미루면_APPROVING일_때만_갱신_시각이_바뀌고_상태는_그대로다() {
+        Instant later = NOW.plusSeconds(180);
+        Suggestion s = proposed();
+        assertThat(s.deferRecheck(later)).isFalse();
+        assertThat(s.getUpdatedAt()).isEqualTo(NOW);
+
+        s.beginApproval(null, null, NOW);
+        assertThat(s.deferRecheck(later)).isTrue();
+        assertThat(s.getUpdatedAt()).isEqualTo(later);
+        assertThat(s.getStatus()).isEqualTo(SuggestionStatus.APPROVING);
+
+        Suggestion approved = approved();
+        assertThat(approved.deferRecheck(later)).isFalse(); // 이미 확정된 제안은 건드리지 않는다
+        assertThat(approved.getUpdatedAt()).isEqualTo(NOW);
+    }
+
+    @Test
     void 건너뛴_제안은_승인할_수_없다() {
         Suggestion s = proposed();
         s.dismiss(NOW);

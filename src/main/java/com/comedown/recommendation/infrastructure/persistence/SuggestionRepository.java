@@ -32,7 +32,10 @@ public interface SuggestionRepository extends JpaRepository<Suggestion, Long> {
             @Param("status") SuggestionStatus status, @Param("targetDate") LocalDate targetDate);
 
     /**
-     * 사용자의 제안 행을 모두 잠근다. 같은 사용자의 승인 시작을 직렬화해 겹친 시간 예약을 막는다.
+     * 사용자의 제안 행을 모두 잠그고 커밋된 최신 상태로 읽는다(사용자 잠금). 같은 사용자의 승인 시작을 직렬화해 겹친 시간
+     * 예약을 막고, 한 제안의 상태 전이(건너뛰기·했어요·승인 확정·실패·되돌리기·만료)도 이 잠금으로 읽어 먼저 커밋된 전이를
+     * 보고 판단한다. 잠그지 않고 읽으면 오래된 상태로 판단한 뒤 모든 컬럼을 덮어쓴다. 전이마다 같은 잠금을 같은 순서로
+     * 잡으므로, 행 하나만 PK로 잠그는 방식과 달리 승인 시작과 교착하지 않는다.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Suggestion s WHERE s.userId = :userId")
@@ -74,11 +77,14 @@ public interface SuggestionRepository extends JpaRepository<Suggestion, Long> {
     int clearJudgmentExceptType(@Param("userId") long userId, @Param("type") SuggestionType type,
             @Param("now") Instant now);
 
-    /** 만료 시각이 지난 PROPOSED 제안. */
-    @Query("SELECT s FROM Suggestion s WHERE s.status = :status AND s.expiresAt <= :now")
-    List<Suggestion> findDue(@Param("status") SuggestionStatus status, @Param("now") Instant now);
+    /** 만료 시각이 지난 제안이 있는 사용자(잠그지 않는다. 바꾸기 전에 {@link #lockAllOfUser}로 다시 읽어 확인). */
+    @Query("SELECT DISTINCT s.userId FROM Suggestion s WHERE s.status = :status AND s.expiresAt <= :now")
+    List<Long> findUserIdsWithDue(@Param("status") SuggestionStatus status, @Param("now") Instant now);
 
-    /** 갱신된 지 오래된 승인 중 제안(오래된 순). 외부 등록 결과를 다시 확인할 대상. */
+    /**
+     * 갱신된 지 오래된 승인 중 제안(오래된 순). 외부 등록 결과를 다시 확인할 대상. 재확인하고도 APPROVING이면
+     * updatedAt을 갱신해 뒤로 보내므로({@code Suggestion#deferRecheck}), 풀리지 않는 행이 앞자리를 계속 차지하지 않는다.
+     */
     @Query("SELECT s FROM Suggestion s WHERE s.status = :status AND s.updatedAt <= :cutoff ORDER BY s.updatedAt, s.id")
     List<Suggestion> findStale(@Param("status") SuggestionStatus status, @Param("cutoff") Instant cutoff,
             org.springframework.data.domain.Pageable page);
