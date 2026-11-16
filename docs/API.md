@@ -174,7 +174,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
   "consentVersion": "2026-11-01"
 }
 ```
-- 검증: 닉네임 1~20자. `TERMS` `PRIVACY` `AGE_14` `CALENDAR` `AI_NOTICE`는 true 필수(`AI_NOTICE`: 인공지능기본법상 AI 기반 운용 사실 사전 고지). `SENSITIVE_HRV`가 false면 가입은 되지만 측정이 꺼집니다(열린 항목 3).
+- 검증: 닉네임 1~20자. 동의 6개(`TERMS` `PRIVACY` `AGE_14` `SENSITIVE_HRV` `CALENDAR` `AI_NOTICE`)는 모두 true 필수이며 하나라도 빠지면 400 `VALIDATION_FAILED`(`fieldErrors[].field`: `consents.<종류>`)입니다(`AI_NOTICE`: 인공지능기본법상 AI 기반 운용 사실 사전 고지). 건강정보 동의(`SENSITIVE_HRV`)는 2026-11-17 결정으로 가입 때 필수이고, 가입 뒤에는 마이페이지에서 철회할 수 있습니다(8절, 철회하면 측정 꺼짐).
 - 응답 200: `{ "onboardingStep": "CBI", "calendarAuthUrl": "/oauth2/authorization/google-calendar" }` — `calendarAuthUrl`이 있으면(아직 캘린더 권한이 없으면) 그 주소로 이동합니다.
 
 ### `GET /api/cbi/questions` → 200 — A3 문항
@@ -611,7 +611,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 기능별 삭제 계약(조율은 `experience.accountlifecycle`, 한 트랜잭션): `SuggestionDataDeletion.removeHealthBasis` → `SafetyDataDeletion.deleteAll` → `CbiDataDeletion.deleteAll` → `RecoveryDataDeletion.deleteAll` → `CheckinDataDeletion.eraseHealthData` → `IdempotencyService.deleteForUser(userId, "hrv-")`·`("cbi-")`. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. 회복 AI 캐시(`ai_outputs`)는 ai 구현 때 같은 순서에 추가합니다.
 - 측정·컨디션·CBI 저장은 저장 트랜잭션에서 사용자 행을 잠근 뒤 접근 조건(탈퇴 진행 → 건강정보 동의 → 측정 켜짐)을 한 번 더 확인합니다. 건강 기록 삭제·동의 철회·탈퇴도 같은 행을 잠그므로 저장과 겹치지 않고, 요청을 받은 뒤 철회·탈퇴가 먼저 끝났다면 저장은 아무것도 쓰지 않고 403 `HRV_CONSENT_REQUIRED`(탈퇴 진행 중이면 409 `INVALID_STATE`)로 끝납니다. 동의가 유효한 채 기록만 지운 경우(`DELETE /api/hrv/data`)에는 삭제가 끝난 뒤의 저장을 새 기록으로 받습니다.
 - **구현 해석(확인 필요)** 아침 체크는 호흡 기록이 있으면 건강 필드(컨디션·교란 요인)와 `completed_at`만 비우고 남기며, 남을 것이 없는 체크는 지웁니다. "회복 기반 미승인 추천"은 RECOVERY 중 `APPROVING`·`APPROVED`가 아닌 것이며 지웁니다(`APPROVING`은 외부 등록 확인 전이라 남김). 남는 RECOVERY 제안은 "건강 근거 제거"로 `judgment_state`·`message`를 비우고 `reason_code`를 `HEALTH_DATA_DELETED`로 바꾸며, PRE_START는 `judgment_state`만 비웁니다(제목·시간·Google 일정·승인 상태는 유지). 안전 안내는 `LOW_RECOVERY_2W`·`CBI_HIGH` 모두 건강 근거이므로 지웁니다.
-- 민감정보 비동의/철회 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.
+- 건강정보 동의는 가입 때 필수이므로 동의가 없는 경우는 가입 뒤 철회한 사용자입니다. 철회한 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.
 
 용어 사전(C4)은 프론트 정적 데이터로 둡니다(API 없음).
 
@@ -682,7 +682,7 @@ API URL은 유지하며 내부 패키지는 서비스 책임으로 구분합니�
 ## 13. 열린 항목
 1. 캘린더 탭에서 일정 제목을 보여줄지, 보여준다면 매번 구글에서 읽을지(지금 명세) 저장할지.
 2. 측정 알림을 캘린더 반복 일정으로 할지 → 하면 `PUT /api/me/settings`에 `reminder: true` 추가.
-3. 건강정보 동의를 필수로 할지. 현재 선택으로 유지하고 CBI 건너뛰기·일정 전용 흐름을 v0.2 제안으로 명시.
+3. ~~건강정보 동의를 필수로 할지~~ → 2026-11-17 확정: 가입 때 필수. 가입 뒤 철회한 사용자를 위한 CBI 건너뛰기·일정 전용 흐름은 유지.
 4. 탈퇴할 때 Come-down이 넣은 캘린더 일정도 지울지.
 5. ~~회복 점수를 숫자로 보여줄지~~ → v0.3 확정: 0~100 점수를 쓰지 않음(평소 대비 % + 상태).
 6. ~~안전 안내를 닫은 뒤 다시 보여줄 기준~~ → v0.3 확정: 조건 해제 후 재충족 시 새 안내.
