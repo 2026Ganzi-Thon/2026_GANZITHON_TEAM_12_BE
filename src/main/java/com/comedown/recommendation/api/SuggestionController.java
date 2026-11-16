@@ -4,6 +4,7 @@ import com.comedown.account.contract.AccountAccessQuery;
 import com.comedown.account.contract.HealthDataAccess;
 import com.comedown.recommendation.contract.SuggestionCommands;
 import com.comedown.recommendation.contract.SuggestionPayload;
+import com.comedown.recommendation.contract.SuggestionPayloads;
 import com.comedown.recommendation.contract.SuggestionQuery;
 import com.comedown.recommendation.domain.SuggestionStatus;
 import com.comedown.recommendation.domain.SuggestionType;
@@ -39,12 +40,14 @@ public class SuggestionController {
     private final SuggestionQuery query;
     private final SuggestionCommands commands;
     private final AccountAccessQuery accountAccess;
+    private final SuggestionPayloads payloads;
 
     public SuggestionController(SuggestionQuery query, SuggestionCommands commands,
-            AccountAccessQuery accountAccess) {
+            AccountAccessQuery accountAccess, SuggestionPayloads payloads) {
         this.query = query;
         this.commands = commands;
         this.accountAccess = accountAccess;
+        this.payloads = payloads;
     }
 
     record SuggestionsResponse(List<SuggestionPayload> suggestions) {
@@ -64,19 +67,17 @@ public class SuggestionController {
                 throw new ApiException(ErrorCode.ONBOARDING_REQUIRED);
             }
         }
-        return new SuggestionsResponse(query.search(user.id(), type, status, date).stream()
-                .map(SuggestionPayload::of)
-                .toList());
+        return new SuggestionsResponse(payloads.of(user.id(), query.search(user.id(), type, status, date)));
     }
 
     @PostMapping("/api/suggestions/{id}/dismiss")
     public SuggestionPayload dismiss(CurrentUser user, @PathVariable long id) {
-        return SuggestionPayload.of(commands.dismiss(user.id(), id));
+        return payloads.of(user.id(), commands.dismiss(user.id(), id));
     }
 
     @PostMapping("/api/suggestions/{id}/done")
     public SuggestionPayload done(CurrentUser user, @PathVariable long id) {
-        return SuggestionPayload.of(commands.markDone(user.id(), id));
+        return payloads.of(user.id(), commands.markDone(user.id(), id));
     }
 
     private static void validate(String type, String status) {

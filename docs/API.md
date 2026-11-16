@@ -174,7 +174,7 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
   "consentVersion": "2026-11-01"
 }
 ```
-- 검증: 닉네임 1~20자. `TERMS` `PRIVACY` `AGE_14` `CALENDAR` `AI_NOTICE`는 true 필수(`AI_NOTICE`: 인공지능기본법상 AI 기반 운용 사실 사전 고지). `SENSITIVE_HRV`가 false면 가입은 되지만 측정이 꺼집니다(열린 항목 3).
+- 검증: 닉네임 1~20자. 동의 6개(`TERMS` `PRIVACY` `AGE_14` `SENSITIVE_HRV` `CALENDAR` `AI_NOTICE`)는 모두 true 필수이며 하나라도 빠지면 400 `VALIDATION_FAILED`(`fieldErrors[].field`: `consents.<종류>`)입니다(`AI_NOTICE`: 인공지능기본법상 AI 기반 운용 사실 사전 고지). 건강정보 동의(`SENSITIVE_HRV`)는 2026-11-17 결정으로 가입 때 필수이고, 가입 뒤에는 마이페이지에서 철회할 수 있습니다(8절, 철회하면 측정 꺼짐).
 - 응답 200: `{ "onboardingStep": "CBI", "calendarAuthUrl": "/oauth2/authorization/google-calendar" }` — `calendarAuthUrl`이 있으면(아직 캘린더 권한이 없으면) 그 주소로 이동합니다.
 
 ### `GET /api/cbi/questions` → 200 — A3 문항
@@ -390,7 +390,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 조회·건너뛰기·했어요는 로그인 사용자 본인 제안만 다룹니다(남의 id는 404). `type=RECOVERY` 조회는 온보딩 완료 후(403 `ONBOARDING_REQUIRED`), PRE_START는 온보딩 중에도 조회합니다. `type`·`status`가 정의된 값이 아니거나 `date`가 `YYYY-MM-DD`가 아니면 400입니다. 목록은 시작 시각 순입니다.
 - done을 일정 종료 전에 부르면 409 `INVALID_STATE`("일정이 끝난 뒤에 체크할 수 있어요.")입니다. `message`는 문구가 없으면 null입니다.
 - 제안의 등록 키(`registration_key`)는 생성 때 서버가 만드는 Google event id(`cd` + 32자, base32hex 문자만)이며 응답에 내보내지 않습니다. 승인 시작 때 같은 사용자의 다른 APPROVING·APPROVED 예약과 겹치면 409 `SLOT_CONFLICT`입니다. 만료 시각이 지난 PROPOSED는 서버가 주기적으로 `EXPIRED`로 바꿉니다. 건너뛰기·했어요·되돌리기·만료·승인 확정은 승인 시작과 같은 사용자별 잠금으로 직렬화합니다. 승인이 먼저 시작된 제안을 동시에 건너뛰면 409 `INVALID_STATE`이고 만료 대상에서도 빠집니다(`APPROVING`을 덮어쓰지 않음).
-- **현재 구현 범위**: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) "과부하 대비 제안"). `generate`는 `type: PRE_START`만 되고 `RECOVERY`는 "1~7일 컨디션 기반 추천 임계값" 확정 전까지 422 `CALCULATION_POLICY_PENDING`입니다. `relatedEvent`는 아직 null입니다(제안의 대상 일정은 `riskWeekStart`로만 알 수 있음). 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `FAILED`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `APPROVING` + 202, 서버의 재확인 작업이 1분마다 돌며 이어서 확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `INVALID_STATE`입니다. 구글 403은 권한 범위 부족일 때만 `CALENDAR_SCOPE_MISSING`이고, 사용량 제한 등 그 외 403은 확정 실패(`FAILED`, `CALENDAR_API_ERROR`)입니다.
+- **현재 구현 범위**: PRE_START 생성·다른 시간·승인·되돌리기를 구현했습니다(규칙은 [계산 정책](계산_정책.md) "과부하 대비 제안"). `generate`는 `type: PRE_START`만 되고 `RECOVERY`는 "1~7일 컨디션 기반 추천 임계값" 확정 전까지 422 `CALCULATION_POLICY_PENDING`입니다. `relatedEvent`는 제안을 내보내는 모든 응답(목록·생성·승인·건너뛰기·했어요·되돌리기·홈의 `todaySuggestions`)에 들어갑니다. `start`는 일정 시작(종일 일정이면 그 날 00:00, 서울 시각), `category`는 저장된 분류(분류 전이면 null)이고, `title`은 응답할 때 구글에서 읽으며 읽지 못하면(연결 만료·구글 오류 등) `title`만 null입니다. 일정 참조가 없는 제안(RECOVERY, 캘린더 연결 해제 뒤 남은 이력)은 `relatedEvent` 자체가 null이고 이때는 구글을 부르지 않습니다. 승인은 구글에 등록 키를 일정 id로 등록하며, 타임아웃·5xx는 `FAILED`로 확정하지 않고 등록 키로 조회해 확인합니다(못 알면 `APPROVING` + 202, 서버의 재확인 작업이 1분마다 돌며 이어서 확인). 되돌리기는 Come-down이 만든 일정(표식 확인)만 지우며 아니면 409 `INVALID_STATE`입니다. 구글 403은 권한 범위 부족일 때만 `CALENDAR_SCOPE_MISSING`이고, 사용량 제한 등 그 외 403은 확정 실패(`FAILED`, `CALENDAR_API_ERROR`)입니다.
 - **구현 해석(확인 필요)** 시간을 바꾸지 않는 승인의 재확인(0절 "Google의 최신 빈 시간을 재확인"): 구글을 새로 조회하지 않고 저장된(마지막으로 동기화한) 일정으로 확인합니다. 충돌은 제안 구간 `[start, end)`과 실제로 겹치는 시간 일정이 있을 때이며, 종일·취소·"한가함" 일정과 구간에 맞닿기만 한 일정은 충돌이 아닙니다. 제안을 만들 때의 조건인 앞뒤 10분 간격·수면 시간대는 다시 적용하지 않고, 다른 제안과의 겹침은 기존대로 APPROVING·APPROVED 예약만 봅니다. "지났다"는 시작 시각이 현재보다 이전인 경우입니다(만료 전이어도 409). 이미 `APPROVING`인 제안의 재승인은 이전 시도가 구글에 반영됐을 수 있으므로 재확인하지 않고 같은 등록 키로 이어 갑니다.
 - **구현 해석(확인 필요)** 승인 재확인 순서: 재확인 작업은 한 번에 오래된 순으로 20건을 봅니다. 재확인하고도 `APPROVING`이면 `updated_at`을 갱신해 순서를 맨 뒤로 보내고, 그 제안은 2분(`comedown.suggestions.recheck-after`) 뒤에 다시 확인합니다. 풀리지 않는 제안(연결 해제·미재인증 사용자)이 새 제안의 재확인을 막지 않게 하려는 것이며, 재확인 횟수 제한이나 간격 늘리기는 없습니다(확인할 수 없는 `APPROVING`을 언제 정리할지는 미정).
 - **구현 해석(확인 필요)** PRE_START 재제안: 같은 마감 일정에 `PROPOSED`·`APPROVING`·`APPROVED`·`FAILED`(재시도 가능)·`DISMISSED`·`UNDONE` 제안이 있으면 동기화·`generate`가 새 제안을 만들지 않습니다. 사용자가 건너뛰거나 되돌린 마감은 다시 권하지 않고, `EXPIRED`(응답 없이 날짜가 지남)만 다시 제안합니다.
@@ -610,7 +610,7 @@ Come-down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉�
 - 기능별 삭제 계약(조율은 `experience.accountlifecycle`, 한 트랜잭션): `SuggestionDataDeletion.removeHealthBasis` → `SafetyDataDeletion.deleteAll` → `CbiDataDeletion.deleteAll` → `RecoveryDataDeletion.deleteAll` → `CheckinDataDeletion.eraseHealthData` → `IdempotencyService.deleteForUser(userId, "hrv-")`·`("cbi-")`. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. 회복 AI 캐시(`ai_outputs`)는 ai 구현 때 같은 순서에 추가합니다.
 - 측정·컨디션·CBI 저장은 저장 트랜잭션에서 사용자 행을 잠근 뒤 접근 조건(탈퇴 진행 → 건강정보 동의 → 측정 켜짐)을 한 번 더 확인합니다. 건강 기록 삭제·동의 철회·탈퇴도 같은 행을 잠그므로 저장과 겹치지 않고, 요청을 받은 뒤 철회·탈퇴가 먼저 끝났다면 저장은 아무것도 쓰지 않고 403 `HRV_CONSENT_REQUIRED`(탈퇴 진행 중이면 409 `INVALID_STATE`)로 끝납니다. 동의가 유효한 채 기록만 지운 경우(`DELETE /api/hrv/data`)에는 삭제가 끝난 뒤의 저장을 새 기록으로 받습니다.
 - **구현 해석(확인 필요)** 아침 체크는 호흡 기록이 있으면 건강 필드(컨디션·교란 요인)와 `completed_at`만 비우고 남기며, 남을 것이 없는 체크는 지웁니다. "회복 기반 미승인 추천"은 RECOVERY 중 `APPROVING`·`APPROVED`가 아닌 것이며 지웁니다(`APPROVING`은 외부 등록 확인 전이라 남김). 남는 RECOVERY 제안은 "건강 근거 제거"로 `judgment_state`·`message`를 비우고 `reason_code`를 `HEALTH_DATA_DELETED`로 바꾸며, PRE_START는 `judgment_state`만 비웁니다(제목·시간·Google 일정·승인 상태는 유지). 안전 안내는 `LOW_RECOVERY_2W`·`CBI_HIGH` 모두 건강 근거이므로 지웁니다.
-- 민감정보 비동의/철회 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.
+- 건강정보 동의는 가입 때 필수이므로 동의가 없는 경우는 가입 뒤 철회한 사용자입니다. 철회한 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.
 
 용어 사전(C4)은 프론트 정적 데이터로 둡니다(API 없음).
 
@@ -681,7 +681,7 @@ API URL은 유지하며 내부 패키지는 서비스 책임으로 구분합니�
 ## 13. 열린 항목
 1. 캘린더 탭에서 일정 제목을 보여줄지, 보여준다면 매번 구글에서 읽을지(지금 명세) 저장할지.
 2. 측정 알림을 캘린더 반복 일정으로 할지 → 하면 `PUT /api/me/settings`에 `reminder: true` 추가.
-3. 건강정보 동의를 필수로 할지. 현재 선택으로 유지하고 CBI 건너뛰기·일정 전용 흐름을 v0.2 제안으로 명시.
+3. ~~건강정보 동의를 필수로 할지~~ → 2026-11-17 확정: 가입 때 필수. 가입 뒤 철회한 사용자를 위한 CBI 건너뛰기·일정 전용 흐름은 유지.
 4. 탈퇴할 때 Come-down이 넣은 캘린더 일정도 지울지.
 5. ~~회복 점수를 숫자로 보여줄지~~ → v0.3 확정: 0~100 점수를 쓰지 않음(평소 대비 % + 상태).
 6. ~~안전 안내를 닫은 뒤 다시 보여줄 기준~~ → v0.3 확정: 조건 해제 후 재충족 시 새 안내.
