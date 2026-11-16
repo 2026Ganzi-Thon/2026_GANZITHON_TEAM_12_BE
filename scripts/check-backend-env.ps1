@@ -51,7 +51,7 @@ function Invoke-Probe {
     }
 }
 
-Write-Output 'Come-down backend environment check (does not change system settings)'
+Write-Output 'Come & Down backend environment check (does not change system settings)'
 
 $java = Invoke-Probe 'java' '-version'
 if ($java.ExitCode -eq 0 -and $java.Text -match 'version "21(?:\.|"|-)') {

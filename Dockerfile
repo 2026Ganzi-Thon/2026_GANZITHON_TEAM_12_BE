@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Come-down 백엔드 실행 이미지. 테스트는 CI(.github/workflows/ci.yml)에서 돌리므로 여기서는 jar만 만든다.
+# Come & Down 백엔드 실행 이미지. 테스트는 CI(.github/workflows/ci.yml)에서 돌리므로 여기서는 jar만 만든다.
 
 # ---- 빌드 ----
 FROM eclipse-temurin:21-jdk AS build

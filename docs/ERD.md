@@ -1,8 +1,8 @@
-# Come-down ERD (v0.3, 2026-11-12)
+# Come & Down ERD (v0.3, 2026-11-12)
 
 > v0.3: 팀장 "백엔드 설계 수정 요청 1" 반영 — `hrv_measurements` 서버 계산 컬럼, 하루 대표값 = 첫 적격 측정, `GOOD`→`NORMAL`, AI 고지 필수, 위험 주차 점수제, `weekly_loads.vs_usual_unavailable_reason` 추가. 계산 산식은 [계산_정책.md](계산_정책.md).
 
-기준: 기획안 1차 수정본 + IA 차트 초안 ([서비스_요구사항.md](서비스_요구사항.md)). 서비스명은 Come-down(캄다운)입니다. 기존 구현과 독립적인 목표 데이터 설계입니다.
+기준: 기획안 1차 수정본 + IA 차트 초안 ([서비스_요구사항.md](서비스_요구사항.md)). 서비스명은 Come & Down(캄다운)입니다. 기존 구현과 독립적인 목표 데이터 설계입니다.
 API는 [API.md](API.md)를 봅니다.
 
 검토 결과는 [검토결과.md](검토결과.md), 관계도·테이블을 볼 수 있는 HTML은 [ERD.html](ERD.html)입니다.
@@ -330,7 +330,7 @@ erDiagram
 | all_day | BOOLEAN | | |
 | event_status | VARCHAR(20) | | `confirmed` `tentative` |
 | transparency | VARCHAR(20) | | `opaque`(바쁨) `transparent`(한가함) |
-| created_by_app | BOOLEAN | | Come-down이 넣은 일정(회복 일정·작업 블록). 부하 계산에서 제외 |
+| created_by_app | BOOLEAN | | Come & Down이 넣은 일정(회복 일정·작업 블록). 부하 계산에서 제외 |
 | category | VARCHAR(30) | Y | 3절 일정 카테고리. 분류 전이면 null |
 | custom_category | VARCHAR(20) | Y | "기타"(`OTHER`)를 고르고 사용자가 직접 입력한 카테고리 이름. 그 외에는 null |
 | category_source | VARCHAR(10) | Y | `AI` `RULE`(AI 실패 시 규칙) `USER`(직접 수정) |
