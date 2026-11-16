@@ -188,6 +188,8 @@ docker compose up -d        # MySQL 8.4 → localhost:3307
 
 ### 프록시 뒤에 배포할 때 (GCP 등)
 
+컨테이너 이미지(`Dockerfile`), 환경 변수, 구글 콘솔 설정, 배포 후 확인 절차는 [배포 가이드](docs/배포_가이드.md)에 정리했습니다.
+
 로드밸런서나 Cloud Run 뒤에서는 TLS가 프록시에서 끝나고 앱은 HTTP로 요청을 받습니다. 그대로 두면 구글에 보내는 리디렉션 주소가 `http://…`로 만들어져 로그인이 `redirect_uri_mismatch`로 막히고, 세션·CSRF 쿠키에 `Secure`가 붙지 않습니다.
 
 - 운영 환경 변수에 `SERVER_FORWARD_HEADERS_STRATEGY=framework`를 넣습니다. `X-Forwarded-Proto`·`X-Forwarded-Host`로 원래 주소를 복원합니다. 기본값은 `none`이고 로컬에서는 설정하지 않습니다.

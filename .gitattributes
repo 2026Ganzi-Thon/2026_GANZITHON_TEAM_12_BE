@@ -15,3 +15,6 @@
 *.jpg binary
 *.pdf binary
 *.zip binary
+# 컨테이너 빌드 파일은 Linux에서 읽으므로 LF로 고정한다.
+Dockerfile text eol=lf
+.dockerignore text eol=lf
