@@ -11,8 +11,8 @@ import java.util.Map;
 public interface AccountCommands {
 
     /**
-     * @param consents ConsentType 이름 → 동의 여부. 필수 동의(TERMS·PRIVACY·AGE_14·CALENDAR·AI_NOTICE)가 true여야 한다.
-     *                 SENSITIVE_HRV가 false면 가입은 되지만 측정이 꺼진다.
+     * @param consents ConsentType 이름 → 동의 여부. 6개(TERMS·PRIVACY·AGE_14·SENSITIVE_HRV·CALENDAR·AI_NOTICE)
+     *                 모두 true여야 한다.
      */
     record Profile(String nickname, Map<String, Boolean> consents, String consentVersion) {
     }
