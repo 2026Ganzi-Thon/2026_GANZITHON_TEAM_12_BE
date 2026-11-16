@@ -447,6 +447,8 @@
 </div></details><details class="endpoint" data-search="patch /api/calendar/events/{id}/category 일정 분류 · 부담 · 마감 여부 직접 수정 ```json
 { &quot;category&quot;: &quot;assignment&quot;, &quot;burden&quot;: 2, &quot;adjustable&quot;: true, &quot;isdeadline&quot;: true, &quot;scope&quot;: &quot;series&quot; }
 ```
+- 카테고리 화면(b2-1, 2026-11-17 확정): 일·공부(부하 계산에 포함) = `class` 수업 · `assignment` 과제 · `study` 공부 · `exam` 시험 · `presentation` 발표 · `part_time` 아르바이트 · `club` 동아리·대외활동 · `work_meeting` 회의·팀플, 개인(부하 계산 제외) = `exercise` 운동 · `appointment` 약속 · `personal` 개인, 그 외 = `other` 기타.
+- &quot;기타&quot;를 고르면 사용자가 카테고리 이름을 직접 입력할 수 있습니다: `{ &quot;category&quot;: &quot;other&quot;, &quot;customcategory&quot;: &quot;봉사활동&quot;, &quot;isdeadline&quot;: false, &quot;scope&quot;: &quot;title&quot; }`. `customcategory`는 선택이며 앞뒤 공백을 떼고 1~20자입니다(비어 있으면 이름 없는 기타). `other`가 아닌 카테고리에 보내거나 20자를 넘으면 400 `validation_failed`입니다. 다른 카테고리로 바꾸면 이름은 지워집니다. **구현 해석(확인 필요)**: 직접 입력한 카테고리도 `other`이므로 부하 계산에는 기존 `other` 규칙대로 포함합니다([계산_정책.md](계산_정책.md) 1절).
 - `scope`: `this`(이 일정만) `series`(반복 일정 전체, 반복 일정일 때만) `title`(같은 제목 일정 전체).
 - 필드 category·isdeadline·scope는 필수입니다. burden(1~3)·adjustable은 선택입니다(카테고리 변경 화면 b2-1에 입력이 없음). burden을 보내지 않으면 null로 두고, adjustable을 보내지 않으면 카테고리 기본값(`assignment`·`presentation`만 true, 제목 규칙 분류와 같음)을 씁니다. 우선순위는 this &gt; series &gt; title &gt; ai &gt; rule. 범위 규칙은 현재 동기화된 일정과 이후 들어오는 일정에 적용하며 원본 google 일정은 변경하지 않습니다.
 - 응답 200: `{ &quot;updatedcount&quot;: 12, &quot;weeks&quot;: [weekload] }` — 바뀐 주의 부하를 다시 계산해 돌려줍니다.
@@ -454,6 +456,8 @@
 " data-group="g3"><summary><span class="method PATCH">PATCH</span><div><div class="path">/api/calendar/events/{id}/category</div><div class="description">일정 분류 · 부담 · 마감 여부 직접 수정</div></div></summary><div class="detail-body"><pre><code class="language-json">{ &quot;category&quot;: &quot;ASSIGNMENT&quot;, &quot;burden&quot;: 2, &quot;adjustable&quot;: true, &quot;isDeadline&quot;: true, &quot;scope&quot;: &quot;SERIES&quot; }
 </code></pre>
 <ul>
+<li>카테고리 화면(B2-1, 2026-11-17 확정): 일·공부(부하 계산에 포함) = <code>CLASS</code> 수업 · <code>ASSIGNMENT</code> 과제 · <code>STUDY</code> 공부 · <code>EXAM</code> 시험 · <code>PRESENTATION</code> 발표 · <code>PART_TIME</code> 아르바이트 · <code>CLUB</code> 동아리·대외활동 · <code>WORK_MEETING</code> 회의·팀플, 개인(부하 계산 제외) = <code>EXERCISE</code> 운동 · <code>APPOINTMENT</code> 약속 · <code>PERSONAL</code> 개인, 그 외 = <code>OTHER</code> 기타.</li>
+<li>&quot;기타&quot;를 고르면 사용자가 카테고리 이름을 직접 입력할 수 있습니다: <code>{ &quot;category&quot;: &quot;OTHER&quot;, &quot;customCategory&quot;: &quot;봉사활동&quot;, &quot;isDeadline&quot;: false, &quot;scope&quot;: &quot;TITLE&quot; }</code>. <code>customCategory</code>는 선택이며 앞뒤 공백을 떼고 1~20자입니다(비어 있으면 이름 없는 기타). <code>OTHER</code>가 아닌 카테고리에 보내거나 20자를 넘으면 400 <code>VALIDATION_FAILED</code>입니다. 다른 카테고리로 바꾸면 이름은 지워집니다. <strong>구현 해석(확인 필요)</strong>: 직접 입력한 카테고리도 <code>OTHER</code>이므로 부하 계산에는 기존 <code>OTHER</code> 규칙대로 포함합니다(<a href="%EA%B3%84%EC%82%B0_%EC%A0%95%EC%B1%85.html">계산_정책.md</a> 1절).</li>
 <li><code>scope</code>: <code>THIS</code>(이 일정만) <code>SERIES</code>(반복 일정 전체, 반복 일정일 때만) <code>TITLE</code>(같은 제목 일정 전체).</li>
 <li>필드 category·isDeadline·scope는 필수입니다. burden(1~3)·adjustable은 선택입니다(카테고리 변경 화면 B2-1에 입력이 없음). burden을 보내지 않으면 null로 두고, adjustable을 보내지 않으면 카테고리 기본값(<code>ASSIGNMENT</code>·<code>PRESENTATION</code>만 true, 제목 규칙 분류와 같음)을 씁니다. 우선순위는 THIS &gt; SERIES &gt; TITLE &gt; AI &gt; RULE. 범위 규칙은 현재 동기화된 일정과 이후 들어오는 일정에 적용하며 원본 Google 일정은 변경하지 않습니다.</li>
 <li>응답 200: <code>{ &quot;updatedCount&quot;: 12, &quot;weeks&quot;: [WeekLoad] }</code> — 바뀐 주의 부하를 다시 계산해 돌려줍니다.</li>
@@ -1284,12 +1288,13 @@
   &quot;id&quot;: 812, &quot;googleEventId&quot;: &quot;abc_20261118&quot;, &quot;recurring&quot;: true, &quot;startDate&quot;: null, &quot;endDateExclusive&quot;: null,
   &quot;start&quot;: &quot;2026-11-18T14:00:00+09:00&quot;, &quot;end&quot;: &quot;2026-11-18T15:30:00+09:00&quot;, &quot;allDay&quot;: false,
   &quot;title&quot;: &quot;캡스톤 중간발표&quot;,
-  &quot;category&quot;: &quot;PRESENTATION&quot;, &quot;categorySource&quot;: &quot;AI&quot;, &quot;burden&quot;: 3, &quot;adjustable&quot;: true, &quot;isDeadline&quot;: true,
+  &quot;category&quot;: &quot;PRESENTATION&quot;, &quot;customCategory&quot;: null, &quot;categorySource&quot;: &quot;AI&quot;, &quot;burden&quot;: 3, &quot;adjustable&quot;: true, &quot;isDeadline&quot;: true,
   &quot;createdByApp&quot;: false
 }
 </code></pre>
 <ul>
 <li><code>title</code>은 <strong>DB에 저장하지 않고</strong> 응답할 때 구글에서 읽어 붙입니다(열린 항목 1).</li>
+<li><code>customCategory</code>는 사용자가 &quot;기타&quot;를 고르고 직접 입력한 카테고리 이름입니다(<code>category: OTHER</code>일 때만, 없으면 null). 값이 있으면 화면에 &quot;기타&quot; 대신 이 이름을 보여 줍니다.</li>
 </ul>
 <hr />
 </div></details></section><section id="reference"><h2>화면 매핑 · 개발 참고</h2><details class="block"><summary>10. 화면 → API</summary><div class="content"><table>

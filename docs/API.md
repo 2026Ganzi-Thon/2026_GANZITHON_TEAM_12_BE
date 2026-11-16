@@ -121,11 +121,12 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
   "id": 812, "googleEventId": "abc_20261118", "recurring": true, "startDate": null, "endDateExclusive": null,
   "start": "2026-11-18T14:00:00+09:00", "end": "2026-11-18T15:30:00+09:00", "allDay": false,
   "title": "캡스톤 중간발표",
-  "category": "PRESENTATION", "categorySource": "AI", "burden": 3, "adjustable": true, "isDeadline": true,
+  "category": "PRESENTATION", "customCategory": null, "categorySource": "AI", "burden": 3, "adjustable": true, "isDeadline": true,
   "createdByApp": false
 }
 ```
 - `title`은 **DB에 저장하지 않고** 응답할 때 구글에서 읽어 붙입니다(열린 항목 1).
+- `customCategory`는 사용자가 "기타"를 고르고 직접 입력한 카테고리 이름입니다(`category: OTHER`일 때만, 없으면 null). 값이 있으면 화면에 "기타" 대신 이 이름을 보여 줍니다.
 
 ---
 
@@ -335,6 +336,8 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```json
 { "category": "ASSIGNMENT", "burden": 2, "adjustable": true, "isDeadline": true, "scope": "SERIES" }
 ```
+- 카테고리 화면(B2-1, 2026-11-17 확정): 일·공부(부하 계산에 포함) = `CLASS` 수업 · `ASSIGNMENT` 과제 · `STUDY` 공부 · `EXAM` 시험 · `PRESENTATION` 발표 · `PART_TIME` 아르바이트 · `CLUB` 동아리·대외활동 · `WORK_MEETING` 회의·팀플, 개인(부하 계산 제외) = `EXERCISE` 운동 · `APPOINTMENT` 약속 · `PERSONAL` 개인, 그 외 = `OTHER` 기타.
+- "기타"를 고르면 사용자가 카테고리 이름을 직접 입력할 수 있습니다: `{ "category": "OTHER", "customCategory": "봉사활동", "isDeadline": false, "scope": "TITLE" }`. `customCategory`는 선택이며 앞뒤 공백을 떼고 1~20자입니다(비어 있으면 이름 없는 기타). `OTHER`가 아닌 카테고리에 보내거나 20자를 넘으면 400 `VALIDATION_FAILED`입니다. 다른 카테고리로 바꾸면 이름은 지워집니다. **구현 해석(확인 필요)**: 직접 입력한 카테고리도 `OTHER`이므로 부하 계산에는 기존 `OTHER` 규칙대로 포함합니다([계산_정책.md](계산_정책.md) 1절).
 - `scope`: `THIS`(이 일정만) `SERIES`(반복 일정 전체, 반복 일정일 때만) `TITLE`(같은 제목 일정 전체).
 - 필드 category·isDeadline·scope는 필수입니다. burden(1~3)·adjustable은 선택입니다(카테고리 변경 화면 B2-1에 입력이 없음). burden을 보내지 않으면 null로 두고, adjustable을 보내지 않으면 카테고리 기본값(`ASSIGNMENT`·`PRESENTATION`만 true, 제목 규칙 분류와 같음)을 씁니다. 우선순위는 THIS > SERIES > TITLE > AI > RULE. 범위 규칙은 현재 동기화된 일정과 이후 들어오는 일정에 적용하며 원본 Google 일정은 변경하지 않습니다.
 - 응답 200: `{ "updatedCount": 12, "weeks": [WeekLoad] }` — 바뀐 주의 부하를 다시 계산해 돌려줍니다.

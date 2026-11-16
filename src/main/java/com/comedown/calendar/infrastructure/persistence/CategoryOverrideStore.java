@@ -26,7 +26,7 @@ public class CategoryOverrideStore {
 
     public List<CategoryOverride> findAll(long userId) {
         return jdbc.sql("""
-                        SELECT scope, match_key, category, burden, adjustable, is_deadline
+                        SELECT scope, match_key, category, burden, adjustable, is_deadline, custom_category
                           FROM event_category_overrides WHERE user_id = ? AND calendar_id = ?
                         """)
                 .params(userId, CalendarEventStore.CALENDAR_ID)
@@ -34,7 +34,7 @@ public class CategoryOverrideStore {
                         rs.getString("match_key"), EventCategory.valueOf(rs.getString("category")),
                         rs.getObject("burden") == null ? null : rs.getInt("burden"),
                         rs.getObject("adjustable") == null ? null : rs.getBoolean("adjustable"),
-                        rs.getBoolean("is_deadline")))
+                        rs.getBoolean("is_deadline"), rs.getString("custom_category")))
                 .list();
     }
 
@@ -43,13 +43,15 @@ public class CategoryOverrideStore {
         LocalDateTime at = LocalDateTime.ofInstant(now, ZoneOffset.UTC);
         jdbc.sql("""
                         INSERT INTO event_category_overrides (user_id, calendar_id, scope, match_key, category,
-                            burden, adjustable, is_deadline, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS v
-                        ON DUPLICATE KEY UPDATE category = v.category, burden = v.burden,
-                            adjustable = v.adjustable, is_deadline = v.is_deadline, updated_at = v.updated_at
+                            custom_category, burden, adjustable, is_deadline, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS v
+                        ON DUPLICATE KEY UPDATE category = v.category, custom_category = v.custom_category,
+                            burden = v.burden, adjustable = v.adjustable, is_deadline = v.is_deadline,
+                            updated_at = v.updated_at
                         """)
                 .params(userId, CalendarEventStore.CALENDAR_ID, rule.scope().name(), rule.matchKey(),
-                        rule.category().name(), rule.burden(), rule.adjustable(), rule.deadline(), at, at)
+                        rule.category().name(), rule.customCategory(), rule.burden(), rule.adjustable(),
+                        rule.deadline(), at, at)
                 .update();
     }
 }
