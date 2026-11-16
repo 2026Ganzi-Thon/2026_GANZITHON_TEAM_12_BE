@@ -24,6 +24,7 @@ import org.springframework.security.config.oauth2.client.CommonOAuth2Provider;
 
 /**
  * Google OAuth2 설정. {@code GOOGLE_CLIENT_ID}가 있을 때만 켜진다(없으면 로그인 경로 자체가 없다).
+ * 켜질 때 {@code COMEDOWN_TOKEN_KEY}나 {@code GOOGLE_CLIENT_SECRET}이 비어 있으면 시작하지 않는다.
  * <ul>
  *   <li>{@code google}: 로그인. 기본 정보(openid, email)만 받는다(이름·프로필은 받지 않는다).</li>
  *   <li>{@code google-calendar}: 캘린더 권한 추가. 일정 읽기·쓰기 범위를 받고, refresh token을 받으려고
@@ -47,11 +48,15 @@ class GoogleOAuthConfig {
         }
     }
 
-    GoogleOAuthConfig(TokenCipher cipher) {
+    GoogleOAuthConfig(TokenCipher cipher, @Value("${comedown.google.client-secret:}") String clientSecret) {
         // 토큰을 저장할 수 없는 상태로 로그인이 열리지 않게 시작할 때 막는다.
         if (!cipher.isConfigured()) {
             throw new IllegalStateException(
                     "GOOGLE_CLIENT_ID를 설정하면 COMEDOWN_TOKEN_KEY(Base64 32바이트)도 설정해야 합니다.");
+        }
+        // 비밀 값 없이 열리면 모든 로그인이 구글의 코드 교환 단계에서 실패하므로 시작할 때 막는다.
+        if (clientSecret == null || clientSecret.isBlank()) {
+            throw new IllegalStateException("GOOGLE_CLIENT_ID를 설정하면 GOOGLE_CLIENT_SECRET도 설정해야 합니다.");
         }
     }
 

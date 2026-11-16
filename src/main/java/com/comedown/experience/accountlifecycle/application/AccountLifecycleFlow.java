@@ -18,7 +18,8 @@ import org.springframework.stereotype.Service;
 public class AccountLifecycleFlow {
 
     private static final Logger log = LoggerFactory.getLogger(AccountLifecycleFlow.class);
-    static final int RETRY_BATCH = 50;
+    /** 재시도 한 번에 처리하는 사용자 수(탈퇴·철회 각각). */
+    public static final int RETRY_BATCH = 50;
 
     /** DONE이면 정리가 끝났다(204), PENDING이면 외부 정리가 남았다(202). */
     public enum Outcome { DONE, PENDING }
@@ -61,7 +62,10 @@ public class AccountLifecycleFlow {
         return Outcome.DONE;
     }
 
-    /** 끝나지 않은 탈퇴·철회를 이어서 처리한다(재시도 작업). */
+    /**
+     * 끝나지 않은 탈퇴·철회를 이어서 처리한다(재시도 작업). 한 번에 {@link #RETRY_BATCH}명씩 처리하며, 구글 철회가
+     * 실패한 사용자는 account가 순서의 맨 뒤로 보내므로 계속 실패하는 묶음이 뒤의 사용자를 막지 않는다.
+     */
     public void retryPending() {
         Set<Long> deleting = new LinkedHashSet<>(deletion.deletingUsers(RETRY_BATCH));
         for (long userId : deleting) {

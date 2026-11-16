@@ -20,6 +20,9 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
  * 로그인·캘린더 권한 허용 성공 처리. 구글이 준 토큰을 암호화해 저장하고 메모리의 인증 클라이언트는 지운다.
  * 로그인은 {@code /}, 캘린더 권한은 {@code /onboarding/cbi}로 돌려보낸다.
  * 토큰 저장에 실패해도 로그인은 유지하고(캘린더만 미연결로 남음) 토큰 값은 로그에 남기지 않는다.
+ * <p>
+ * 남아 있는 구글 철회 요청(연결 해제·탈퇴 재시도)은 캘린더 연결({@code google-calendar})만 풀 수 있다.
+ * 일반 로그인({@code google})은 철회 대기 중인 토큰 행을 건드리지 않는다.
  */
 class GoogleOAuthSuccessHandler implements AuthenticationSuccessHandler {
 
@@ -41,7 +44,7 @@ class GoogleOAuthSuccessHandler implements AuthenticationSuccessHandler {
         OAuth2AuthorizedClient client = clients.loadAuthorizedClient(registrationId, token.getName());
         if (client != null) {
             try {
-                saveTokens(token, client);
+                saveTokens(token, client, GoogleOAuthConfig.CALENDAR_REGISTRATION.equals(registrationId));
             } catch (RuntimeException e) {
                 log.warn("구글 토큰 저장에 실패했습니다(registration={}).", registrationId, e);
             } finally {
@@ -52,15 +55,21 @@ class GoogleOAuthSuccessHandler implements AuthenticationSuccessHandler {
                 ? "/onboarding/cbi" : "/");
     }
 
-    private void saveTokens(OAuth2AuthenticationToken token, OAuth2AuthorizedClient client) {
+    private void saveTokens(OAuth2AuthenticationToken token, OAuth2AuthorizedClient client,
+            boolean calendarConnection) {
         long userId = ((ComeDownPrincipal) token.getPrincipal()).userId();
         String sub = ((OidcUser) token.getPrincipal()).getSubject();
         OAuth2RefreshToken refresh = client.getRefreshToken();
-        accounts.saveTokens(userId, sub, new TokenGrant(
+        TokenGrant grant = new TokenGrant(
                 client.getAccessToken().getTokenValue(),
                 refresh == null ? null : refresh.getTokenValue(),
                 client.getAccessToken().getIssuedAt(),
                 client.getAccessToken().getExpiresAt(),
-                client.getAccessToken().getScopes()));
+                client.getAccessToken().getScopes());
+        if (calendarConnection) {
+            accounts.saveCalendarTokens(userId, sub, grant);
+        } else {
+            accounts.saveLoginTokens(userId, sub, grant);
+        }
     }
 }

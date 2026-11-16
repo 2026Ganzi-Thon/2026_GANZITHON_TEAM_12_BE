@@ -60,7 +60,7 @@ class CalendarCredentialServiceIntegrationTest {
     }
 
     private void tokens(long userId, String sub, String refresh, Instant expiresAt, String... scopes) {
-        accounts.saveTokens(userId, sub, new TokenGrant("access-old", refresh, NOW.minusSeconds(3000), expiresAt,
+        accounts.saveCalendarTokens(userId, sub, new TokenGrant("access-old", refresh, NOW.minusSeconds(3000), expiresAt,
                 Set.of(scopes)));
     }
 

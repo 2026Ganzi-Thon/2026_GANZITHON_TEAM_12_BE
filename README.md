@@ -184,6 +184,8 @@ docker compose up -d        # MySQL 8.4 → localhost:3307
 
 실행하면 Flyway가 기준선 스키마를 자동으로 만듭니다.
 
+`GOOGLE_CLIENT_ID`를 넣으면 Google 로그인이 켜집니다. 이때 `GOOGLE_CLIENT_SECRET`이나 `COMEDOWN_TOKEN_KEY`(Base64로 인코딩한 32바이트)가 비어 있으면 서버가 시작하지 않습니다(로그인마다 실패하는 상태로 뜨지 않게). 셋 다 비워 두면 Google 로그인 없이 실행됩니다.
+
 Google 로그인 없이 API를 시험할 때는 local 전용 테스트 로그인을 씁니다(운영 프로필에는 없음). `GET /api/auth/csrf`로 받은 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더에 넣어 `POST /api/dev/login` `{ "userId": 1 }`을 보내면 그 사용자로 세션이 생깁니다. 사용자 행은 만들지 않으므로 해당 `users` 행이 로컬 DB에 있어야 합니다.
 
 ### 테스트·검증

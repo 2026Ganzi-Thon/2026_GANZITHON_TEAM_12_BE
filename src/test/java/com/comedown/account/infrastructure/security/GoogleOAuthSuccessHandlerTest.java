@@ -52,19 +52,34 @@ class GoogleOAuthSuccessHandlerTest {
     }
 
     @Test
-    void 로그인_성공은_토큰을_저장하고_메모리_클라이언트를_지우고_루트로_보낸다() throws Exception {
+    void 로그인_성공은_로그인_토큰으로_저장하고_메모리_클라이언트를_지우고_루트로_보낸다() throws Exception {
         when(clients.loadAuthorizedClient("google", "42")).thenReturn(client("google", null, "openid", "email"));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google"));
 
         ArgumentCaptor<TokenGrant> grant = ArgumentCaptor.forClass(TokenGrant.class);
-        verify(accounts).saveTokens(eq(42L), eq("google-sub"), grant.capture());
+        // 일반 로그인은 철회 요청을 풀지 않는 저장만 쓴다.
+        verify(accounts).saveLoginTokens(eq(42L), eq("google-sub"), grant.capture());
+        verify(accounts, never()).saveCalendarTokens(any(Long.class), any(), any());
         assertThat(grant.getValue().accessToken()).isEqualTo("access-value");
         assertThat(grant.getValue().refreshToken()).isNull();
         assertThat(grant.getValue().scopes()).containsExactlyInAnyOrder("openid", "email");
         verify(clients).removeAuthorizedClient("google", "42");
         assertThat(response.getRedirectedUrl()).isEqualTo("/");
+    }
+
+    @Test
+    void 로그인_응답에_캘린더_범위가_섞여_와도_캘린더_연결_저장을_쓰지_않는다() throws Exception {
+        // include_granted_scopes 때문에 이전에 허용한 캘린더 범위가 로그인 토큰에 함께 온다.
+        when(clients.loadAuthorizedClient("google", "42"))
+                .thenReturn(client("google", null, "openid", "email", GoogleOAuthConfig.CALENDAR_SCOPE));
+
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), new MockHttpServletResponse(),
+                authentication("google"));
+
+        verify(accounts).saveLoginTokens(eq(42L), eq("google-sub"), any());
+        verify(accounts, never()).saveCalendarTokens(any(Long.class), any(), any());
     }
 
     @Test
@@ -77,7 +92,8 @@ class GoogleOAuthSuccessHandlerTest {
         handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google-calendar"));
 
         ArgumentCaptor<TokenGrant> grant = ArgumentCaptor.forClass(TokenGrant.class);
-        verify(accounts).saveTokens(eq(42L), eq("google-sub"), grant.capture());
+        verify(accounts).saveCalendarTokens(eq(42L), eq("google-sub"), grant.capture());
+        verify(accounts, never()).saveLoginTokens(any(Long.class), any(), any());
         assertThat(grant.getValue().refreshToken()).isEqualTo("refresh-value");
         assertThat(grant.getValue().scopes()).contains(calendar);
         assertThat(response.getRedirectedUrl()).isEqualTo("/onboarding/cbi");
@@ -87,7 +103,8 @@ class GoogleOAuthSuccessHandlerTest {
     void 토큰_저장에_실패해도_로그인은_유지하고_클라이언트는_지운다() throws Exception {
         when(clients.loadAuthorizedClient("google-calendar", "42"))
                 .thenReturn(client("google-calendar", "r", "openid"));
-        doThrow(new IllegalStateException("db down")).when(accounts).saveTokens(any(Long.class), any(), any());
+        doThrow(new IllegalStateException("db down")).when(accounts)
+                .saveCalendarTokens(any(Long.class), any(), any());
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google-calendar"));
@@ -102,7 +119,8 @@ class GoogleOAuthSuccessHandlerTest {
 
         handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google"));
 
-        verify(accounts, never()).saveTokens(any(Long.class), any(), any());
+        verify(accounts, never()).saveLoginTokens(any(Long.class), any(), any());
+        verify(accounts, never()).saveCalendarTokens(any(Long.class), any(), any());
         assertThat(response.getRedirectedUrl()).isEqualTo("/");
     }
 }

@@ -1,6 +1,7 @@
 package com.comedown.account.infrastructure.persistence;
 
 import com.comedown.account.infrastructure.crypto.TokenCipher;
+import com.comedown.account.infrastructure.crypto.TokenDecryptionException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -25,6 +26,17 @@ public class GoogleTokenReader {
         }
     }
 
+    /**
+     * 철회를 기다리는 토큰 행. 저장된 값을 지금 키로 복호화할 수 없으면(키 변경·암호문 손상) {@code tokens}가 null이고,
+     * 그 토큰은 구글에 보낼 수 없다.
+     */
+    public record PendingRevoke(StoredTokens tokens) {
+
+        public boolean decryptable() {
+            return tokens != null;
+        }
+    }
+
     private final JdbcClient jdbc;
     private final TokenCipher cipher;
 
@@ -43,21 +55,33 @@ public class GoogleTokenReader {
                 .optional();
     }
 
-    /** 철회를 요청했지만 아직 구글에서 철회하지 못한 토큰. */
-    public Optional<StoredTokens> findPendingRevoke(long userId) {
+    /**
+     * 철회를 요청했지만 아직 구글에서 철회하지 못한 토큰. 복호화 실패는 예외로 내보내지 않고
+     * {@link PendingRevoke#decryptable()}로 알린다(철회 흐름이 그 행을 정리하고 끝낼 수 있게).
+     */
+    public Optional<PendingRevoke> findPendingRevoke(long userId) {
         return jdbc.sql("""
                         SELECT access_token_enc, refresh_token_enc, access_token_expires_at, scopes
                           FROM oauth_tokens WHERE user_id = ? AND revoke_requested_at IS NOT NULL
                         """)
                 .params(userId)
-                .query(this::map)
+                .query((rs, n) -> {
+                    try {
+                        return new PendingRevoke(map(rs, n));
+                    } catch (TokenDecryptionException e) {
+                        return new PendingRevoke(null);
+                    }
+                })
                 .optional();
     }
 
-    /** 철회를 기다리는 사용자 id(오래된 요청부터). */
+    /**
+     * 철회를 기다리는 사용자 id. 마지막으로 손댄 시각(updated_at)이 오래된 순서다: 철회 시도가 실패하면 그 시각을
+     * 갱신하므로 계속 실패하는 행이 뒤로 밀리고 아직 시도하지 않은 행이 먼저 나온다.
+     */
     public java.util.List<Long> usersWithPendingRevoke(int limit) {
         return jdbc.sql("SELECT user_id FROM oauth_tokens WHERE revoke_requested_at IS NOT NULL "
-                        + "ORDER BY revoke_requested_at LIMIT ?")
+                        + "ORDER BY updated_at, id LIMIT ?")
                 .params(limit).query(Long.class).list();
     }
 

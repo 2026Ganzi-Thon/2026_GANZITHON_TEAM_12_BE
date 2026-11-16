@@ -48,6 +48,21 @@ class TokenCipherTest {
     }
 
     @Test
+    void 복호화할_수_없는_값은_모두_TokenDecryptionException이고_내용을_드러내지_않는다() {
+        String stored = new TokenCipher(KEY).encrypt("secret");
+
+        // 키가 바뀜, 암호문이 Base64가 아님, 너무 짧음, 키 없음
+        assertThatThrownBy(() -> new TokenCipher(OTHER_KEY).decrypt(stored))
+                .isInstanceOf(TokenDecryptionException.class).hasMessageNotContaining("secret");
+        assertThatThrownBy(() -> new TokenCipher(KEY).decrypt("not base64 !!"))
+                .isInstanceOf(TokenDecryptionException.class);
+        assertThatThrownBy(() -> new TokenCipher(KEY).decrypt("AAAA"))
+                .isInstanceOf(TokenDecryptionException.class);
+        assertThatThrownBy(() -> new TokenCipher("").decrypt(stored))
+                .isInstanceOf(TokenDecryptionException.class);
+    }
+
+    @Test
     void 키가_없으면_평문으로_저장하지_않고_실패한다() {
         TokenCipher cipher = new TokenCipher("");
 
