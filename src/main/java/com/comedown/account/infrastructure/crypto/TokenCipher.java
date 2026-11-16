@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
  * 구글 토큰 암호화(AES-256-GCM). 키는 {@code COMEDOWN_TOKEN_KEY}(Base64로 인코딩한 32바이트)이다.
  * 저장 형식은 Base64(nonce 12바이트 + 암호문·인증 태그)이고 호출마다 새 nonce를 쓴다.
  * 키가 없으면 암호화·복호화를 시도할 때 실패한다(토큰을 평문으로 저장하지 않는다).
+ * 복호화 실패(키 없음·키 불일치·암호문 손상)는 모두 {@link TokenDecryptionException}이다.
  */
 @Component
 public class TokenCipher {
@@ -49,7 +50,9 @@ public class TokenCipher {
     }
 
     public String decrypt(String stored) {
-        requireKey();
+        if (key == null) {
+            throw new TokenDecryptionException("COMEDOWN_TOKEN_KEY가 설정되지 않아 토큰을 복호화할 수 없습니다.");
+        }
         try {
             byte[] bytes = Base64.getDecoder().decode(stored);
             if (bytes.length <= NONCE_BYTES) {
@@ -59,9 +62,9 @@ public class TokenCipher {
             cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, java.util.Arrays.copyOf(bytes, NONCE_BYTES)));
             return new String(cipher.doFinal(bytes, NONCE_BYTES, bytes.length - NONCE_BYTES),
                     java.nio.charset.StandardCharsets.UTF_8);
-        } catch (GeneralSecurityException e) {
-            // 키가 다르거나 암호문이 변조됐다. 내용은 로그에 남기지 않는다.
-            throw new IllegalStateException("토큰 복호화에 실패했습니다.", e);
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            // 키가 다르거나 암호문이 변조·손상됐다. 내용은 로그에 남기지 않는다.
+            throw new TokenDecryptionException("토큰 복호화에 실패했습니다.", e);
         }
     }
 

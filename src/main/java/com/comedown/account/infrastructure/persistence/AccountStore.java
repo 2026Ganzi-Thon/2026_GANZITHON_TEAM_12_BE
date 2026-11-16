@@ -42,6 +42,13 @@ public class AccountStore {
                 .optional();
     }
 
+    /** 해당 사용자의 구글 계정 식별자(sub)가 이 값인지. */
+    public boolean hasGoogleSub(long userId, String googleSub) {
+        Integer n = jdbc.sql("SELECT COUNT(*) FROM users WHERE id = ? AND google_sub = ?")
+                .params(userId, googleSub).query(Integer.class).single();
+        return n != null && n > 0;
+    }
+
     public int updateNickname(long userId, String nickname) {
         return jdbc.sql("UPDATE users SET nickname = ? WHERE id = ?").params(nickname, userId).update();
     }
@@ -126,9 +133,19 @@ public class AccountStore {
                 .params(utc(now), userId).update();
     }
 
+    /**
+     * 탈퇴 진행 중인 사용자(재시도 대상). 구글 철회가 남은 사용자는 마지막 철회 시도 시각(oauth_tokens.updated_at),
+     * 나머지는 탈퇴 요청 시각 순서다. 철회가 계속 실패하는 사용자가 뒤로 밀려 다른 사용자를 막지 않는다.
+     */
     public List<Long> deletingUsers(int limit) {
-        return jdbc.sql("SELECT id FROM users WHERE deletion_status = 'DELETING' "
-                        + "ORDER BY deletion_requested_at LIMIT ?")
+        return jdbc.sql("""
+                        SELECT u.id
+                          FROM users u
+                          LEFT JOIN oauth_tokens t ON t.user_id = u.id AND t.revoke_requested_at IS NOT NULL
+                         WHERE u.deletion_status = 'DELETING'
+                         ORDER BY COALESCE(t.updated_at, u.deletion_requested_at), u.id
+                         LIMIT ?
+                        """)
                 .params(limit).query(Long.class).list();
     }
 
