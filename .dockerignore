@@ -1,0 +1,8 @@
+# 이미지 빌드에 필요한 것만 보낸다. 비밀값(.env)과 로컬 산출물은 절대 넣지 않는다.
+*
+!gradlew
+!settings.gradle
+!build.gradle
+!gradle/
+!src/
+src/test/
