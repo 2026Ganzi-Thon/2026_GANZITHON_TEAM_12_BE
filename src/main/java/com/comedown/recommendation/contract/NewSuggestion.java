@@ -8,7 +8,7 @@ import java.util.Objects;
  * 새 제안 생성 명령(PRE_START 규칙·RECOVERY 규칙이 만든다). 빈 시간·문구·근거 판단은 만드는 쪽의 정책이다.
  *
  * @param type                PRE_START·RECOVERY
- * @param reasonCode          RISK_WEEK·LOW_RECOVERY·LOW_CONDITION·OVERLOAD …
+ * @param reasonCode          RISK_WEEK(PRE_START)·LOW_RECOVERY·OVERLOAD(RECOVERY)
  * @param calculationVersion  근거가 된 계산 정책 버전(예: load-v1, recovery-v1)
  * @param expiresAt           지나면 EXPIRED
  */

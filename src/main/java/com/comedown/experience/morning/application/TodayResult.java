@@ -14,7 +14,7 @@ import java.util.List;
  * @param rmssdMs              하루 대표 측정의 HRV(RMSSD, ms). 대표값이 없으면 null. 기준선 만드는 중에도 표시용으로 준다
  * @param heartRateBpm         하루 대표 측정의 심박수. 대표값이 없으면 null
  * @param excludedFromBaseline 오늘이 '내 평소' 계산에서 빠졌는지(교란 요인·대표값 없음·컨디션 미입력)
- * @param judgment             2축 판단(회복 × 이번 주 일정). 기준선 확정 전이면 BUILDING
+ * @param judgment             2축 판단(지난주 평균 대비 오늘 측정값 × 이번 주 일정). 1주차면 BUILDING
  * @param interpretation       회복 해석 한 줄. 기준선 확정 전(BUILDING)이면 null. AI 도입 전까지 규칙 기반 문구(fallback: true)
  * @param suggestions          그날의 RECOVERY 추천(건너뜀·만료·되돌림 제외). 없으면 빈 배열
  */
