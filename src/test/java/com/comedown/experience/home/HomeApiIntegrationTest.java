@@ -79,7 +79,7 @@ class HomeApiIntegrationTest {
                          "recovery":{"status":"BUILDING","changePct":null,
                                      "baseline":{"validDays":0,"required":7,"established":false},
                                      "conditionScore":null,"excludedToday":false},
-                         "thisWeekLoad":null,"judgment":null,"todaySuggestions":[],
+                         "thisWeekLoad":null,"judgment":"BUILDING","todaySuggestions":[],
                          "safety":{"show":false},"plan":null}
                         """, JsonCompareMode.STRICT));
     }

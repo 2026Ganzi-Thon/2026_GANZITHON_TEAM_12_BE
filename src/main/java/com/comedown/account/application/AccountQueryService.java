@@ -65,6 +65,12 @@ public class AccountQueryService implements com.comedown.account.contract.Lifest
                 .orElse(new SleepWindow(LocalTime.of(23, 0), LocalTime.of(7, 0)));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> preferredActivities(long userId) {
+        return store.preferredActivities(userId);
+    }
+
     /** 기록이 있는 동의만(가장 최근 한 건씩). */
     @Transactional(readOnly = true)
     public List<ConsentView> consents(long userId) {

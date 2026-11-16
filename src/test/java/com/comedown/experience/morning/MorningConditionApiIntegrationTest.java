@@ -92,7 +92,7 @@ class MorningConditionApiIntegrationTest {
                          "recovery":{"status":"BUILDING","changePct":null,"trendRmssdMs":null,"normalRange":null},
                          "qualityLevel":null,"rmssdMs":null,"heartRateBpm":null,"excludedFromBaseline":true,
                          "baseline":{"validDays":0,"required":7,"established":false,"frozen":false},
-                         "conditionScore":3,"judgment":null,"interpretation":null,"suggestions":[]}
+                         "conditionScore":3,"judgment":"BUILDING","interpretation":null,"suggestions":[]}
                         """, JsonCompareMode.STRICT));
 
         Map<String, Object> check = jdbc.queryForMap("SELECT day_index, condition_score, alcohol, completed_at "
@@ -155,11 +155,98 @@ class MorningConditionApiIntegrationTest {
                                      "normalRange":{"lowerMs":38.2,"upperMs":47.4}},
                          "qualityLevel":"GOOD","rmssdMs":42.5,"heartRateBpm":60.0,"excludedFromBaseline":false,
                          "baseline":{"validDays":7,"required":7,"established":true,"frozen":false},
-                         "conditionScore":3,"judgment":null,
+                         "conditionScore":3,"judgment":"OK",
                          "interpretation":{"text":"최근 7일 회복이 평소 범위 안에 있어요. 평소와 비슷해요.",
                                            "aiGenerated":false,"fallback":true},
                          "suggestions":[]}
                         """, JsonCompareMode.STRICT));
+    }
+
+    // ---------- 회복 추천·2축 판단 ----------
+
+    @Test
+    void 기준선_뒤_회복이_평소보다_낮으면_선호_활동을_오늘_빈_시간에_하나_추천한다() throws Exception {
+        seedLowRecovery();
+        preferredActivities("WALK");
+
+        generateRecovery().andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions.length()").value(0)); // 컨디션 입력 전에는 만들지 않는다
+
+        condition(3, false, false, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phase").value("ESTABLISHED"))
+                .andExpect(jsonPath("$.recovery.status").value("LOW"))
+                .andExpect(jsonPath("$.judgment").value("NORMAL_LOW"))
+                .andExpect(jsonPath("$.suggestions.length()").value(1))
+                .andExpect(jsonPath("$.suggestions[0].type").value("RECOVERY"))
+                .andExpect(jsonPath("$.suggestions[0].status").value("PROPOSED"))
+                .andExpect(jsonPath("$.suggestions[0].targetDate").value("2026-11-12"))
+                .andExpect(jsonPath("$.suggestions[0].start").value("2026-11-12T07:30:00+09:00"))
+                .andExpect(jsonPath("$.suggestions[0].durationMin").value(20))
+                .andExpect(jsonPath("$.suggestions[0].title").value("20분 걷기"))
+                .andExpect(jsonPath("$.suggestions[0].activityCode").value("WALK"))
+                .andExpect(jsonPath("$.suggestions[0].reasonCode").value("LOW_RECOVERY"))
+                .andExpect(jsonPath("$.suggestions[0].judgmentState").value("NORMAL_LOW"))
+                .andExpect(jsonPath("$.suggestions[0].message.text").value("오늘은 회복이 평소보다 낮아요. 20분 걷기 어때요?"))
+                .andExpect(jsonPath("$.suggestions[0].message.aiGenerated").value(false))
+                .andExpect(jsonPath("$.suggestions[0].message.fallback").value(true))
+                .andExpect(jsonPath("$.suggestions[0].relatedEvent").value(Matchers.nullValue()));
+
+        // 다시 저장하거나 다시 만들어도 하루 하나다.
+        condition(2, false, false, false).andExpect(jsonPath("$.suggestions.length()").value(1));
+        generateRecovery().andExpect(jsonPath("$.suggestions.length()").value(1));
+        assertThat(suggestionCount()).isEqualTo(1);
+
+        // 건너뛴 추천은 결과에서 빠지고, 같은 날 다시 만들지 않는다.
+        long id = jdbc.queryForObject("SELECT id FROM suggestions WHERE user_id = ?", Long.class, userId);
+        mvc.perform(post("/api/suggestions/" + id + "/dismiss").with(loginAs(userId)).with(csrf()))
+                .andExpect(status().isOk());
+        condition(2, false, false, false).andExpect(jsonPath("$.suggestions.length()").value(0));
+        assertThat(suggestionCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 이번_주_일정이_평소보다_많으면_OVERLOAD_판단이고_문구가_달라진다() throws Exception {
+        seedLowRecovery();
+        preferredActivities("MEDITATION");
+        jdbc.update("INSERT INTO weekly_loads (user_id, week_start, total_hours, load_score, deadline_count, "
+                + "late_night_count, weekend_hours, rest_days, risk_level, risk_reasons, calculation_version, "
+                + "computed_at) VALUES (?, '2026-11-09', 40, 52, 0, 0, 0, 2, 'WATCH', '[\"LOAD_HIGH\"]', 'load-v1', "
+                + "'2026-11-11 00:00:00')", userId);
+
+        condition(3, false, false, false)
+                .andExpect(jsonPath("$.judgment").value("OVERLOAD_LOW"))
+                .andExpect(jsonPath("$.suggestions[0].judgmentState").value("OVERLOAD_LOW"))
+                .andExpect(jsonPath("$.suggestions[0].title").value("20분 명상"))
+                .andExpect(jsonPath("$.suggestions[0].message.text")
+                        .value("이번 주 일정이 평소보다 많고 회복이 평소보다 낮아요. 20분 명상 어때요?"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/home")
+                        .with(loginAs(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.judgment").value("OVERLOAD_LOW"))
+                .andExpect(jsonPath("$.todaySuggestions.length()").value(1));
+    }
+
+    @Test
+    void 선호_활동이_없으면_회복이_낮아도_추천을_만들지_않는다() throws Exception {
+        seedLowRecovery();
+
+        condition(3, false, false, false)
+                .andExpect(jsonPath("$.judgment").value("NORMAL_LOW"))
+                .andExpect(jsonPath("$.suggestions.length()").value(0));
+        assertThat(suggestionCount()).isZero();
+    }
+
+    @Test
+    void 기준선을_만드는_동안에는_컨디션이_낮아도_추천하지_않는다() throws Exception {
+        preferredActivities("WALK");
+        measure(STARTED_AT, SyntheticPpg.clean(70_000, 30));
+
+        condition(1, false, false, false)
+                .andExpect(jsonPath("$.phase").value("BUILDING"))
+                .andExpect(jsonPath("$.judgment").value("BUILDING"))
+                .andExpect(jsonPath("$.suggestions.length()").value(0));
+        assertThat(suggestionCount()).isZero();
     }
 
     // ---------- 변경·재계산 ----------
@@ -290,6 +377,38 @@ class MorningConditionApiIntegrationTest {
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON).content(jsonMapper.writeValueAsString(body)))
                 .andExpect(status().isCreated());
+    }
+
+    /**
+     * 기준선(10-28~11-03, 평균 ln 3.8)이 확정된 뒤 최근 6일(11-06~11-11)과 오늘 측정이 모두 낮은(ln 3.4) 사용자.
+     * 오늘 컨디션을 저장하면 7일 추세가 정상 범위 아래라 LOW가 된다.
+     */
+    private void seedLowRecovery() {
+        double[] baseline = {3.75, 3.85, 3.80, 3.70, 3.90, 3.80, 3.80};
+        String[] baselineDays = {"2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02",
+            "2026-11-03"};
+        for (int i = 0; i < baseline.length; i++) {
+            seedEligibleDay(baselineDays[i], baseline[i]);
+        }
+        for (int day = 6; day <= 11; day++) {
+            seedEligibleDay("2026-11-%02d".formatted(day), 3.40);
+        }
+        seedMeasurementToday(3.40);
+    }
+
+    private void preferredActivities(String... codes) {
+        for (String code : codes) {
+            jdbc.update("INSERT INTO user_preferred_activities (user_id, activity_code) VALUES (?, ?)", userId, code);
+        }
+    }
+
+    private ResultActions generateRecovery() throws Exception {
+        return mvc.perform(post("/api/suggestions/generate").with(loginAs(userId)).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"RECOVERY\"}"));
+    }
+
+    private int suggestionCount() {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM suggestions WHERE user_id = ?", Integer.class, userId);
     }
 
     /** 컨디션까지 끝난 과거 적격일(GOOD 측정 1건). 시각은 그날 서울 07:00. */

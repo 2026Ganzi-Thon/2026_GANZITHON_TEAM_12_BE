@@ -48,4 +48,36 @@ public interface SuggestionPlanning {
     String preStartReasonCode();
 
     String preStartCalculationVersion();
+
+    // ---------- RECOVERY 규칙·2축 판단 ----------
+
+    /** 이번 주 일정이 평소보다 많은지(주간 부하의 위험 사유로 판단). */
+    boolean isOverloadedWeek(List<String> weekRiskReasons);
+
+    /**
+     * 2축 판단(회복 × 이번 주 일정): OK·OVERLOAD_OK·OVERLOAD_LOW·NORMAL_LOW·BUILDING·INSUFFICIENT.
+     *
+     * @param recoveryStatus BUILDING·INSUFFICIENT·NORMAL·LOW
+     */
+    String judgment(boolean baselineEstablished, String recoveryStatus, boolean overloaded);
+
+    /** 회복 추천을 만드는 판단인지. */
+    boolean recommendsRecovery(String judgment);
+
+    /** 선호 활동 중 그 날짜에 추천할 활동 코드. */
+    String pickRecoveryActivity(List<String> preferredActivities, LocalDate date);
+
+    Duration recoveryBlockLength();
+
+    String recoveryTitle(String activityCode);
+
+    /** AI 도입 전 규칙 기반 카드 문구. */
+    String recoveryMessage(String activityCode, String judgment);
+
+    String recoveryReasonCode();
+
+    String recoveryCalculationVersion();
+
+    /** 그 날짜 제안의 만료 시각(종류와 무관하게 같다). */
+    Instant suggestionExpiresAt(LocalDate targetDate);
 }

@@ -4,6 +4,7 @@ import com.comedown.recommendation.contract.SuggestionPlanning;
 import com.comedown.recommendation.domain.policy.FreeSlotFinder;
 import com.comedown.recommendation.domain.policy.FreeSlotFinder.Interval;
 import com.comedown.recommendation.domain.policy.PrepareAheadPolicy;
+import com.comedown.recommendation.domain.policy.RecoverySuggestionPolicy;
 import com.comedown.shared.time.ServiceTime;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,16 +14,22 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-/** {@link SuggestionPlanning}을 recommendation 도메인 정책({@link FreeSlotFinder}, {@link PrepareAheadPolicy})으로 구현한다. */
+/**
+ * {@link SuggestionPlanning}을 recommendation 도메인 정책({@link FreeSlotFinder}, {@link PrepareAheadPolicy},
+ * {@link RecoverySuggestionPolicy})으로 구현한다.
+ */
 @Service
 class SuggestionPlanningService implements SuggestionPlanning {
 
     private final PrepareAheadPolicy policy;
+    private final RecoverySuggestionPolicy recovery;
 
     SuggestionPlanningService(
             @Value("${comedown.suggestions.pre-start.duration-minutes:30}") int durationMinutes,
-            @Value("${comedown.suggestions.max-per-day:2}") int maxPerDay) {
+            @Value("${comedown.suggestions.max-per-day:2}") int maxPerDay,
+            @Value("${comedown.suggestions.recovery.duration-minutes:20}") int recoveryMinutes) {
         this.policy = new PrepareAheadPolicy(Duration.ofMinutes(durationMinutes), maxPerDay, ServiceTime.ZONE);
+        this.recovery = new RecoverySuggestionPolicy(Duration.ofMinutes(recoveryMinutes));
     }
 
     @Override
@@ -73,6 +80,56 @@ class SuggestionPlanningService implements SuggestionPlanning {
     @Override
     public String preStartCalculationVersion() {
         return PrepareAheadPolicy.CALCULATION_VERSION;
+    }
+
+    @Override
+    public boolean isOverloadedWeek(List<String> weekRiskReasons) {
+        return RecoverySuggestionPolicy.isOverloaded(weekRiskReasons);
+    }
+
+    @Override
+    public String judgment(boolean baselineEstablished, String recoveryStatus, boolean overloaded) {
+        return RecoverySuggestionPolicy.judgment(baselineEstablished, recoveryStatus, overloaded);
+    }
+
+    @Override
+    public boolean recommendsRecovery(String judgment) {
+        return RecoverySuggestionPolicy.recommends(judgment);
+    }
+
+    @Override
+    public String pickRecoveryActivity(List<String> preferredActivities, LocalDate date) {
+        return RecoverySuggestionPolicy.pickActivity(preferredActivities, date);
+    }
+
+    @Override
+    public Duration recoveryBlockLength() {
+        return recovery.blockLength();
+    }
+
+    @Override
+    public String recoveryTitle(String activityCode) {
+        return recovery.title(activityCode);
+    }
+
+    @Override
+    public String recoveryMessage(String activityCode, String judgment) {
+        return recovery.message(activityCode, judgment);
+    }
+
+    @Override
+    public String recoveryReasonCode() {
+        return RecoverySuggestionPolicy.REASON_CODE;
+    }
+
+    @Override
+    public String recoveryCalculationVersion() {
+        return RecoverySuggestionPolicy.CALCULATION_VERSION;
+    }
+
+    @Override
+    public Instant suggestionExpiresAt(LocalDate targetDate) {
+        return policy.expiresAt(targetDate);
     }
 
     private static List<Interval> toIntervals(List<TimeSlot> slots) {

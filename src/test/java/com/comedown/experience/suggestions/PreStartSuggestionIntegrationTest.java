@@ -198,7 +198,7 @@ class PreStartSuggestionIntegrationTest {
     }
 
     @Test
-    void 일정이_있는_시간과_10분_간격을_피하고_RECOVERY는_아직_준비_중이다() throws Exception {
+    void 일정이_있는_시간과_10분_간격을_피하고_RECOVERY_다시_만들기는_건강정보_동의가_필요하다() throws Exception {
         long user = riskUser();
         event(user, "busy", "2026-11-16 22:00:00", "2026-11-16 23:00:00", "CLASS"); // 11-17 07:00~08:00 서울
 
@@ -206,8 +206,8 @@ class PreStartSuggestionIntegrationTest {
 
         mvc.perform(post("/api/suggestions/generate").with(loginAs(user)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"RECOVERY\"}"))
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("CALCULATION_POLICY_PENDING"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HRV_CONSENT_REQUIRED"));
     }
 
     @Test
