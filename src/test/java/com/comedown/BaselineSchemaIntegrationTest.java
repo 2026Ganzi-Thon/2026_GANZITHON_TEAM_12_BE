@@ -49,7 +49,7 @@ class BaselineSchemaIntegrationTest {
         assertThat(tables).contains("SPRING_SESSION", "SPRING_SESSION_ATTRIBUTES");
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1 AND version IS NOT NULL", Integer.class))
-                .isEqualTo(3); // baseline, spring session, oauth_tokens.revoke_requested_at
+                .isEqualTo(4); // baseline, spring session, oauth_tokens.revoke_requested_at, oauth_tokens.calendar_synced_at
     }
 
     @Test
