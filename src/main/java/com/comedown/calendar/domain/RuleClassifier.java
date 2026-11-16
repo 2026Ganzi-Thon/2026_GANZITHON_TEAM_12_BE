@@ -99,8 +99,12 @@ public final class RuleClassifier {
     private static Classification of(EventCategory category) {
         boolean deadline = category == EventCategory.ASSIGNMENT || category == EventCategory.EXAM
                 || category == EventCategory.PRESENTATION;
-        boolean adjustable = category == EventCategory.ASSIGNMENT || category == EventCategory.PRESENTATION;
-        return new Classification(category, null, adjustable, deadline, CategorySource.RULE);
+        return new Classification(category, null, adjustableByDefault(category), deadline, CategorySource.RULE);
+    }
+
+    /** 미리 시작할 수 있는 일의 카테고리 기본값: 과제·발표만 true. 직접 수정에서 값을 보내지 않았을 때도 쓴다. */
+    public static boolean adjustableByDefault(EventCategory category) {
+        return category == EventCategory.ASSIGNMENT || category == EventCategory.PRESENTATION;
     }
 
     private static Rule rule(EventCategory category, String... keywords) {
