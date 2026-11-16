@@ -5,21 +5,29 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 회복 추천(RECOVERY)과 2축 판단 규칙(2026-11-17 결정). 순수 계산이다.
  * <ul>
- *   <li>첫 적격 7일로 '내 평소'(기준선)를 만드는 동안에는 회복을 판단하지 않고 추천도 만들지 않는다.</li>
- *   <li>기준선이 생긴 뒤 그날 회복 상태가 평소보다 낮으면(LOW) 선호 활동 하나를 추천한다. 하루 한 번.</li>
+ *   <li>1주차(1~7일차)에는 HRV를 모으기만 하고 회복을 판단하지 않는다. 이번 주 일정이 평소보다 많을 때만
+ *       "일정 많음"을 이유로 가볍게 움직이기를 추천한다(와이어프레임 B6-1).</li>
+ *   <li>2주차부터는 <b>그날 측정값을 지난주(온보딩 기준 직전 주차) 평균과 비교</b>해 낮으면 추천한다.</li>
+ *   <li>추천 활동은 HRV에 도움이 된다고 보고된 운동 목록에서 날짜마다 돌아가며 고른다.</li>
  * </ul>
- * 2축 판단은 회복(LOW 여부) × 일정(이번 주가 평소보다 많은지)이다.
+ * 2축 판단은 회복(지난주 평균보다 낮은지) × 일정(이번 주가 평소보다 많은지)이다. 값은 모두 ln(RMSSD) 단위로 비교한다.
  */
 public final class RecoverySuggestionPolicy {
 
-    public static final String REASON_CODE = "LOW_RECOVERY";
-    public static final String CALCULATION_VERSION = "recovery-v1";
+    public static final String CALCULATION_VERSION = "recovery-suggest-v2";
+    /** 그날 측정값이 지난주 평균보다 낮음. */
+    public static final String REASON_LOW_RECOVERY = "LOW_RECOVERY";
+    /** 회복을 판단하기 전(1주차)인데 이번 주 일정이 평소보다 많음. */
+    public static final String REASON_OVERLOAD = "OVERLOAD";
     /** 주간 부하의 위험 사유 중 "평소보다 일정이 많음". */
     public static final String LOAD_HIGH_REASON = "LOAD_HIGH";
+    /** 지난주 평균을 내는 데 필요한 최소 적격 측정일 수. */
+    public static final int MIN_PRIOR_WEEK_DAYS = 3;
 
     public static final String BUILDING = "BUILDING";
     public static final String INSUFFICIENT = "INSUFFICIENT";
@@ -28,16 +36,27 @@ public final class RecoverySuggestionPolicy {
     public static final String NORMAL_LOW = "NORMAL_LOW";
     public static final String OVERLOAD_LOW = "OVERLOAD_LOW";
 
-    private static final String STATUS_LOW = "LOW";
-    private static final String STATUS_NORMAL = "NORMAL";
+    /**
+     * 추천 활동 목록(이 순서로 돌아간다). 유산소 운동·요가·명상은 HRV(RMSSD)를 높인다는 보고가 있고, HRV가 낮은 날에는
+     * 걷기·가벼운 요가·스트레칭 같은 가벼운 회복 활동이 권장된다(근거는 계산_정책.md). 낮잠은 운동이 아니라 넣지 않는다.
+     */
+    static final List<String> HRV_ACTIVITIES = List.of("WALK", "STRETCH", "YOGA", "MEDITATION", "LIGHT_RUN");
+    /** 회복이 낮은 날에는 강도가 있는 활동(가벼운 러닝)을 빼고 고른다. */
+    static final List<String> GENTLE_ACTIVITIES = List.of("WALK", "STRETCH", "YOGA", "MEDITATION");
 
     private static final Map<String, String> ACTIVITY_NAMES = Map.of(
             "WALK", "걷기",
             "STRETCH", "스트레칭",
-            "NAP", "낮잠",
             "YOGA", "요가",
             "MEDITATION", "명상",
             "LIGHT_RUN", "가벼운 러닝");
+
+    private static final Map<String, String> ACTIVITY_TIPS = Map.of(
+            "WALK", "숨이 살짝 찰 정도로 편하게 걸어 보세요.",
+            "STRETCH", "목·어깨·허리를 천천히 늘려 긴장을 풀어 보세요.",
+            "YOGA", "호흡에 맞춰 쉬운 동작 위주로 해 보세요.",
+            "MEDITATION", "편하게 앉아 천천히 숨을 고르며 쉬어 보세요.",
+            "LIGHT_RUN", "옆 사람과 대화할 수 있는 속도로 가볍게 달려 보세요.");
 
     private final Duration blockLength;
 
@@ -57,42 +76,57 @@ public final class RecoverySuggestionPolicy {
         return weekRiskReasons != null && weekRiskReasons.contains(LOAD_HIGH_REASON);
     }
 
+    /** 온보딩 기준 n주차(1주차 = 1~7일차). */
+    public static int programWeek(int dayIndex) {
+        return (Math.max(1, dayIndex) - 1) / 7 + 1;
+    }
+
     /**
      * 2축 판단.
      *
-     * @param baselineEstablished 기준선이 확정됐는지
-     * @param recoveryStatus      BUILDING·INSUFFICIENT·NORMAL·LOW
-     * @param overloaded          이번 주 일정이 평소보다 많은지
+     * @param programWeek  판단하는 날의 온보딩 기준 주차
+     * @param dayLn        그날 대표 측정값(ln RMSSD). 측정이 없거나 교란 요인이 있는 날이면 null
+     * @param priorWeekLn  직전 주차의 적격일 대표값들(ln RMSSD)
+     * @param overloaded   이번 주 일정이 평소보다 많은지
      */
-    public static String judgment(boolean baselineEstablished, String recoveryStatus, boolean overloaded) {
-        if (!baselineEstablished) {
+    public static String judgment(int programWeek, Double dayLn, List<Double> priorWeekLn, boolean overloaded) {
+        if (programWeek <= 1) {
             return BUILDING;
         }
-        if (STATUS_LOW.equals(recoveryStatus)) {
+        if (dayLn == null || priorWeekLn.size() < MIN_PRIOR_WEEK_DAYS) {
+            return INSUFFICIENT;
+        }
+        double priorAverage = priorWeekLn.stream().mapToDouble(Double::doubleValue).average().orElseThrow();
+        if (dayLn < priorAverage) {
             return overloaded ? OVERLOAD_LOW : NORMAL_LOW;
         }
-        if (STATUS_NORMAL.equals(recoveryStatus)) {
-            return overloaded ? OVERLOAD_OK : OK;
-        }
-        return INSUFFICIENT;
+        return overloaded ? OVERLOAD_OK : OK;
     }
 
-    /** 회복 추천을 만드는 판단인지(회복이 평소보다 낮은 두 경우). */
-    public static boolean recommends(String judgment) {
-        return NORMAL_LOW.equals(judgment) || OVERLOAD_LOW.equals(judgment);
+    /** 추천을 만드는 이유. 추천하지 않으면 비어 있다. */
+    public static Optional<String> reasonCode(String judgment, boolean overloaded) {
+        if (NORMAL_LOW.equals(judgment) || OVERLOAD_LOW.equals(judgment)) {
+            return Optional.of(REASON_LOW_RECOVERY);
+        }
+        if (BUILDING.equals(judgment) && overloaded) {
+            return Optional.of(REASON_OVERLOAD);
+        }
+        return Optional.empty();
     }
 
     /**
-     * 추천할 활동. 선호 활동의 저장 순서가 없으므로 코드 순으로 놓고 날짜마다 돌아가며 고른다(같은 날은 같은 활동).
+     * 그 날짜에 추천할 활동. 목록에서 사용자의 선호 활동만 남기고(하나도 없으면 목록 전체) 날짜마다 돌아가며 고른다.
+     * 같은 날은 같은 활동이다.
      *
-     * @param preferredActivities 사용자가 고른 활동 코드(1개 이상)
+     * @param preferredActivities 사용자가 고른 활동 코드(없어도 된다)
      */
-    public static String pickActivity(List<String> preferredActivities, LocalDate date) {
-        if (preferredActivities.isEmpty()) {
-            throw new IllegalArgumentException("preferredActivities must not be empty");
+    public static String pickActivity(String reasonCode, Collection<String> preferredActivities, LocalDate date) {
+        List<String> pool = REASON_LOW_RECOVERY.equals(reasonCode) ? GENTLE_ACTIVITIES : HRV_ACTIVITIES;
+        List<String> candidates = pool.stream().filter(preferredActivities::contains).toList();
+        if (candidates.isEmpty()) {
+            candidates = pool;
         }
-        List<String> sorted = preferredActivities.stream().sorted().toList();
-        return sorted.get((int) Math.floorMod(date.toEpochDay(), (long) sorted.size()));
+        return candidates.get((int) Math.floorMod(date.toEpochDay(), (long) candidates.size()));
     }
 
     /** 제안 제목(구글 캘린더에 등록되는 일정 이름). 예: "20분 걷기". */
@@ -101,11 +135,16 @@ public final class RecoverySuggestionPolicy {
     }
 
     /** AI 도입 전 규칙 기반 카드 문구. */
-    public String message(String activityCode, String judgment) {
-        String lead = OVERLOAD_LOW.equals(judgment)
-                ? "이번 주 일정이 평소보다 많고 회복이 평소보다 낮아요."
-                : "오늘은 회복이 평소보다 낮아요.";
-        return lead + " " + blockLength.toMinutes() + "분 " + activityName(activityCode) + " 어때요?";
+    public String message(String activityCode, String reasonCode, String judgment) {
+        String lead;
+        if (REASON_OVERLOAD.equals(reasonCode)) {
+            lead = "이번 주 일정이 평소보다 많아요. 가볍게 움직여 볼까요?";
+        } else if (OVERLOAD_LOW.equals(judgment)) {
+            lead = "이번 주 일정이 평소보다 많고, 오늘 측정값이 지난주 평균보다 낮아요.";
+        } else {
+            lead = "오늘 측정값이 지난주 평균보다 낮아요.";
+        }
+        return lead + " " + title(activityCode) + " 어때요? " + ACTIVITY_TIPS.get(activityCode);
     }
 
     private static String activityName(String activityCode) {

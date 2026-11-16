@@ -20,8 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 오늘의 회복 추천(RECOVERY) 만들기. 컨디션까지 입력한 날, 기준선이 확정된 뒤 회복이 평소보다 낮을 때 선호 활동 하나를
- * 오늘의 가장 이른 빈 시간에 제안한다(규칙은 recommendation의 {@link SuggestionPlanning}).
+ * 오늘의 회복 추천(RECOVERY) 만들기. 컨디션까지 입력한 날에, 오늘 측정값이 지난주 평균보다 낮거나(2주차부터)
+ * 1주차인데 이번 주 일정이 평소보다 많으면 활동 하나를 오늘의 가장 이른 빈 시간에 제안한다
+ * (규칙은 recommendation의 {@link SuggestionPlanning}).
  * 외부 호출이 없는 한 트랜잭션이고, 오늘 회복 추천이 이미 있으면(건너뛴 것 포함) 다시 만들지 않으므로 여러 번 불러도
  * 하루 하나다. 회복 상태는 계산하지 않고 저장된 값을 읽는다.
  */
@@ -68,8 +69,9 @@ public class RecoverySuggestionFlow {
             return Optional.empty();
         }
         Optional<DailyRecoverySnapshot> state = recoveryQuery.findDay(userId, today);
-        String judged = judgment.of(userId, state);
-        if (state.isEmpty() || !planning.recommendsRecovery(judged)) {
+        RecoveryJudgment.Result judged = judgment.evaluate(userId, state);
+        Optional<String> reason = planning.recoveryReasonCode(judged.judgment(), judged.overloaded());
+        if (reason.isEmpty()) {
             return Optional.empty();
         }
         List<SuggestionView> todays = suggestionQuery.search(userId, null, null, today);
@@ -77,8 +79,7 @@ public class RecoverySuggestionFlow {
             return Optional.empty();
         }
         long reserved = todays.stream().filter(s -> PreStartGenerationFlow.isLive(s.status())).count();
-        List<String> preferred = lifestyle.preferredActivities(userId);
-        if (reserved >= planning.maxSuggestionsPerDay() || preferred.isEmpty()) {
+        if (reserved >= planning.maxSuggestionsPerDay()) {
             return Optional.empty();
         }
         LifestyleQuery.SleepWindow sleep = lifestyle.sleepWindow(userId);
@@ -89,10 +90,11 @@ public class RecoverySuggestionFlow {
             return Optional.empty();
         }
         TimeSlot slot = slots.get(0);
-        String activity = planning.pickRecoveryActivity(preferred, today);
+        String activity = planning.pickRecoveryActivity(reason.get(), lifestyle.preferredActivities(userId), today);
         return Optional.of(suggestionCommands.propose(new NewSuggestion(userId, RECOVERY, today, slot.start(),
-                slot.end(), planning.recoveryTitle(activity), activity, judged, planning.recoveryReasonCode(),
-                planning.recoveryCalculationVersion(), planning.recoveryMessage(activity, judged), false, true,
+                slot.end(), planning.recoveryTitle(activity), activity, judged.judgment(), reason.get(),
+                planning.recoveryCalculationVersion(),
+                planning.recoveryMessage(activity, reason.get(), judged.judgment()), false, true,
                 null, null, planning.suggestionExpiresAt(today))));
     }
 }
