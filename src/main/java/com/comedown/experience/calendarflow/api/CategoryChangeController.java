@@ -35,8 +35,8 @@ class CategoryChangeController {
 
     record ChangeRequest(
             @NotBlank String category,
-            @NotNull @Min(1) @Max(3) Integer burden,
-            @NotNull Boolean adjustable,
+            @Min(1) @Max(3) Integer burden,
+            Boolean adjustable,
             @NotNull Boolean isDeadline,
             @NotBlank String scope) {
     }

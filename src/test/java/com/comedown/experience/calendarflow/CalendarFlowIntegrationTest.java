@@ -268,6 +268,42 @@ class CalendarFlowIntegrationTest {
     }
 
     @Test
+    void 분류_수정은_부담_정도와_미리_시작_가능_여부_없이도_저장한다() throws Exception {
+        long user = newUser();
+        when(source.fetch(any(), any())).thenReturn(List.of(
+                timed("o1", null, "동아리 모임", "2026-11-18T05:00:00Z", "2026-11-18T06:00:00Z"),
+                timed("o2", null, "세미나", "2026-11-19T05:00:00Z", "2026-11-19T06:00:00Z")));
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+
+        // 카테고리 변경 화면(B2-1)이 보내는 값: 카테고리, 마감 여부, 적용 범위.
+        patchCategoryOnly(user, eventId(user, "o1"), "ASSIGNMENT", true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedCount").value(1));
+        patchCategoryOnly(user, eventId(user, "o2"), "CLUB", false).andExpect(status().isOk());
+
+        // 부담 정도는 비워 두고, 미리 시작 가능 여부는 카테고리 기본값(과제·발표만 true)을 쓴다.
+        assertThat(jdbc.queryForMap("SELECT category, category_source, burden, adjustable, is_deadline "
+                + "FROM calendar_events WHERE id = ?", eventId(user, "o1")))
+                .containsEntry("category", "ASSIGNMENT").containsEntry("category_source", "USER")
+                .containsEntry("burden", null).containsEntry("adjustable", true).containsEntry("is_deadline", true);
+        assertThat(jdbc.queryForMap("SELECT burden, adjustable, is_deadline FROM calendar_events WHERE id = ?",
+                eventId(user, "o2")))
+                .containsEntry("burden", null).containsEntry("adjustable", false).containsEntry("is_deadline", false);
+
+        // 보낸 값이 있으면 그대로 쓰고, 범위를 벗어난 부담 정도·빠진 마감 여부는 여전히 400이다.
+        patchCategory(user, eventId(user, "o2"), "CLUB", "THIS").andExpect(status().isOk());
+        assertThat(jdbc.queryForMap("SELECT burden, adjustable FROM calendar_events WHERE id = ?",
+                eventId(user, "o2"))).containsEntry("burden", 2).containsEntry("adjustable", true);
+        mvc.perform(patch("/api/calendar/events/" + eventId(user, "o1") + "/category").with(loginAs(user))
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\":\"CLUB\",\"burden\":4,\"isDeadline\":false,\"scope\":\"THIS\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch("/api/calendar/events/" + eventId(user, "o1") + "/category").with(loginAs(user))
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\":\"CLUB\",\"scope\":\"THIS\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 분류_수정_검증_실패와_남의_일정() throws Exception {
         long owner = newUser();
         long other = newUser();
@@ -327,6 +363,14 @@ class CalendarFlowIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"category\":\"" + category + "\",\"burden\":2,\"adjustable\":true,\"isDeadline\":false,"
                         + "\"scope\":\"" + scope + "\"}"));
+    }
+
+    /** 카테고리 변경 화면(B2-1)처럼 부담 정도·미리 시작 가능 여부 없이 보낸다. */
+    private org.springframework.test.web.servlet.ResultActions patchCategoryOnly(long user, long eventId,
+            String category, boolean deadline) throws Exception {
+        return mvc.perform(patch("/api/calendar/events/" + eventId + "/category").with(loginAs(user)).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"category\":\"" + category + "\",\"isDeadline\":" + deadline + ",\"scope\":\"THIS\"}"));
     }
 
     private SyncedEvent timed(String id, String recurring, String title, String startUtc, String endUtc) {
