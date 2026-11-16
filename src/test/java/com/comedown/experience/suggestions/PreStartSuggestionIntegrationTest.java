@@ -119,6 +119,9 @@ class PreStartSuggestionIntegrationTest {
                 .andExpect(jsonPath("$.suggestions[0].durationMin").value(30))
                 .andExpect(jsonPath("$.suggestions[0].reasonCode").value("RISK_WEEK"))
                 .andExpect(jsonPath("$.suggestions[0].riskWeekStart").value("2026-11-16"))
+                .andExpect(jsonPath("$.suggestions[0].message.text").value(
+                        "다음 주에 마감 3건이 몰려 있어요. 과제를 30분만 미리 시작해 볼까요? (마감일은 그대로예요)"))
+                .andExpect(jsonPath("$.suggestions[0].message.aiGenerated").value(false))
                 .andExpect(jsonPath("$.suggestions[0].message.fallback").value(true));
         assertThat(jdbc.queryForObject("SELECT expires_at FROM suggestions WHERE user_id = ?",
                 java.sql.Timestamp.class, user).toLocalDateTime().toString()).isEqualTo("2026-11-17T15:00"); // 제안 날짜가 지나면 만료

@@ -14,8 +14,10 @@ import com.comedown.schedule.contract.WeekLoads;
 import com.comedown.shared.time.ServiceTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class PreStartGenerationFlow {
 
     static final String TITLE = "과제 미리 시작하기";
-    static final String MESSAGE = "과제 마감 전에 %d분만 먼저 시작해 볼까요?";
     /** 마감을 찾는 앞쪽 범위(주간 부하가 계산되는 범위와 맞춘다). */
     static final int HORIZON_WEEKS = 5;
 
@@ -67,10 +68,10 @@ public class PreStartGenerationFlow {
         LocalDate today = time.today();
         LocalDate thisMonday = time.weekStartOf(today);
         var range = time.dateRange(today, thisMonday.plusWeeks(HORIZON_WEEKS).minusDays(1));
-        Set<LocalDate> riskWeeks = new HashSet<>();
+        Map<LocalDate, Integer> riskWeeks = new HashMap<>(); // 위험 주의 월요일 → 그 주 마감 수(문구에 쓴다)
         for (WeekLoadView week : weekLoads.range(userId, thisMonday, HORIZON_WEEKS)) {
             if (planning.isPreStartRiskWeek(week.riskLevel())) {
-                riskWeeks.add(week.weekStart());
+                riskWeeks.put(week.weekStart(), week.deadlineCount());
             }
         }
         if (riskWeeks.isEmpty()) {
@@ -84,12 +85,12 @@ public class PreStartGenerationFlow {
             }
         }
         LifestyleQuery.SleepWindow sleep = lifestyle.sleepWindow(userId);
-        long blockMinutes = planning.preStartBlockLength().toMinutes();
         List<SuggestionView> created = new ArrayList<>();
         for (CalendarDeadlineQuery.Deadline deadline : deadlines.upcomingAssignments(userId, range.start(),
                 range.endExclusive())) {
             LocalDate deadlineDate = time.toServiceDate(deadline.start());
-            if (!riskWeeks.contains(time.weekStartOf(deadlineDate)) || alreadySuggested.contains(deadline.eventId())) {
+            LocalDate riskWeek = time.weekStartOf(deadlineDate);
+            if (!riskWeeks.containsKey(riskWeek) || alreadySuggested.contains(deadline.eventId())) {
                 continue;
             }
             for (LocalDate day : planning.preStartCandidateDays(today, deadlineDate)) {
@@ -108,8 +109,9 @@ public class PreStartGenerationFlow {
                 TimeSlot slot = slots.get(0);
                 created.add(suggestionCommands.propose(new NewSuggestion(userId, "PRE_START", day, slot.start(),
                         slot.end(), TITLE, null, null, planning.preStartReasonCode(),
-                        planning.preStartCalculationVersion(), MESSAGE.formatted(blockMinutes), false, true,
-                        deadline.eventId(), time.weekStartOf(deadlineDate), planning.preStartExpiresAt(day))));
+                        planning.preStartCalculationVersion(),
+                        planning.preStartMessage(thisMonday, riskWeek, riskWeeks.get(riskWeek)), false, true,
+                        deadline.eventId(), riskWeek, planning.preStartExpiresAt(day))));
                 break;
             }
         }

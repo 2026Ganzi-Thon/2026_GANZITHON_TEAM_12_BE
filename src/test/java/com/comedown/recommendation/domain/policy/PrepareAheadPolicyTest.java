@@ -36,6 +36,22 @@ class PrepareAheadPolicyTest {
     }
 
     @Test
+    void 문구는_위험_주의_마감_수와_마감을_옮기지_않는다는_점을_알린다() {
+        LocalDate thisWeek = LocalDate.of(2026, 11, 9);
+
+        assertThat(policy.message(thisWeek, LocalDate.of(2026, 11, 16), 3))
+                .isEqualTo("다음 주에 마감 3건이 몰려 있어요. 과제를 30분만 미리 시작해 볼까요? (마감일은 그대로예요)");
+        assertThat(policy.message(thisWeek, thisWeek, 2))
+                .isEqualTo("이번 주에 마감 2건이 몰려 있어요. 과제를 30분만 미리 시작해 볼까요? (마감일은 그대로예요)");
+        assertThat(policy.message(thisWeek, LocalDate.of(2026, 11, 30), 4))
+                .startsWith("11월 30일 주에 마감 4건이 몰려 있어요.");
+        // 마감이 1건 이하면 "몰려 있다"고 하지 않고 건수를 빼고 말한다.
+        assertThat(policy.message(thisWeek, LocalDate.of(2026, 11, 16), 1))
+                .isEqualTo("다음 주에 일정이 많이 몰려 있어요. 과제를 30분만 미리 시작해 볼까요? (마감일은 그대로예요)");
+        assertThat(policy.message(thisWeek, LocalDate.of(2026, 11, 16), 0)).startsWith("다음 주에 일정이 많이 몰려 있어요.");
+    }
+
+    @Test
     void 제안은_그_날짜가_지나면_만료된다() {
         assertThat(policy.expiresAt(LocalDate.of(2026, 11, 17))).isEqualTo(Instant.parse("2026-11-17T15:00:00Z"));
     }

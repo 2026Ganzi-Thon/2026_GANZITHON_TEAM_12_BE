@@ -49,6 +49,15 @@ public interface SuggestionPlanning {
 
     String preStartCalculationVersion();
 
+    /**
+     * 규칙 기반 카드 문구.
+     *
+     * @param thisWeekStart 오늘이 속한 주의 월요일
+     * @param riskWeekStart 마감이 있는 위험 주의 월요일
+     * @param deadlineCount 그 주의 마감 수
+     */
+    String preStartMessage(LocalDate thisWeekStart, LocalDate riskWeekStart, int deadlineCount);
+
     // ---------- RECOVERY 규칙·2축 판단 ----------
 
     /** 이번 주 일정이 평소보다 많은지(주간 부하의 위험 사유로 판단). */
