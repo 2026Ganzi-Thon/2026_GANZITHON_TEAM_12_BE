@@ -503,7 +503,7 @@ Come & Down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉
 - `interpretation`(B6-2 해석 한 줄, 0절 "AI 문구 표시" 모양): 기준선 확정 후(`ESTABLISHED`)에만 주고 `BUILDING`이면 null입니다(7일 확보 전 HRV로 판단하지 않음). 추천 카드의 `message`와 별개입니다.
 - 표시값 반올림: `trendRmssdMs`·`normalRange`·`rmssdMs`·`heartRateBpm`은 소수 첫째 자리, `changePct`는 저장값(소수 첫째 자리) 그대로입니다.
 - `qualityLevel`·`rmssdMs`·`heartRateBpm`은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. B6의 "HRV 41 ms"는 `rmssdMs`(소수 첫째 자리)이며 기준선 만드는 중(`BUILDING`)에도 표시용으로 줍니다(판단·추천 근거로는 쓰지 않음). 재측정해도 결과 화면 값은 마지막 측정이 아니라 대표값입니다. `excludedFromBaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
-- **현재 구현 범위**: `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`, 회복 리포트와 같은 문구)입니다. `judgment`와 `suggestions`는 [계산_정책.md](계산_정책.md) "회복 추천" 규칙(2026-11-17 결정)으로 채웁니다: 1주차(1~7일차)에는 `judgment: BUILDING`이고 이번 주 일정이 평소보다 많을 때만 추천하며(`reasonCode: OVERLOAD`), 2주차부터는 오늘 측정값이 지난주 평균보다 낮으면 추천합니다(`reasonCode: LOW_RECOVERY`). 활동은 운동 목록에서 날짜마다 돌아가며 하나, 하루 하나, 문구는 규칙 기반(`fallback: true`)입니다. `judgment`는 `recovery.status`(`recovery-v1`)와 기준이 달라 상태가 `NORMAL`이어도 `NORMAL_LOW`일 수 있습니다. `suggestions`는 그날의 RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것입니다.
+- **현재 구현 범위**: `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`, 회복 리포트와 같은 문구)입니다. `judgment`와 `suggestions`는 [계산_정책.md](계산_정책.md) "회복 추천" 규칙(2026-11-17 결정)으로 채웁니다: 1주차(1~7일차)에는 `judgment: BUILDING`이고 이번 주 일정이 평소보다 많을 때만 추천하며(`reasonCode: OVERLOAD`), 2주차부터는 오늘 측정값이 지난주 평균보다 10% 이상 낮으면 추천합니다(`reasonCode: LOW_RECOVERY`). 활동은 운동 목록에서 날짜마다 돌아가며 하나, 하루 하나, 문구는 규칙 기반(`fallback: true`)입니다. `judgment`는 `recovery.status`(`recovery-v1`)와 기준이 달라 상태가 `NORMAL`이어도 `NORMAL_LOW`일 수 있습니다. `suggestions`는 그날의 RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것입니다.
 
 ### `POST /api/morning-checks/today/breathing` → 204 — ③ 호흡 1분 완료 (건너뛰기 가능)
 ```json
@@ -694,6 +694,6 @@ API URL은 유지하며 내부 패키지는 서비스 책임으로 구분합니�
 v0.3에서 확정(→ [계산_정책.md](계산_정책.md)): 일정 부하 가중치·임계값·OTHER·미분류·종일·겹친 일정 규칙, 회복 계산 단위·기준선·LOW 판정·확정 당일, 2주 연속 낮음, 4주 범위 위치의 최소 표본·백분위, CBI 문항·보기 버전(`cbi-ko-2026.11.2`).
 
 아직 남은 항목:
-- ~~1~7일 컨디션 기반 추천 임계값~~ → 2026-11-17 확정: 1주차에는 일정이 많을 때만 추천하고, 2주차부터 그날 측정값이 지난주 평균보다 낮은 날에 추천([계산_정책.md](계산_정책.md) "회복 추천"). 최근 표본 부족(`INSUFFICIENT`)·건강정보 동의 철회 사용자에게 주는 일반 추천 규칙은 아직 없습니다(추천 없음).
+- ~~1~7일 컨디션 기반 추천 임계값~~ → 2026-11-17 확정: 1주차에는 일정이 많을 때만 추천하고, 2주차부터 그날 측정값이 지난주 평균보다 10% 이상 낮은 날에 추천([계산_정책.md](계산_정책.md) "회복 추천"). 최근 표본 부족(`INSUFFICIENT`)·건강정보 동의 철회 사용자에게 주는 일반 추천 규칙은 아직 없습니다(추천 없음).
 - 구글 토큰 철회가 로그인용 권한까지 영향을 줄 때 캘린더만 해제하는 처리, 탈퇴 시 앱 생성 일정 보존/삭제 선택.
 - 본 검토는 임상적 유효성이나 법적 적합성을 검증한 것이 아닙니다.
