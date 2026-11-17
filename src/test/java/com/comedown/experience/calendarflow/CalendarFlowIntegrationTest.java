@@ -62,6 +62,10 @@ class CalendarFlowIntegrationTest {
     @MockitoBean
     CalendarCredentialProvider credentials;
 
+    /** AI 전송 대체. 따로 정하지 않으면 쓸 수 없는 상태(available=false)라 제목 규칙만 쓴다. */
+    @MockitoBean
+    com.comedown.ai.contract.AiCompletionPort aiPort;
+
     @BeforeEach
     void setUp() {
         clock.set(FixedClockTestConfig.DEFAULT_NOW);
@@ -342,6 +346,77 @@ class CalendarFlowIntegrationTest {
     }
 
     @Test
+    void 규칙으로_분류하지_못한_제목만_AI에_묻고_AI_분류는_규칙보다_우선하며_직접_고친_분류보다는_낮다() throws Exception {
+        long user = newUser();
+        aiNoticeConsent(user);
+        org.mockito.Mockito.when(aiPort.available()).thenReturn(true);
+        org.mockito.Mockito.when(aiPort.complete(any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn("{\"1\":\"CLUB\",\"2\":\"OTHER\",\"3\":\"RECOVERY\"}");
+        when(source.fetch(any(), any())).thenReturn(List.of(
+                timed("a1", null, "캡스톤 회의", "2026-11-18T05:00:00Z", "2026-11-18T06:00:00Z"),
+                timed("a2", null, "플리마켓 부스", "2026-11-18T07:00:00Z", "2026-11-18T08:00:00Z"),
+                timed("a3", null, "플리마켓 부스", "2026-11-19T07:00:00Z", "2026-11-19T08:00:00Z"),
+                timed("a4", null, "ㅁㄴㅇㄹ", "2026-11-19T09:00:00Z", "2026-11-19T10:00:00Z"),
+                timed("a5", null, "알 수 없는 일", "2026-11-20T09:00:00Z", "2026-11-20T10:00:00Z")));
+
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+
+        // 규칙에 걸린 "캡스톤 회의"는 보내지 않고, 같은 제목은 한 번만 보낸다.
+        org.mockito.ArgumentCaptor<String> sent = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(aiPort, org.mockito.Mockito.times(1))
+                .complete(any(), sent.capture(), org.mockito.ArgumentMatchers.anyInt());
+        assertThat(sent.getValue()).contains("1. 플리마켓 부스").contains("2. ㅁㄴㅇㄹ").contains("3. 알 수 없는 일")
+                .doesNotContain("캡스톤").doesNotContain("4.");
+        assertThat(source(user, "a1")).isEqualTo("WORK_MEETING/RULE");
+        assertThat(source(user, "a2")).isEqualTo("CLUB/AI");
+        assertThat(source(user, "a3")).isEqualTo("CLUB/AI");
+        assertThat(source(user, "a4")).isEqualTo("OTHER/AI"); // AI도 모르겠다고 한 것(다시 묻지 않게 AI로 남긴다)
+        assertThat(source(user, "a5")).isEqualTo("OTHER/RULE"); // 허용하지 않는 카테고리 응답은 버린다
+
+        // 다시 동기화: 이미 AI가 분류한 제목은 다시 묻지 않고, 응답을 버렸던 제목만 다시 묻는다.
+        org.mockito.Mockito.clearInvocations(aiPort);
+        org.mockito.Mockito.when(aiPort.complete(any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn("{\"1\":\"PERSONAL\"}");
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+        org.mockito.Mockito.verify(aiPort, org.mockito.Mockito.times(1))
+                .complete(any(), sent.capture(), org.mockito.ArgumentMatchers.anyInt());
+        assertThat(sent.getValue()).contains("1. 알 수 없는 일").doesNotContain("플리마켓 부스").doesNotContain("ㅁㄴㅇㄹ");
+        assertThat(source(user, "a2")).isEqualTo("CLUB/AI");
+        assertThat(source(user, "a5")).isEqualTo("PERSONAL/AI");
+
+        // 사용자가 직접 고치면 그 값이 우선하고, 그 일정은 다시 AI에 묻지 않는다.
+        patchCategoryOnly(user, eventId(user, "a2"), "PART_TIME", false).andExpect(status().isOk());
+        org.mockito.Mockito.clearInvocations(aiPort);
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+        org.mockito.Mockito.verify(aiPort, org.mockito.Mockito.never())
+                .complete(any(), any(), org.mockito.ArgumentMatchers.anyInt());
+        assertThat(source(user, "a2")).isEqualTo("PART_TIME/USER");
+        assertThat(source(user, "a3")).isEqualTo("CLUB/AI");
+    }
+
+    @Test
+    void AI가_실패하거나_AI_안내_동의가_없으면_제목_규칙만으로_동기화한다() throws Exception {
+        long user = newUser();
+        org.mockito.Mockito.when(aiPort.available()).thenReturn(true);
+        org.mockito.Mockito.when(aiPort.complete(any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenThrow(new com.comedown.shared.error.ExternalServiceException(
+                        com.comedown.shared.error.ExternalServiceException.Kind.UNCERTAIN, "timeout"));
+        when(source.fetch(any(), any())).thenReturn(List.of(
+                timed("f1", null, "플리마켓 부스", "2026-11-18T07:00:00Z", "2026-11-18T08:00:00Z")));
+
+        // AI 활용 안내 동의가 없으면 제목을 보내지 않는다.
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+        org.mockito.Mockito.verify(aiPort, org.mockito.Mockito.never())
+                .complete(any(), any(), org.mockito.ArgumentMatchers.anyInt());
+        assertThat(source(user, "f1")).isEqualTo("OTHER/RULE");
+
+        // 동의가 있어도 AI가 실패하면 동기화는 성공하고 규칙 분류로 남는다.
+        aiNoticeConsent(user);
+        mvc.perform(post("/api/calendar/sync").with(loginAs(user)).with(csrf())).andExpect(status().isOk());
+        assertThat(source(user, "f1")).isEqualTo("OTHER/RULE");
+    }
+
+    @Test
     void 분류_수정_검증_실패와_남의_일정() throws Exception {
         long owner = newUser();
         long other = newUser();
@@ -422,6 +497,17 @@ class CalendarFlowIntegrationTest {
     private SyncedEvent timed(String id, String recurring, String title, String startUtc, String endUtc) {
         return new SyncedEvent(id, recurring, title, false, Instant.parse(startUtc), Instant.parse(endUtc), null, null,
                 "confirmed", "opaque", false, Instant.parse("2026-11-10T00:00:00Z"));
+    }
+
+    private void aiNoticeConsent(long user) {
+        jdbc.update("INSERT INTO user_consents (user_id, consent_type, version, agreed_at) VALUES (?, 'AI_NOTICE', "
+                + "'2026-11-01', '2026-09-01 00:00:00')", user);
+    }
+
+    /** "카테고리/출처". */
+    private String source(long user, String googleId) {
+        return jdbc.queryForObject("SELECT CONCAT(category, '/', category_source) FROM calendar_events "
+                + "WHERE user_id = ? AND google_event_id = ?", String.class, user, googleId);
     }
 
     private long newUser() {

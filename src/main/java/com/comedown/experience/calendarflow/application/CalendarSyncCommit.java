@@ -14,6 +14,7 @@ import com.comedown.shared.time.InstantRange;
 import com.comedown.shared.time.ServiceTime;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,13 +45,14 @@ class CalendarSyncCommit {
     }
 
     @Transactional
-    SyncResult commit(long userId, InstantRange range, List<SyncedEvent> fetched, List<LocalDate> weekStarts) {
+    SyncResult commit(long userId, InstantRange range, List<SyncedEvent> fetched, List<LocalDate> weekStarts,
+            Map<String, String> aiCategories) {
         lock.lock(userId);
         if (!connection.isConnected(userId)) {
             throw new ApiException(ErrorCode.CALENDAR_NOT_CONNECTED);
         }
         // 제안 생성도 같은 사용자 잠금을 쓰므로, 잠금 안에서 읽은 참조 목록은 저장이 끝날 때까지 바뀌지 않는다.
-        SyncResult saved = sync.apply(userId, range, fetched, suggestions.referencedEventIds(userId));
+        SyncResult saved = sync.apply(userId, range, fetched, suggestions.referencedEventIds(userId), aiCategories);
         weekLoads.recalculate(userId, weekStarts);
         syncState.markSynced(userId, time.now()); // 일정이 0건이어도 동기화한 시각을 남긴다
         return saved;

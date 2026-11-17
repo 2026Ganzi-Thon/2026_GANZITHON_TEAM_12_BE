@@ -17,6 +17,12 @@ public interface AccountAccessQuery {
      */
     boolean calendarConsented(long userId);
 
+    /**
+     * AI 활용 안내 동의(AI_NOTICE)가 유효한지. 일정 제목처럼 사용자가 쓴 내용을 AI에 보내기 전에 확인한다.
+     * 프로필 단계의 필수 동의이므로 그 전이거나 사용자가 없으면 false다.
+     */
+    boolean aiNoticeConsented(long userId);
+
     /** 화면 표시용 닉네임. 사용자가 없거나 닉네임을 정하기 전이면 비어 있다. */
     Optional<String> findNickname(long userId);
 }

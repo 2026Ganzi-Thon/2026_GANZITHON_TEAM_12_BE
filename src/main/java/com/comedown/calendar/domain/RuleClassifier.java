@@ -97,9 +97,14 @@ public final class RuleClassifier {
      * 부담 정도(burden)는 규칙으로 정하지 않는다(null).
      */
     private static Classification of(EventCategory category) {
+        return withDefaults(category, CategorySource.RULE);
+    }
+
+    /** 카테고리 기본값으로 만든 분류. AI 분류도 카테고리만 AI가 고르고 나머지는 같은 기본값을 쓴다. */
+    public static Classification withDefaults(EventCategory category, CategorySource source) {
         boolean deadline = category == EventCategory.ASSIGNMENT || category == EventCategory.EXAM
                 || category == EventCategory.PRESENTATION;
-        return new Classification(category, null, adjustableByDefault(category), deadline, CategorySource.RULE);
+        return new Classification(category, null, adjustableByDefault(category), deadline, source);
     }
 
     /** 미리 시작할 수 있는 일의 카테고리 기본값: 과제·발표만 true. 직접 수정에서 값을 보내지 않았을 때도 쓴다. */
