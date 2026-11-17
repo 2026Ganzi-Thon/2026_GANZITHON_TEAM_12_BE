@@ -190,7 +190,7 @@ class MorningConditionApiIntegrationTest {
                 .andExpect(jsonPath("$.suggestions[0].reasonCode").value("LOW_RECOVERY"))
                 .andExpect(jsonPath("$.suggestions[0].judgmentState").value("NORMAL_LOW"))
                 .andExpect(jsonPath("$.suggestions[0].message.text").value(
-                        "오늘 측정값이 지난주 평균보다 낮아요. 20분 걷기 어때요? 숨이 살짝 찰 정도로 편하게 걸어 보세요."))
+                        "오늘 측정값이 지난주 평균보다 많이 낮아요. 20분 걷기 어때요? 숨이 살짝 찰 정도로 편하게 걸어 보세요."))
                 .andExpect(jsonPath("$.suggestions[0].message.aiGenerated").value(false))
                 .andExpect(jsonPath("$.suggestions[0].message.fallback").value(true))
                 .andExpect(jsonPath("$.suggestions[0].relatedEvent").value(Matchers.nullValue()));
@@ -209,9 +209,9 @@ class MorningConditionApiIntegrationTest {
     }
 
     @Test
-    void 지난주_평균_이상이면_추천하지_않는다() throws Exception {
+    void 지난주_평균보다_낮아도_10퍼센트_미만이면_추천하지_않는다() throws Exception {
         secondWeekWithPriorAverage(3.80, 6);
-        seedMeasurementToday(3.90);
+        seedMeasurementToday(3.75); // 지난주 평균보다 약 5% 낮음
         preferredActivities("WALK");
 
         condition(3, false, false, false)
@@ -233,7 +233,7 @@ class MorningConditionApiIntegrationTest {
                 .andExpect(jsonPath("$.suggestions[0].reasonCode").value("LOW_RECOVERY"))
                 .andExpect(jsonPath("$.suggestions[0].title").value("20분 명상"))
                 .andExpect(jsonPath("$.suggestions[0].message.text").value(
-                        "이번 주 일정이 평소보다 많고, 오늘 측정값이 지난주 평균보다 낮아요. 20분 명상 어때요? "
+                        "이번 주 일정이 평소보다 많고, 오늘 측정값이 지난주 평균보다 많이 낮아요. 20분 명상 어때요? "
                                 + "편하게 앉아 천천히 숨을 고르며 쉬어 보세요."));
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/home")
                         .with(loginAs(userId)))

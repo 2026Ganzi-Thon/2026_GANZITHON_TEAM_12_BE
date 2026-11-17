@@ -31,16 +31,23 @@ class RecoverySuggestionPolicyTest {
     }
 
     @Test
-    void 둘째_주부터는_그날_값을_지난주_평균과_비교한다() {
-        assertThat(RecoverySuggestionPolicy.judgment(2, 3.79, PRIOR, false)).isEqualTo("NORMAL_LOW");
-        assertThat(RecoverySuggestionPolicy.judgment(2, 3.79, PRIOR, true)).isEqualTo("OVERLOAD_LOW");
+    void 둘째_주부터는_그날_값이_지난주_평균보다_10퍼센트_이상_낮으면_낮음이다() {
+        // 평균 ln 3.80 → 낮음 기준은 3.80 + ln(0.9) ≈ 3.6946
+        assertThat(RecoverySuggestionPolicy.judgment(2, 3.69, PRIOR, false)).isEqualTo("NORMAL_LOW");
+        assertThat(RecoverySuggestionPolicy.judgment(2, 3.60, PRIOR, true)).isEqualTo("OVERLOAD_LOW");
         assertThat(RecoverySuggestionPolicy.judgment(2, 3.81, PRIOR, false)).isEqualTo("OK");
         assertThat(RecoverySuggestionPolicy.judgment(3, 3.81, PRIOR, true)).isEqualTo("OVERLOAD_OK");
     }
 
     @Test
-    void 지난주_평균과_같으면_낮은_것이_아니다() {
+    void 지난주_평균보다_낮아도_10퍼센트_미만이면_낮은_것이_아니다() {
         assertThat(RecoverySuggestionPolicy.judgment(2, 3.80, List.of(3.80, 3.80, 3.80), false)).isEqualTo("OK");
+        assertThat(RecoverySuggestionPolicy.judgment(2, 3.79, PRIOR, false)).isEqualTo("OK");
+        assertThat(RecoverySuggestionPolicy.judgment(2, 3.70, PRIOR, true)).isEqualTo("OVERLOAD_OK"); // 약 9.5% 낮음
+        // ms로 보면: 평균 50ms일 때 45ms(정확히 10% 낮음)부터 낮음, 46ms는 아님.
+        List<Double> fifty = List.of(Math.log(50), Math.log(50), Math.log(50));
+        assertThat(RecoverySuggestionPolicy.judgment(2, Math.log(44.9), fifty, false)).isEqualTo("NORMAL_LOW");
+        assertThat(RecoverySuggestionPolicy.judgment(2, Math.log(46), fifty, false)).isEqualTo("OK");
     }
 
     @Test
@@ -101,9 +108,9 @@ class RecoverySuggestionPolicyTest {
         assertThat(policy.title("WALK")).isEqualTo("20분 걷기");
         assertThat(policy.title("LIGHT_RUN")).isEqualTo("20분 가벼운 러닝");
         assertThat(policy.message("WALK", "LOW_RECOVERY", "NORMAL_LOW"))
-                .isEqualTo("오늘 측정값이 지난주 평균보다 낮아요. 20분 걷기 어때요? 숨이 살짝 찰 정도로 편하게 걸어 보세요.");
+                .isEqualTo("오늘 측정값이 지난주 평균보다 많이 낮아요. 20분 걷기 어때요? 숨이 살짝 찰 정도로 편하게 걸어 보세요.");
         assertThat(policy.message("MEDITATION", "LOW_RECOVERY", "OVERLOAD_LOW"))
-                .isEqualTo("이번 주 일정이 평소보다 많고, 오늘 측정값이 지난주 평균보다 낮아요. 20분 명상 어때요? "
+                .isEqualTo("이번 주 일정이 평소보다 많고, 오늘 측정값이 지난주 평균보다 많이 낮아요. 20분 명상 어때요? "
                         + "편하게 앉아 천천히 숨을 고르며 쉬어 보세요.");
         assertThat(policy.message("STRETCH", "OVERLOAD", "BUILDING"))
                 .isEqualTo("이번 주 일정이 평소보다 많아요. 가볍게 움직여 볼까요? 20분 스트레칭 어때요? "

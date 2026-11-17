@@ -12,15 +12,22 @@ import java.util.Optional;
  * <ul>
  *   <li>1주차(1~7일차)에는 HRV를 모으기만 하고 회복을 판단하지 않는다. 이번 주 일정이 평소보다 많을 때만
  *       "일정 많음"을 이유로 가볍게 움직이기를 추천한다(와이어프레임 B6-1).</li>
- *   <li>2주차부터는 <b>그날 측정값을 지난주(온보딩 기준 직전 주차) 평균과 비교</b>해 낮으면 추천한다.</li>
+ *   <li>2주차부터는 <b>그날 측정값을 지난주(온보딩 기준 직전 주차) 평균과 비교</b>해 10% 이상 낮으면 추천한다.</li>
  *   <li>추천 활동은 HRV에 도움이 된다고 보고된 운동 목록에서 날짜마다 돌아가며 고른다.</li>
  * </ul>
- * 2축 판단은 회복(지난주 평균보다 낮은지) × 일정(이번 주가 평소보다 많은지)이다. 값은 모두 ln(RMSSD) 단위로 비교한다.
+ * 2축 판단은 회복(지난주 평균보다 10% 이상 낮은지) × 일정(이번 주가 평소보다 많은지)이다. 값은 모두 ln(RMSSD) 단위로 비교한다.
  */
 public final class RecoverySuggestionPolicy {
 
-    public static final String CALCULATION_VERSION = "recovery-suggest-v2";
-    /** 그날 측정값이 지난주 평균보다 낮음. */
+    public static final String CALCULATION_VERSION = "recovery-suggest-v3";
+    /**
+     * "낮음"으로 보는 비율: 그날 값이 지난주 평균의 90% 이하(10% 이상 낮음)일 때. 조금만 낮아도 추천하면 이틀에 하루꼴로
+     * 나와서 여유 폭을 둔다(2026-11-17 결정).
+     */
+    public static final double LOW_RATIO = 0.90;
+    /** ln 단위 차이 기준: ln(0.9) ≈ −0.105. */
+    static final double LOW_LN_DIFF = Math.log(LOW_RATIO);
+    /** 그날 측정값이 지난주 평균보다 10% 이상 낮음. */
     public static final String REASON_LOW_RECOVERY = "LOW_RECOVERY";
     /** 회복을 판단하기 전(1주차)인데 이번 주 일정이 평소보다 많음. */
     public static final String REASON_OVERLOAD = "OVERLOAD";
@@ -97,7 +104,7 @@ public final class RecoverySuggestionPolicy {
             return INSUFFICIENT;
         }
         double priorAverage = priorWeekLn.stream().mapToDouble(Double::doubleValue).average().orElseThrow();
-        if (dayLn < priorAverage) {
+        if (dayLn - priorAverage <= LOW_LN_DIFF) {
             return overloaded ? OVERLOAD_LOW : NORMAL_LOW;
         }
         return overloaded ? OVERLOAD_OK : OK;
@@ -140,9 +147,9 @@ public final class RecoverySuggestionPolicy {
         if (REASON_OVERLOAD.equals(reasonCode)) {
             lead = "이번 주 일정이 평소보다 많아요. 가볍게 움직여 볼까요?";
         } else if (OVERLOAD_LOW.equals(judgment)) {
-            lead = "이번 주 일정이 평소보다 많고, 오늘 측정값이 지난주 평균보다 낮아요.";
+            lead = "이번 주 일정이 평소보다 많고, 오늘 측정값이 지난주 평균보다 많이 낮아요.";
         } else {
-            lead = "오늘 측정값이 지난주 평균보다 낮아요.";
+            lead = "오늘 측정값이 지난주 평균보다 많이 낮아요.";
         }
         return lead + " " + title(activityCode) + " 어때요? " + ACTIVITY_TIPS.get(activityCode);
     }
