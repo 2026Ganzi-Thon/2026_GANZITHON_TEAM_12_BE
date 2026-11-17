@@ -6,6 +6,7 @@ import com.comedown.ai.contract.AiInterpretation;
 import com.comedown.ai.infrastructure.persistence.AiOutputStore;
 import com.comedown.shared.time.ServiceTime;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,7 @@ class AiInterpretationService implements AiInterpretation, AiDataDeletion {
                 AiOutputStore.Row row = cached.get();
                 return new Text(row.content(), !row.fallback(), row.fallback());
             }
-            Optional<String> written = write(request);
+            Optional<String> written = generate(request.kind(), request.facts(), request.fallbackText());
             store.save(request.userId(), request.kind(), request.refDate(), hash,
                     written.orElse(request.fallbackText()), written.isPresent() ? port.model() : null,
                     written.isEmpty(), time.now());
@@ -66,19 +67,27 @@ class AiInterpretationService implements AiInterpretation, AiDataDeletion {
     }
 
     /** AI가 쓴 문장. 호출이 실패했거나 검증을 통과하지 못하면 비어 있다. 문구 내용은 로그에 남기지 않는다. */
-    private Optional<String> write(Request request) {
+    private Optional<String> generate(String kind, List<String> facts, String fallbackText) {
         try {
-            String raw = port.complete(InterpretationPrompt.SYSTEM,
-                    InterpretationPrompt.user(request.kind(), request.facts(), request.fallbackText()));
+            String raw = port.complete(InterpretationPrompt.system(kind),
+                    InterpretationPrompt.user(kind, facts, fallbackText));
             Optional<String> cleaned = InterpretationPrompt.clean(raw);
             if (cleaned.isEmpty()) {
-                log.warn("AI 문구가 검증을 통과하지 못해 대체 문구를 씁니다(kind={}).", request.kind());
+                log.warn("AI 문구가 검증을 통과하지 못해 대체 문구를 씁니다(kind={}).", kind);
             }
             return cleaned;
         } catch (RuntimeException e) {
-            log.warn("AI 문구 생성 실패(kind={}): {}", request.kind(), e.getClass().getSimpleName());
+            log.warn("AI 문구 생성 실패(kind={}): {}", kind, e.getClass().getSimpleName());
             return Optional.empty();
         }
+    }
+
+    @Override
+    public Optional<String> write(String kind, List<String> facts, String fallbackText) {
+        if (!port.available()) {
+            return Optional.empty();
+        }
+        return generate(kind, List.copyOf(facts), fallbackText);
     }
 
     @Override

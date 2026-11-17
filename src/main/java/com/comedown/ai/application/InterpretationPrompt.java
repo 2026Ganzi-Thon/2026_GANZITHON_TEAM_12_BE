@@ -14,17 +14,33 @@ import java.util.Optional;
 final class InterpretationPrompt {
 
     /** 프롬프트를 바꾸면 올린다(캐시 키에 들어가 이전 문구를 다시 쓰지 않게 한다). */
-    static final String VERSION = "interp-v1";
+    static final String VERSION = "interp-v2";
     static final int MAX_LENGTH = 200;
 
-    static final String SYSTEM = """
+    private static final String HEAD = """
             너는 대학생의 번아웃 예방을 돕는 서비스 'Come & Down'의 안내 문구를 쓴다.
             규칙:
             1. 아래 '사실'에 있는 내용만 말한다. 숫자를 새로 만들거나 바꾸지 않는다.
+               사실의 낱말을 다른 뜻의 말로 바꾸지 않는다(예: 측정값을 활동량이나 컨디션으로 바꾸지 않는다).
             2. 진단, 질병, 치료, 약, 병원에 대한 말을 하지 않는다. 원인을 추측하지 않는다.
-               조언이나 권유, 몸 상태에 대한 평가를 덧붙이지 않는다. 사실에 없는 정도 표현(약간, 많이 등)을 붙이지 않는다.
+            """;
+    private static final String TAIL = """
             3. 한국어 해요체로 두 문장 이내, 120자 이내로 쓴다. 부드럽고 담백하게 쓴다.
             4. 따옴표, 이모지, 줄바꿈, 머리말 없이 문장만 쓴다.""";
+
+    /** 해석·요약: 사실을 전하기만 한다. */
+    static final String SYSTEM = HEAD
+            + "   조언이나 권유, 몸 상태에 대한 평가를 덧붙이지 않는다. 사실에 없는 정도 표현(약간, 많이 등)을 붙이지 않는다.\n"
+            + TAIL;
+    /** 추천 카드: 사실에 있는 제안 하나만 가볍게 권한다. */
+    static final String SUGGESTION_SYSTEM = HEAD
+            + "   사실에 있는 '제안 내용'과 '제안 시간'만 가볍게 권한다. 다른 조언이나 몸 상태에 대한 평가는 덧붙이지 않는다.\n"
+            + "   강요하지 않고 물어보는 말투로 끝낸다.\n"
+            + TAIL;
+
+    static String system(String kind) {
+        return "SUGGESTION_MESSAGE".equals(kind) ? SUGGESTION_SYSTEM : SYSTEM;
+    }
 
     /** 결과에 있으면 버리는 말(진단·의료 표현). */
     private static final List<String> FORBIDDEN = List.of("진단", "질병", "질환", "치료", "처방", "병원", "약을", "우울증");
@@ -46,6 +62,7 @@ final class InterpretationPrompt {
     private static String instruction(String kind) {
         return switch (kind) {
             case "FOUR_WEEK_SUMMARY" -> "4주 동안의 변화를 한두 문장으로 요약해 줘.";
+            case "SUGGESTION_MESSAGE" -> "추천 카드에 넣을 문구를 써 줘. 왜 권하는지와 무엇을 언제 권하는지가 드러나게.";
             default -> "최근 회복 상태를 한두 문장으로 알려 줘.";
         };
     }

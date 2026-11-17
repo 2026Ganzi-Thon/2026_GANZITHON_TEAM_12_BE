@@ -31,6 +31,12 @@ public record SuggestionPayload(
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
+    /** 문구만 바꾼 복사본. */
+    public SuggestionPayload withMessage(Message newMessage) {
+        return new SuggestionPayload(id, type, status, targetDate, start, end, durationMin, title, activityCode,
+                reasonCode, judgmentState, newMessage, relatedEvent, riskWeekStart, googleEventId, doneAt);
+    }
+
     public record Message(String text, boolean aiGenerated, boolean fallback) {
     }
 

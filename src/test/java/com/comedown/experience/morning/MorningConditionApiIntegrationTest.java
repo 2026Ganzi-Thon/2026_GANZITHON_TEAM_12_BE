@@ -211,6 +211,62 @@ class MorningConditionApiIntegrationTest {
                 .isZero();
     }
 
+    @Test
+    void 추천_카드_문구도_AI가_쓰고_저장하며_일정_제목이나_이름은_보내지_않는다() throws Exception {
+        org.mockito.Mockito.when(aiPort.available()).thenReturn(true);
+        org.mockito.Mockito.when(aiPort.model()).thenReturn("test-model");
+        org.mockito.Mockito.when(aiPort.complete(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.contains("추천 카드"))).thenReturn("오늘은 측정값이 낮아요. 07:30에 20분 걷기 어때요?");
+        org.mockito.Mockito.when(aiPort.complete(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.contains("최근 회복 상태"))).thenReturn("회복 해석이에요.");
+        secondWeekWithPriorAverage(3.80, 6);
+        seedMeasurementToday(3.60);
+        preferredActivities("WALK");
+
+        condition(3, false, false, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions[0].message.text").value("오늘은 측정값이 낮아요. 07:30에 20분 걷기 어때요?"))
+                .andExpect(jsonPath("$.suggestions[0].message.aiGenerated").value(true))
+                .andExpect(jsonPath("$.suggestions[0].message.fallback").value(false));
+        assertThat(jdbc.queryForMap("SELECT message, ai_generated, is_fallback FROM suggestions WHERE user_id = ?",
+                userId))
+                .containsEntry("message", "오늘은 측정값이 낮아요. 07:30에 20분 걷기 어때요?")
+                .containsEntry("ai_generated", true).containsEntry("is_fallback", false);
+
+        org.mockito.ArgumentCaptor<String> sent = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(aiPort, org.mockito.Mockito.times(1)).complete(
+                org.mockito.ArgumentMatchers.contains("가볍게 권한다"), sent.capture());
+        assertThat(sent.getValue()).contains("제안 내용: 20분 걷기 (20분)").contains("제안 시간: 11월 12일 07:30")
+                .contains("제안 이유: 오늘 아침 심박변이도(HRV) 측정값이 지난주 평균보다 10% 이상 낮음").doesNotContain("아리");
+
+        // 이미 AI 문구인 제안은 다시 묻지 않는다(다시 저장해도, 다시 조회해도).
+        condition(3, false, false, false)
+                .andExpect(jsonPath("$.suggestions[0].message.aiGenerated").value(true));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/morning-checks/today").with(loginAs(userId)))
+                .andExpect(jsonPath("$.result.suggestions[0].message.aiGenerated").value(true));
+        org.mockito.Mockito.verify(aiPort, org.mockito.Mockito.times(1)).complete(
+                org.mockito.ArgumentMatchers.contains("가볍게 권한다"), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void 추천_카드_문구의_AI가_실패하면_규칙_기반_문구가_그대로_남는다() throws Exception {
+        org.mockito.Mockito.when(aiPort.available()).thenReturn(true);
+        org.mockito.Mockito.when(aiPort.complete(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenThrow(new com.comedown.shared.error.ExternalServiceException(
+                        com.comedown.shared.error.ExternalServiceException.Kind.UNCERTAIN, "timeout"));
+        secondWeekWithPriorAverage(3.80, 6);
+        seedMeasurementToday(3.60);
+        preferredActivities("WALK");
+
+        condition(3, false, false, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions[0].message.text").value(
+                        "오늘 측정값이 지난주 평균보다 많이 낮아요. 20분 걷기 어때요? 숨이 살짝 찰 정도로 편하게 걸어 보세요."))
+                .andExpect(jsonPath("$.suggestions[0].message.aiGenerated").value(false))
+                .andExpect(jsonPath("$.suggestions[0].message.fallback").value(true));
+    }
+
     // ---------- 회복 추천·2축 판단 ----------
 
     @Test
