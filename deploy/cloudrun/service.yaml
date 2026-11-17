@@ -1,0 +1,87 @@
+# Cloud Run 서비스 정의 틀. ${...} 자리는 scripts/deploy-cloudrun.ps1이 채워 임시 파일로 배포한다.
+# 채운 결과(프로젝트 ID·DB 주소·클라이언트 ID)는 저장소에 커밋하지 않는다. 비밀값은 Secret Manager 참조만 둔다.
+# 구성: ingress(nginx, 밖으로 여는 유일한 포트 8080) + backend(Spring Boot, 같은 인스턴스의 127.0.0.1:8081).
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: ${SERVICE_NAME}
+  labels:
+    cloud.googleapis.com/location: ${REGION}
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # 서버 안의 주기 작업(승인 재확인·제안 만료·정리 재시도)에 인스턴스 간 잠금이 없다 → 인스턴스 1개 고정.
+        autoscaling.knative.dev/minScale: '1'
+        autoscaling.knative.dev/maxScale: '1'
+        # 요청이 없을 때도 주기 작업이 돌도록 CPU를 항상 할당한다.
+        run.googleapis.com/cpu-throttling: 'false'
+        run.googleapis.com/startup-cpu-boost: 'true'
+        run.googleapis.com/execution-environment: gen2
+        # 백엔드가 뜬 뒤에 nginx를 띄운다(백엔드 startupProbe 통과 후).
+        run.googleapis.com/container-dependencies: '{"ingress":["backend"]}'
+        # Cloud SQL 비공개 IP로 나가는 경로(Direct VPC egress). 사설 대역만 VPC로 보내고 구글 API·OpenAI는 그대로 인터넷으로 나간다.
+        run.googleapis.com/network-interfaces: '[{"network":"default","subnetwork":"default"}]'
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+    spec:
+      serviceAccountName: ${SERVICE_ACCOUNT}
+      containerConcurrency: 80
+      timeoutSeconds: 120
+      containers:
+        - name: ingress
+          image: ${IMAGE_INGRESS}
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: '1'
+              memory: 256Mi
+        - name: backend
+          image: ${IMAGE_BACKEND}
+          env:
+            - name: SERVER_PORT
+              value: '8081'
+            - name: SERVER_FORWARD_HEADERS_STRATEGY
+              value: framework
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://${DB_HOST}:3306/comedown
+            - name: SPRING_DATASOURCE_USERNAME
+              value: ${DB_USER}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-password
+                  key: latest
+            - name: GOOGLE_CLIENT_ID
+              value: ${GOOGLE_CLIENT_ID}
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: google-client-secret
+                  key: latest
+            - name: COMEDOWN_TOKEN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: comedown-token-key
+                  key: latest
+            - name: OPENAI_MODEL
+              value: '${OPENAI_MODEL}'
+#OPENAI_SECRET            - name: OPENAI_API_KEY
+#OPENAI_SECRET              valueFrom:
+#OPENAI_SECRET                secretKeyRef:
+#OPENAI_SECRET                  name: openai-api-key
+#OPENAI_SECRET                  key: latest
+          resources:
+            limits:
+              cpu: '1'
+              memory: 1Gi
+          startupProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 40

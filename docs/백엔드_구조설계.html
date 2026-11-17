@@ -28,8 +28,12 @@
 │   ├── 백엔드_구조설계.md / 백엔드_구조설계.html
 │   ├── 책임_매핑.md / architecture-map.json
 │   └── 백엔드_협업가이드.md
+├── Dockerfile / .dockerignore              # 백엔드 실행 이미지
+├── deploy/
+│   └── cloudrun/                          # Cloud Run 서비스 정의 틀·진입 nginx 이미지(docs/배포_가이드.md)
 ├── scripts/
-│   └── check-backend-env.ps1
+│   ├── check-backend-env.ps1
+│   └── deploy-cloudrun.ps1                # 이미지 빌드·push·Cloud Run 배포
 └── src/
     ├── main/
     │   ├── java/com/comedown/

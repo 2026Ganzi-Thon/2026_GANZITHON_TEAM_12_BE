@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Come &amp; Down 배포 확인</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; line-height: 1.6; }
+    code { background: #f2f2f2; padding: 1px 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Come &amp; Down</h1>
+  <p>프론트 빌드 없이 배포한 확인용 화면입니다. 백엔드 연결만 확인할 수 있어요.</p>
+  <ul>
+    <li><a href="/oauth2/authorization/google">구글로 로그인</a></li>
+    <li><a href="/api/me">로그인 상태 확인</a> (로그인 전에는 401)</li>
+  </ul>
+  <p>프론트를 함께 배포하려면 <code>scripts/deploy-cloudrun.ps1 -FrontendDist &lt;dist 경로&gt;</code>로 다시 배포합니다.</p>
+</body>
+</html>
