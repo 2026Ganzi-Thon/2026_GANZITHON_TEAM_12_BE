@@ -18,3 +18,5 @@
 # 컨테이너 빌드 파일은 Linux에서 읽으므로 LF로 고정한다.
 Dockerfile text eol=lf
 .dockerignore text eol=lf
+# 진입 컨테이너(nginx) 설정·정적 파일도 Linux에서 읽는다.
+deploy/** text eol=lf
