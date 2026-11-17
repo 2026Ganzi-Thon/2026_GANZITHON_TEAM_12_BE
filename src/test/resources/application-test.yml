@@ -6,3 +6,6 @@ spring:
 comedown:
   # 테스트 전용 더미 키(0x00 32바이트). 실제 키가 아니다.
   token-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  openai:
+    # 테스트는 실제 OpenAI를 부르지 않는다(개발자 환경 변수에 키가 있어도 무시).
+    api-key: ""

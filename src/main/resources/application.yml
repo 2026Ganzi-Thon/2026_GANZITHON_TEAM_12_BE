@@ -37,5 +37,9 @@ comedown:
     client-secret: ${GOOGLE_CLIENT_SECRET:}
   # 구글 토큰 암호화 키(Base64 32바이트). 실제 값은 환경 변수로만 둔다.
   token-key: ${COMEDOWN_TOKEN_KEY:}
-# AI 클라이언트는 integration 구현 PR에서 추가한다.
+  openai:
+    # 비어 있으면 AI를 부르지 않고 규칙 기반 문구(fallback: true)를 내려준다. 실제 값은 환경 변수로만 둔다.
+    api-key: ${OPENAI_API_KEY:}
+    # 비워 두면 기본 모델(gpt-4.1-mini)을 쓴다.
+    model: ${OPENAI_MODEL:}
 # Spring Session 테이블도 Flyway migration으로 만든다(initialize-schema: never).

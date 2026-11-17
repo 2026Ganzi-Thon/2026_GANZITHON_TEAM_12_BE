@@ -4,6 +4,7 @@ import com.comedown.experience.morning.application.MorningAccessGuard;
 import com.comedown.experience.morning.application.MorningAccessGuard.ReadAccess;
 import com.comedown.experience.morning.application.MorningCheckToday;
 import com.comedown.experience.morning.application.MorningTodayQuery;
+import com.comedown.experience.morning.application.TodayInterpretation;
 import com.comedown.shared.security.CurrentUser;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,15 +19,19 @@ public class MorningTodayController {
 
     private final MorningAccessGuard accessGuard;
     private final MorningTodayQuery query;
+    private final TodayInterpretation interpretation;
 
-    public MorningTodayController(MorningAccessGuard accessGuard, MorningTodayQuery query) {
+    public MorningTodayController(MorningAccessGuard accessGuard, MorningTodayQuery query,
+            TodayInterpretation interpretation) {
         this.accessGuard = accessGuard;
         this.query = query;
+        this.interpretation = interpretation;
     }
 
     @GetMapping("/api/morning-checks/today")
     public MorningCheckToday today(CurrentUser user) {
         ReadAccess access = accessGuard.requireOnboarded(user.id());
-        return query.today(user.id(), access.onboardingDate(), access.healthDataVisible());
+        return interpretation.apply(user.id(),
+                query.today(user.id(), access.onboardingDate(), access.healthDataVisible()));
     }
 }

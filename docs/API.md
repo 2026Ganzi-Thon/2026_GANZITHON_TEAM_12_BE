@@ -83,6 +83,12 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
 ```json
 { "text": "이번 주 일정이 평소보다 많고 회복이 평소보다 낮아요. 가볍게 움직여 보세요.", "aiGenerated": true, "fallback": false }
 ```
+- **현재 구현 범위(AI)**: 해석 문구 세 곳을 AI(OpenAI)가 씁니다 — 오늘 결과의 `interpretation`(B6), 회복 리포트의 `interpretation`(C1), 28일차 비교 리포트의 `interpretation`. B6와 C1은 같은 날 같은 값이면 같은 문구입니다.
+  - AI에는 **수치와 상태만** 보냅니다(평소 대비 %, 회복 상태, 점수 변화). 닉네임·이메일·일정 제목·원신호는 보내지 않습니다.
+  - AI는 주어진 사실을 문장으로 옮기기만 하고 계산·판단은 하지 않습니다. 결과가 비었거나 200자를 넘거나 진단·치료·병원 같은 표현이 있으면 버리고 규칙 기반 문구를 씁니다.
+  - 같은 입력의 문구는 `ai_outputs`에 저장해 다시 부르지 않습니다. 호출은 5초 안에 끝나지 않으면 규칙 기반 문구(`aiGenerated: false`, `fallback: true`)로 대체하고 10분 뒤 다시 시도합니다.
+  - `OPENAI_API_KEY`가 없으면 AI를 부르지 않고 항상 규칙 기반 문구입니다. 모델은 `OPENAI_MODEL`(비우면 `gpt-4.1-mini`)입니다.
+  - 추천 카드의 `message`와 일정 분류는 아직 규칙 기반입니다(`message.aiGenerated: false`, `categorySource: RULE`).
 
 ### 자주 쓰는 객체
 
@@ -503,7 +509,7 @@ Come & Down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉
 - `interpretation`(B6-2 해석 한 줄, 0절 "AI 문구 표시" 모양): 기준선 확정 후(`ESTABLISHED`)에만 주고 `BUILDING`이면 null입니다(7일 확보 전 HRV로 판단하지 않음). 추천 카드의 `message`와 별개입니다.
 - 표시값 반올림: `trendRmssdMs`·`normalRange`·`rmssdMs`·`heartRateBpm`은 소수 첫째 자리, `changePct`는 저장값(소수 첫째 자리) 그대로입니다.
 - `qualityLevel`·`rmssdMs`·`heartRateBpm`은 하루 대표 측정(그날 첫 GOOD·FAIR 측정)의 값이며, 대표값이 없으면 null입니다. B6의 "HRV 41 ms"는 `rmssdMs`(소수 첫째 자리)이며 기준선 만드는 중(`BUILDING`)에도 표시용으로 줍니다(판단·추천 근거로는 쓰지 않음). 재측정해도 결과 화면 값은 마지막 측정이 아니라 대표값입니다. `excludedFromBaseline`은 오늘이 적격일이 아닐 때(대표값 없음 또는 교란 요인 있음) true입니다.
-- **현재 구현 범위**: `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`, 회복 리포트와 같은 문구)입니다. `judgment`와 `suggestions`는 [계산_정책.md](계산_정책.md) "회복 추천" 규칙(2026-11-17 결정)으로 채웁니다: 1주차(1~7일차)에는 `judgment: BUILDING`이고 이번 주 일정이 평소보다 많을 때만 추천하며(`reasonCode: OVERLOAD`), 2주차부터는 오늘 측정값이 지난주 평균보다 10% 이상 낮으면 추천합니다(`reasonCode: LOW_RECOVERY`). 활동은 운동 목록에서 날짜마다 돌아가며 하나, 하루 하나, 문구는 규칙 기반(`fallback: true`)입니다. `judgment`는 `recovery.status`(`recovery-v1`)와 기준이 달라 상태가 `NORMAL`이어도 `NORMAL_LOW`일 수 있습니다. `suggestions`는 그날의 RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것입니다.
+- **현재 구현 범위**: `interpretation`은 AI가 쓴 문구이고(0절 "AI 문구 표시", 회복 리포트와 같은 문구) AI를 쓸 수 없으면 규칙 기반 문구(`fallback: true`)입니다. 결과를 저장한 뒤에 붙이므로 AI 호출이 저장을 늦추거나 실패시키지 않습니다. `judgment`와 `suggestions`는 [계산_정책.md](계산_정책.md) "회복 추천" 규칙(2026-11-17 결정)으로 채웁니다: 1주차(1~7일차)에는 `judgment: BUILDING`이고 이번 주 일정이 평소보다 많을 때만 추천하며(`reasonCode: OVERLOAD`), 2주차부터는 오늘 측정값이 지난주 평균보다 10% 이상 낮으면 추천합니다(`reasonCode: LOW_RECOVERY`). 활동은 운동 목록에서 날짜마다 돌아가며 하나, 하루 하나, 문구는 규칙 기반(`fallback: true`)입니다. `judgment`는 `recovery.status`(`recovery-v1`)와 기준이 달라 상태가 `NORMAL`이어도 `NORMAL_LOW`일 수 있습니다. `suggestions`는 그날의 RECOVERY 제안 중 `DISMISSED` `EXPIRED` `UNDONE`을 뺀 것입니다.
 
 ### `POST /api/morning-checks/today/breathing` → 204 — ③ 호흡 1분 완료 (건너뛰기 가능)
 ```json
@@ -564,7 +570,7 @@ Come & Down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉
 - `days`는 7~90(아니면 400). 온보딩 완료 후에만 조회합니다(403). 건강정보 동의가 없으면 200 + `locked: true` + `unavailableReason: "CONSENT_REQUIRED"`이며, 잠금일 때는 `unlock` 외 항목이 null입니다.
 - 그래프 값은 ms 소수 첫째 자리입니다. `points.excluded`는 교란일, `normalRange`·`hrvVsUsualPct`·`recoveryStatus`는 오늘 이하 가장 최근 회복 상태 기준, `latestQuality`는 기간 안에서 가장 최근 대표 측정의 품질입니다. `recoveryStatus`(`NORMAL` `LOW` `INSUFFICIENT`)는 C1-2의 "낮음" 칩에 씁니다. %가 음수여도 `NORMAL`일 수 있으므로 칩을 %로 추측하지 않습니다.
 - `rangePosition.availableFrom` = 온보딩 완료 서울 날짜 + 27일(28일차). 공개 전이면 `recovery`·`load`가 null입니다. 공개 후 null인 항목은 `recoveryUnavailableReason`·`loadUnavailableReason`(`INSUFFICIENT_DATA`)으로 이유를 줍니다. `position`은 정수로 반올림하고 `low`·`high`는 ms 표시값입니다.
-- **현재 구현 범위**: 부하 값은 schedule의 `ProgramWeekLoadQuery` 계약으로 읽으며, 일정축 구현 전에는 `loadWeeks[].loadScore`·`loadVsUsualPct`가 null입니다. `rangePosition.load`는 null + `INSUFFICIENT_DATA`입니다. `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
+- **현재 구현 범위**: 부하 값은 schedule의 `ProgramWeekLoadQuery` 계약으로 읽으며, 일정축 구현 전에는 `loadWeeks[].loadScore`·`loadVsUsualPct`가 null입니다. `rangePosition.load`는 null + `INSUFFICIENT_DATA`입니다. `interpretation`은 AI가 쓴 문구이고 AI를 쓸 수 없으면 규칙 기반 문구(`fallback: true`)입니다(0절 "AI 문구 표시").
 
 ### `GET /api/reports/four-week` → 200 — 28일차 비교 리포트
 ```json
@@ -588,7 +594,7 @@ Come & Down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉
 - `load`: 온보딩 기준 1주차(1~7일차)와 4주차(22~28일차)의 일정 부하 평소 대비(각 주차의 직전 4개 주차 평균 대비, %). 못 구한 값은 null, 캘린더 미연결이면 `load`가 null입니다.
 - `suggestions`: 1~28일차에 날짜가 걸린 제안 중 `approved` = 상태가 APPROVED인 수, `done` = "했어요"를 누른 수.
 - **구현 해석(확인 필요)** `recovery`: 첫 주 = 1~7일차, 마지막 주 = 22~28일차. 각 주에서 대표값이 있고 교란일이 아닌 날의 ln 평균을 exp로 바꾼 값(ms, 단순 RMSSD 산술 평균 아님)이며, `changePct` = (exp(마지막 주 − 첫 주) − 1) × 100입니다. 어느 한 주라도 값이 없으면 그 값과 `changePct`는 null입니다.
-- **현재 구현 범위**: `load`는 캘린더가 연결되지 않았거나 표본이 부족하면 null, `plan`은 체험 시작 전이면 null, `interpretation`은 AI 도입 전 규칙 기반 문구(`fallback: true`)입니다.
+- **현재 구현 범위**: `load`는 캘린더가 연결되지 않았거나 표본이 부족하면 null, `plan`은 체험 시작 전이면 null, `interpretation`은 AI가 쓴 문구이고 AI를 쓸 수 없으면 규칙 기반 문구(`fallback: true`)입니다(0절 "AI 문구 표시").
 
 ---
 
@@ -610,7 +616,7 @@ Come & Down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉
 - `GET /api/me/settings`는 measureTime·sleepStart·sleepEnd·preferredActivities·hrvEnabled를 반환합니다. `PUT /api/me/settings`는 앞의 생활 정보 4필드 전체 교체이며 hrvEnabled 변경은 동의 API로만 처리합니다. 시간 HH:mm, 수면 시작≠종료, 활동 중복·미등록 코드 불가입니다.
 - `DELETE /api/hrv/data`와 `deleteData=true`는 측정·일별 회복 상태·컨디션 및 교란 요인·CBI 응답·회복 AI 캐시·회복 기반 미승인 추천·안전 안내를 삭제하고 기준선과 카운터를 초기화합니다. morning_checks에는 호흡 완료 등 비건강 메타데이터만 남길 수 있습니다. 승인된 일정·이력의 건강 근거는 제거합니다. CBI로 이미 통과한 온보딩 단계는 되돌리지 않습니다. "건강 기록 전체 삭제"로 UI에 표시하며 사용자가 삭제 범위를 확인하게 합니다.
 - 응답: `DELETE /api/hrv/data`, `DELETE /api/me/consents/SENSITIVE_HRV[?deleteData=true]`는 204입니다(이미 철회·삭제돼 있어도 204, 재시도 안전). 캘린더 연결 해제(`DELETE /api/calendar/connection`)는 철회 요청으로 연결이 즉시 끊기고(동기화 409 `CALENDAR_NOT_CONNECTED`), 구글 철회가 끝나면 204, 아직이면 202 `{ "status": "DELETING" }`입니다. **구현 해석(확인 필요)**: 삭제하는 "미승인 제안"은 `PRE_START` 중 `APPROVING`·`APPROVED`가 아닌 것이고, 나머지 제안은 `relatedEvent`만 null로 둡니다. 구글 철회는 refresh token(없으면 access token)을 철회하므로 구글 쪽 허용 전체가 해제됩니다(캘린더만 철회하는 방식은 열린 항목). 탈퇴 마무리 시점에 승인 요청이 진행 중(`APPROVING`)이면 그 제안은 사용자와 함께 지워지고, 이미 구글에 등록된 일정은 사용자 캘린더에 남을 수 있습니다(연결 해제와 같이 Come & Down이 만든 구글 일정은 지우지 않음).
-- 기능별 삭제 계약(조율은 `experience.accountlifecycle`, 한 트랜잭션): `SuggestionDataDeletion.removeHealthBasis` → `SafetyDataDeletion.deleteAll` → `CbiDataDeletion.deleteAll` → `RecoveryDataDeletion.deleteAll` → `CheckinDataDeletion.eraseHealthData` → `IdempotencyService.deleteForUser(userId, "hrv-")`·`("cbi-")`. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. 회복 AI 캐시(`ai_outputs`)는 ai 구현 때 같은 순서에 추가합니다.
+- 기능별 삭제 계약(조율은 `experience.accountlifecycle`, 한 트랜잭션): `SuggestionDataDeletion.removeHealthBasis` → `SafetyDataDeletion.deleteAll` → `CbiDataDeletion.deleteAll` → `RecoveryDataDeletion.deleteAll` → `CheckinDataDeletion.eraseHealthData` → `IdempotencyService.deleteForUser(userId, "hrv-")`·`("cbi-")`. 원본·파생·재시도 응답 캐시를 함께 지워 재계산·재시도가 값을 되살리지 않습니다. AI 문구 캐시(`ai_outputs`)는 `RecoveryDataDeletion` 다음에 `AiDataDeletion.deleteAll`로 함께 지웁니다.
 - 측정·컨디션·CBI 저장은 저장 트랜잭션에서 사용자 행을 잠근 뒤 접근 조건(탈퇴 진행 → 건강정보 동의 → 측정 켜짐)을 한 번 더 확인합니다. 건강 기록 삭제·동의 철회·탈퇴도 같은 행을 잠그므로 저장과 겹치지 않고, 요청을 받은 뒤 철회·탈퇴가 먼저 끝났다면 저장은 아무것도 쓰지 않고 403 `HRV_CONSENT_REQUIRED`(탈퇴 진행 중이면 409 `INVALID_STATE`)로 끝납니다. 동의가 유효한 채 기록만 지운 경우(`DELETE /api/hrv/data`)에는 삭제가 끝난 뒤의 저장을 새 기록으로 받습니다.
 - **구현 해석(확인 필요)** 아침 체크는 호흡 기록이 있으면 건강 필드(컨디션·교란 요인)와 `completed_at`만 비우고 남기며, 남을 것이 없는 체크는 지웁니다. "회복 기반 미승인 추천"은 RECOVERY 중 `APPROVING`·`APPROVED`가 아닌 것이며 지웁니다(`APPROVING`은 외부 등록 확인 전이라 남김). 남는 RECOVERY 제안은 "건강 근거 제거"로 `judgment_state`·`message`를 비우고 `reason_code`를 `HEALTH_DATA_DELETED`로 바꾸며, PRE_START는 `judgment_state`만 비웁니다(제목·시간·Google 일정·승인 상태는 유지). 안전 안내는 `LOW_RECOVERY_2W`·`CBI_HIGH` 모두 건강 근거이므로 지웁니다.
 - 건강정보 동의는 가입 때 필수이므로 동의가 없는 경우는 가입 뒤 철회한 사용자입니다. 철회한 사용자는 일정 기능·호흡·일반 추천만 사용합니다. CBI 응답·컨디션·측정 저장은 동일한 `SENSITIVE_HRV` 동의가 필요합니다. 동의 없이 CBI 단계는 명시적 건너뛰기로 통과할 수 있습니다: `POST /api/onboarding/cbi/skip` → 200 `{ "onboardingStep": "LIFESTYLE" }` (PROFILE 완료·해당 동의 없음인 경우만). 회복 리포트는 200 + locked와 `unavailableReason: CONSENT_REQUIRED`, 4주 리포트는 200 + available:false·cbiDue:false·같은 사유로 표시합니다. 캘린더만 쓰는 흐름을 막지 않습니다.
