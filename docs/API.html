@@ -1054,7 +1054,13 @@
 <hr />
 </div></details></section><div id="empty" class="empty" hidden>검색 결과가 없습니다. 검색어나 분류를 바꿔 주세요.</div><section id="common"><h2>공통 규칙 · 객체</h2><details class="block"><summary>인증 · 오류 · 재시도 · 공통 데이터</summary><div class="content"><h3>주소·형식</h3>
 <ul>
-<li>프론트와 백엔드는 <strong>같은 출처</strong>에서 동작합니다(로컬: Vite가 <code>/api</code>, <code>/oauth2</code>, <code>/login/oauth2</code>를 백엔드로 전달 / 운영: Firebase Hosting rewrite).</li>
+<li>프론트와 백엔드는 <strong>같은 출처</strong>에서 동작합니다. 백엔드에 CORS 설정이 없고 세션 쿠키가 <code>SameSite=Lax</code>이므로 API는 항상 상대 경로(<code>/api/...</code>)로 부릅니다.
+<ul>
+<li>로컬: Vite가 <code>/api</code>, <code>/oauth2</code>, <code>/login/oauth2</code>를 백엔드(<code>localhost:8080</code>)로 전달합니다.</li>
+<li>운영(GCP Cloud Run, 2026-11-17 결정): 한 서비스 안의 nginx가 프론트 빌드 파일을 주고 위 세 경로만 같은 인스턴스의 백엔드로 넘깁니다. 주소는 <code>https://comedown-&lt;프로젝트번호&gt;.asia-northeast3.run.app</code> 하나만 씁니다(<a href="%EB%B0%B0%ED%8F%AC_%EA%B0%80%EC%9D%B4%EB%93%9C.md">배포 가이드</a> 7절).</li>
+<li>프론트를 다른 도메인에 따로 올리거나 Firebase Hosting rewrite 뒤에 API를 두지 않습니다. Firebase Hosting은 <code>__session</code> 외의 쿠키를 지워서 <code>SESSION</code>·<code>XSRF-TOKEN</code>이 전달되지 않습니다.</li>
+</ul>
+</li>
 <li>요청·응답은 JSON, 필드 이름은 camelCase.</li>
 <li>시각은 서울 시간대를 붙인 ISO 8601 (<code>2026-11-11T07:30:00+09:00</code>). 날짜는 서울 기준 <code>YYYY-MM-DD</code>. 주는 <strong>월요일 시작</strong>.</li>
 <li>값이 없으면 필드를 빼지 않고 <code>null</code>로 보냅니다.</li>
