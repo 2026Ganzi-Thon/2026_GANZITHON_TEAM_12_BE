@@ -247,7 +247,7 @@ python docs/build_spec_html.py                            # 문서 HTML 재생�
 - [x] 기준선 DB 스키마(18개 테이블 + 세션) · MySQL 제약 검증 테스트
 - [x] HRV 측정 계산 참고 구현(`HrvAnalyzer`) · 합성 신호 테스트
 - [x] CI(GitHub Actions): 빌드·테스트·문서 동기화 자동 검사
-- [ ] CD: 배포 대상 결정 후 자동 배포
+- [x] CD(GitHub Actions → Cloud Run): main CI 통과 시 자동 배포, 수동 실행 가능. GCP·GitHub 준비 후 동작([배포 가이드](docs/배포_가이드.md) 7.4)
 - [x] 재시도 키 처리(`shared.idempotency`) · local 전용 테스트 로그인
 - [ ] 일정축: Google 로그인·캘린더 동기화·분류·주간 부하·미리 시작하기·추천 승인
 - [ ] HRV축: CBI·아침 체크·회복 계산·회복 추천·홈·리포트·안전 안내
