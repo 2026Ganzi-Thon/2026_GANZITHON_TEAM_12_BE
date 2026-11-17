@@ -2,6 +2,7 @@ package com.comedown.ai.contract;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 해석·요약 문구를 AI로 쓰는 계약. 같은 입력이면 저장된 문구를 돌려주고(ai_outputs), AI를 쓸 수 없거나 실패하면
@@ -34,4 +35,13 @@ public interface AiInterpretation {
     }
 
     Text interpret(Request request);
+
+    /** 추천 카드 문구. 저장은 제안의 소유자(recommendation)가 하므로 ai_outputs에는 두지 않는다. */
+    String SUGGESTION_MESSAGE = "SUGGESTION_MESSAGE";
+
+    /**
+     * 저장하지 않는 문구 한 번 쓰기. AI를 쓸 수 없거나 실패했거나 결과가 검증을 통과하지 못하면 비어 있다
+     * (호출하는 쪽이 규칙 기반 문구를 그대로 쓴다).
+     */
+    Optional<String> write(String kind, List<String> facts, String fallbackText);
 }

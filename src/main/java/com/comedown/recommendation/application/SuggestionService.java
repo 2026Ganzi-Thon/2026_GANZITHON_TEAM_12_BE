@@ -66,6 +66,13 @@ public class SuggestionService implements SuggestionCommands, SuggestionApproval
 
     @Override
     @Transactional
+    public boolean rewriteMessage(long userId, long suggestionId, String aiText) {
+        Suggestion s = lockOwned(userId, suggestionId);
+        return s.rewriteMessageByAi(aiText, serviceTime.now());
+    }
+
+    @Override
+    @Transactional
     public SuggestionView dismiss(long userId, long suggestionId) {
         Suggestion s = lockOwned(userId, suggestionId);
         s.dismiss(serviceTime.now());

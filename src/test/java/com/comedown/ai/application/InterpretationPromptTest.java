@@ -20,6 +20,15 @@ class InterpretationPromptTest {
     }
 
     @Test
+    void 추천_카드는_제안만_권하는_규칙을_쓰고_해석은_권유를_금지한다() {
+        assertThat(InterpretationPrompt.system("SUGGESTION_MESSAGE")).contains("'제안 내용'과 '제안 시간'만 가볍게 권한다")
+                .contains("진단").doesNotContain("조언이나 권유, 몸 상태에 대한 평가를 덧붙이지 않는다");
+        assertThat(InterpretationPrompt.system("RECOVERY_INTERPRETATION")).isEqualTo(InterpretationPrompt.SYSTEM)
+                .contains("조언이나 권유, 몸 상태에 대한 평가를 덧붙이지 않는다");
+        assertThat(InterpretationPrompt.user("SUGGESTION_MESSAGE", FACTS, "x")).contains("추천 카드");
+    }
+
+    @Test
     void 캐시_키는_종류_사실_대체_문구가_같으면_같고_하나라도_다르면_다르다() {
         String hash = InterpretationPrompt.inputHash("RECOVERY_INTERPRETATION", FACTS, "a");
 

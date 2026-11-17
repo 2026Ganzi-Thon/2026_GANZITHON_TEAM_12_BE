@@ -15,6 +15,14 @@ public interface SuggestionCommands {
     /** "했어요"(APPROVED이고 일정 종료 후). doneAt만 채우고 상태 유지. */
     SuggestionView markDone(long userId, long suggestionId);
 
+    /**
+     * 규칙 기반 카드 문구를 AI가 쓴 문구로 바꾼다(aiGenerated true, fallback false). PROPOSED이고 아직 규칙 기반
+     * 문구일 때만 바꾸며, 그 사이 승인·건너뛰기 등으로 상태가 바뀌었으면 바꾸지 않는다.
+     *
+     * @return 바꿨으면 true
+     */
+    boolean rewriteMessage(long userId, long suggestionId, String aiText);
+
     /** 만료 시각이 지난 PROPOSED 제안을 EXPIRED로 바꾼다. @return 바꾼 수 */
     int expireDue();
 }

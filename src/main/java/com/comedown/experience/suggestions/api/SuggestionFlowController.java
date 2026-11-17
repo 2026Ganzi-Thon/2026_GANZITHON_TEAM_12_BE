@@ -5,6 +5,7 @@ import com.comedown.account.contract.HealthDataAccess;
 import com.comedown.experience.suggestions.application.PreStartGenerationFlow;
 import com.comedown.experience.suggestions.application.RecoverySuggestionFlow;
 import com.comedown.experience.suggestions.application.SuggestionApprovalFlow;
+import com.comedown.experience.suggestions.application.SuggestionMessageAi;
 import com.comedown.recommendation.contract.SuggestionPayload;
 import com.comedown.recommendation.contract.SuggestionPayloads;
 import com.comedown.recommendation.contract.SuggestionQuery;
@@ -38,10 +39,11 @@ class SuggestionFlowController {
     private final SuggestionPayloads payloads;
     private final RecoverySuggestionFlow recovery;
     private final AccountAccessQuery accountAccess;
+    private final SuggestionMessageAi messages;
 
     SuggestionFlowController(PreStartGenerationFlow generation, SuggestionApprovalFlow approval,
             SuggestionQuery query, ServiceTime time, SuggestionPayloads payloads, RecoverySuggestionFlow recovery,
-            AccountAccessQuery accountAccess) {
+            AccountAccessQuery accountAccess, SuggestionMessageAi messages) {
         this.generation = generation;
         this.approval = approval;
         this.query = query;
@@ -49,6 +51,7 @@ class SuggestionFlowController {
         this.payloads = payloads;
         this.recovery = recovery;
         this.accountAccess = accountAccess;
+        this.messages = messages;
     }
 
     @PostMapping("/api/suggestions/generate")
@@ -60,8 +63,8 @@ class SuggestionFlowController {
             throw FieldValidationException.of("type", "PRE_START 또는 RECOVERY여야 해요.");
         }
         generation.refresh(user.id());
-        return new SuggestionsResponse(
-                payloads.of(user.id(), query.search(user.id(), "PRE_START", "PROPOSED", null)));
+        return new SuggestionsResponse(messages.apply(user.id(),
+                payloads.of(user.id(), query.search(user.id(), "PRE_START", "PROPOSED", null))));
     }
 
     /** 오늘의 회복 추천: 온보딩 완료·건강정보 동의가 필요하다(회복 상태가 근거라서). */
@@ -75,8 +78,8 @@ class SuggestionFlowController {
             throw new ApiException(ErrorCode.HRV_CONSENT_REQUIRED);
         }
         recovery.refresh(userId);
-        return new SuggestionsResponse(
-                payloads.of(userId, query.search(userId, "RECOVERY", "PROPOSED", time.today())));
+        return new SuggestionsResponse(messages.apply(userId,
+                payloads.of(userId, query.search(userId, "RECOVERY", "PROPOSED", time.today()))));
     }
 
     @GetMapping("/api/suggestions/{id}/slots")

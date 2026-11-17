@@ -152,6 +152,19 @@ class AiInterpretationIntegrationTest {
     }
 
     @Test
+    void 저장하지_않는_쓰기는_성공한_문구만_돌려주고_ai_outputs에_남기지_않는다() {
+        when(port.complete(contains("가볍게 권한다"), contains("추천 카드"))).thenReturn("20분 걷기 어때요?");
+
+        assertThat(ai.write(AiInterpretation.SUGGESTION_MESSAGE, FACTS, FALLBACK)).contains("20분 걷기 어때요?");
+        assertThat(count()).isZero();
+
+        when(port.complete(any(), any())).thenThrow(new ExternalServiceException(Kind.UNCERTAIN, "timeout"));
+        assertThat(ai.write(AiInterpretation.SUGGESTION_MESSAGE, FACTS, FALLBACK)).isEmpty();
+        when(port.available()).thenReturn(false);
+        assertThat(ai.write(AiInterpretation.SUGGESTION_MESSAGE, FACTS, FALLBACK)).isEmpty();
+    }
+
+    @Test
     void 삭제는_그_사용자의_문구만_지운다() {
         when(port.complete(any(), any())).thenReturn("문구예요.");
         long other = newUser();

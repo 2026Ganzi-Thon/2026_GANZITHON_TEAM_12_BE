@@ -88,7 +88,8 @@ AI가 만든 문구는 항상 이 모양으로 내려갑니다. `aiGenerated: tr
   - AI는 주어진 사실을 문장으로 옮기기만 하고 계산·판단은 하지 않습니다. 결과가 비었거나 200자를 넘거나 진단·치료·병원 같은 표현이 있으면 버리고 규칙 기반 문구를 씁니다.
   - 같은 입력의 문구는 `ai_outputs`에 저장해 다시 부르지 않습니다. 호출은 5초 안에 끝나지 않으면 규칙 기반 문구(`aiGenerated: false`, `fallback: true`)로 대체하고 10분 뒤 다시 시도합니다.
   - `OPENAI_API_KEY`가 없으면 AI를 부르지 않고 항상 규칙 기반 문구입니다. 모델은 `OPENAI_MODEL`(비우면 `gpt-4.1-mini`)입니다.
-  - 추천 카드의 `message`와 일정 분류는 아직 규칙 기반입니다(`message.aiGenerated: false`, `categorySource: RULE`).
+  - **추천 카드의 `message`**(PRE_START·RECOVERY)도 AI가 씁니다. 제안은 규칙 기반 문구로 먼저 저장하고, 저장이 끝난 뒤 AI 문구로 바꿔 `suggestions`에 저장합니다(`ai_outputs`에는 두지 않음). 바꾸는 시점은 컨디션 저장·오늘 체크 조회(RECOVERY), `POST /api/suggestions/generate`, 캘린더 동기화(PRE_START)이며 한 번에 최대 3건입니다. AI에는 제안 종류·내용·시간·이유만 보내고 대비할 일정의 제목은 보내지 않습니다. 실패하면 규칙 기반 문구가 그대로 남고 다음 기회에 다시 시도합니다. 사용자가 이미 승인·건너뛴 제안의 문구는 바꾸지 않습니다.
+  - 일정 분류는 아직 규칙 기반입니다(`categorySource: RULE`).
 
 ### 자주 쓰는 객체
 

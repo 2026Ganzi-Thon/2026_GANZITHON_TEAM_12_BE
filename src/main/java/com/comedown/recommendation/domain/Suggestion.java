@@ -71,7 +71,9 @@ public class Suggestion {
     @Column(name = "calculation_version", nullable = false, length = 30)
     private String calculationVersion;
 
-    @Column(name = "message", length = 300)
+    static final int MESSAGE_MAX = 300;
+
+    @Column(name = "message", length = MESSAGE_MAX)
     private String message;
 
     @Column(name = "ai_generated", nullable = false)
@@ -138,6 +140,24 @@ public class Suggestion {
         s.createdAt = now;
         s.updatedAt = now;
         return s;
+    }
+
+    /**
+     * 규칙 기반 문구를 AI 문구로 바꾼다. PROPOSED이고 아직 규칙 기반 문구일 때만 바꾼다(사용자가 이미 보고 승인한
+     * 문구는 바꾸지 않는다). 컬럼 길이를 넘는 문구는 받지 않는다.
+     *
+     * @return 바꿨으면 true
+     */
+    public boolean rewriteMessageByAi(String aiText, Instant now) {
+        if (status != SuggestionStatus.PROPOSED || !fallback || aiText == null || aiText.isBlank()
+                || aiText.length() > MESSAGE_MAX) {
+            return false;
+        }
+        message = aiText;
+        aiGenerated = true;
+        fallback = false;
+        updatedAt = now;
+        return true;
     }
 
     // ---------- 사용자 행동 ----------
