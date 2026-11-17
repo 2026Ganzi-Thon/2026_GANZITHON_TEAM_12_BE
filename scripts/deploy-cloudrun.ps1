@@ -28,20 +28,45 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
+# gcloud and docker print progress to stderr. With 'Stop', Windows PowerShell 5.1 turns those
+# lines into a terminating NativeCommandError when output is redirected, so run native tools
+# under 'Continue' and judge success by the exit code only.
 function Invoke-Native {
     param([string]$Exe, [string[]]$Arguments)
     Write-Host "> $Exe $($Arguments -join ' ')"
-    & $Exe @Arguments
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Exe @Arguments
+    } finally {
+        $ErrorActionPreference = $previous
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "$Exe failed with exit code $LASTEXITCODE"
     }
+}
+
+# Same as Invoke-Native, but returns stdout as one trimmed string (stderr is not captured).
+function Get-NativeOutput {
+    param([string]$Exe, [string[]]$Arguments)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $Exe @Arguments 2>$null
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Exe $($Arguments -join ' ') failed with exit code $LASTEXITCODE"
+    }
+    return ($output -join "`n").Trim()
 }
 
 if (-not $ServiceAccount) {
     $ServiceAccount = "comedown-run@$ProjectId.iam.gserviceaccount.com"
 }
 if (-not $Tag) {
-    $sha = (& git -C $root rev-parse --short HEAD).Trim()
+    $sha = Get-NativeOutput 'git' @('-C', $root, 'rev-parse', '--short', 'HEAD')
     $Tag = "$sha-$(Get-Date -Format 'yyyyMMddHHmmss')"
 }
 if ($FrontendDist -and -not (Test-Path (Join-Path $FrontendDist 'index.html'))) {
@@ -112,11 +137,18 @@ Invoke-Native 'gcloud' @('run', 'services', 'add-iam-policy-binding', $ServiceNa
     '--project', $ProjectId, '--region', $Region,
     '--member', 'allUsers', '--role', 'roles/run.invoker', '--quiet')
 
-$url = (& gcloud run services describe $ServiceName --project $ProjectId --region $Region --format 'value(status.url)').Trim()
+# Cloud Run serves the service on two hosts: the deterministic one below and an older
+# random-looking one (status.url). The app builds OAuth redirect URIs from the host the
+# browser used, so the team should always use the deterministic host.
+$projectNumber = Get-NativeOutput 'gcloud' @('projects', 'describe', $ProjectId, '--format', 'value(projectNumber)')
+$url = "https://$ServiceName-$projectNumber.$Region.run.app"
+$legacyUrl = Get-NativeOutput 'gcloud' @('run', 'services', 'describe', $ServiceName,
+    '--project', $ProjectId, '--region', $Region, '--format', 'value(status.url)')
 Remove-Item $renderedPath -ErrorAction SilentlyContinue
 Write-Host ''
 Write-Host "Deployed $Tag"
 Write-Host "URL: $url"
+Write-Host "(Also reachable at $legacyUrl - do not use it: Google login only accepts the URL above.)"
 Write-Host "Google OAuth redirect URIs to register:"
 Write-Host "  $url/login/oauth2/code/google"
 Write-Host "  $url/login/oauth2/code/google-calendar"
