@@ -60,6 +60,10 @@ class MorningConditionApiIntegrationTest {
     @Autowired
     JsonMapper jsonMapper;
 
+    /** AI 전송 대체. 따로 정하지 않으면 쓸 수 없는 상태(available=false)라 규칙 기반 문구가 나온다. */
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.comedown.ai.contract.AiCompletionPort aiPort;
+
     @Autowired
     com.comedown.recovery.contract.RecoveryCommands recoveryCommands;
 
@@ -163,6 +167,48 @@ class MorningConditionApiIntegrationTest {
                                            "aiGenerated":false,"fallback":true},
                          "suggestions":[]}
                         """, JsonCompareMode.STRICT));
+    }
+
+    @Test
+    void 기준선_뒤에는_AI가_쓴_회복_해석을_주고_같은_날_리포트와_다시_조회에서_같은_문구를_쓴다() throws Exception {
+        org.mockito.Mockito.when(aiPort.available()).thenReturn(true);
+        org.mockito.Mockito.when(aiPort.model()).thenReturn("test-model");
+        org.mockito.Mockito.when(aiPort.complete(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn("최근 7일 회복이 평소 범위 안에 있어요.");
+        double[] ln = {3.60, 3.90, 3.70, 3.80, 3.65, 3.85};
+        for (int i = 0; i < ln.length; i++) {
+            seedEligibleDay("2026-11-0" + (6 + i), ln[i]);
+        }
+        seedMeasurementToday(3.75);
+
+        condition(3, false, false, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interpretation.text").value("최근 7일 회복이 평소 범위 안에 있어요."))
+                .andExpect(jsonPath("$.interpretation.aiGenerated").value(true))
+                .andExpect(jsonPath("$.interpretation.fallback").value(false));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/morning-checks/today").with(loginAs(userId)))
+                .andExpect(jsonPath("$.result.interpretation.aiGenerated").value(true));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/reports/recovery?days=14").with(loginAs(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interpretation.text").value("최근 7일 회복이 평소 범위 안에 있어요."))
+                .andExpect(jsonPath("$.interpretation.aiGenerated").value(true));
+
+        // 세 화면이 같은 저장 문구를 쓰므로 AI는 한 번만 부른다. 보낸 내용에는 수치·상태만 있다.
+        org.mockito.ArgumentCaptor<String> sent = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(aiPort, org.mockito.Mockito.times(1))
+                .complete(org.mockito.ArgumentMatchers.any(), sent.capture());
+        assertThat(sent.getValue()).contains("최근 7일 회복 상태: 평소 범위 안").doesNotContain("아리").doesNotContain("@");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ai_outputs WHERE user_id = ?", Integer.class, userId))
+                .isEqualTo(1);
+
+        // 건강 기록을 지우면 AI 문구 캐시도 함께 지운다.
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/hrv/data")
+                        .with(loginAs(userId)).with(csrf()))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ai_outputs WHERE user_id = ?", Integer.class, userId))
+                .isZero();
     }
 
     // ---------- 회복 추천·2축 판단 ----------

@@ -1,6 +1,7 @@
 package com.comedown.experience.reports.application;
 
 import com.comedown.account.contract.AccountAccessQuery;
+import com.comedown.ai.contract.AiInterpretation;
 import com.comedown.account.contract.HealthDataAccess;
 import com.comedown.checkin.contract.DayIndex;
 import com.comedown.recovery.contract.DailyRecoverySnapshot;
@@ -45,13 +46,15 @@ public class RecoveryReportQuery {
     private final RecoveryQuery recoveryQuery;
     private final ServiceTime serviceTime;
     private final ObjectProvider<ProgramWeekLoadQuery> weekLoads;
+    private final AiInterpretation ai;
 
     public RecoveryReportQuery(AccountAccessQuery accountAccess, RecoveryQuery recoveryQuery,
-            ServiceTime serviceTime, ObjectProvider<ProgramWeekLoadQuery> weekLoads) {
+            ServiceTime serviceTime, ObjectProvider<ProgramWeekLoadQuery> weekLoads, AiInterpretation ai) {
         this.accountAccess = accountAccess;
         this.recoveryQuery = recoveryQuery;
         this.serviceTime = serviceTime;
         this.weekLoads = weekLoads;
+        this.ai = ai;
     }
 
     /** 온보딩 완료 후에만(403). */
@@ -108,7 +111,7 @@ public class RecoveryReportQuery {
 
         return new RecoveryReport(false, null, unlock, graph, current.changePct(), current.recoveryStatus(),
                 latestQuality, loadVsUsualPct(weeks, loads),
-                interpretation(current), rangePosition(access, userId, today));
+                interpretation(userId, current), rangePosition(access, userId, today));
     }
 
     /** 범위 안 주차별 부하. 일정축 구현 전·캘린더 미연결이면 빈 맵. */
@@ -152,10 +155,16 @@ public class RecoveryReportQuery {
                 recovery == null ? INSUFFICIENT_DATA : null, INSUFFICIENT_DATA);
     }
 
-    /** AI 도입 전 규칙 기반 해석 문구(recovery 소유 문구). */
-    static RecoveryReport.Interpretation interpretation(DailyRecoverySnapshot current) {
-        return new RecoveryReport.Interpretation(
-                RecoveryFallbackText.of(current.recoveryStatus(), current.changePct()), false, true);
+    /**
+     * 회복 해석 한 줄. AI가 쓰고(같은 날 같은 값이면 저장된 문구), 쓸 수 없으면 recovery의 규칙 기반 문구다.
+     * 아침 결과(B6)와 같은 종류·기준 날짜·사실을 써서 같은 문구가 나온다.
+     */
+    private RecoveryReport.Interpretation interpretation(long userId, DailyRecoverySnapshot current) {
+        AiInterpretation.Text text = ai.interpret(new AiInterpretation.Request(userId,
+                AiInterpretation.RECOVERY_INTERPRETATION, current.date(),
+                RecoveryFallbackText.facts(current.recoveryStatus(), current.changePct()),
+                RecoveryFallbackText.of(current.recoveryStatus(), current.changePct())));
+        return new RecoveryReport.Interpretation(text.text(), text.aiGenerated(), text.fallback());
     }
 
     private static RecoveryReport locked(String reason, RecoveryReport.Unlock unlock) {

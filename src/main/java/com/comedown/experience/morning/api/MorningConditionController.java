@@ -2,6 +2,7 @@ package com.comedown.experience.morning.api;
 
 import com.comedown.experience.morning.application.ConditionSaveFlow;
 import com.comedown.experience.morning.application.MorningAccessGuard;
+import com.comedown.experience.morning.application.TodayInterpretation;
 import com.comedown.experience.morning.application.TodayResult;
 import com.comedown.shared.error.ErrorResponse.FieldError;
 import com.comedown.shared.error.FieldValidationException;
@@ -27,19 +28,23 @@ public class MorningConditionController {
     private final MorningAccessGuard accessGuard;
     private final ConditionSaveFlow flow;
     private final Validator validator;
+    private final TodayInterpretation interpretation;
 
-    public MorningConditionController(MorningAccessGuard accessGuard, ConditionSaveFlow flow, Validator validator) {
+    public MorningConditionController(MorningAccessGuard accessGuard, ConditionSaveFlow flow, Validator validator,
+            TodayInterpretation interpretation) {
         this.accessGuard = accessGuard;
         this.flow = flow;
         this.validator = validator;
+        this.interpretation = interpretation;
     }
 
     @PutMapping("/api/morning-checks/today/condition")
     public TodayResult saveCondition(CurrentUser user, @RequestBody ConditionRequest request) {
         LocalDate onboardingDate = accessGuard.requireConditionAccess(user.id());
         validate(request);
-        return flow.save(user.id(), onboardingDate, request.score(), request.alcohol(), request.sick(),
+        TodayResult saved = flow.save(user.id(), onboardingDate, request.score(), request.alcohol(), request.sick(),
                 request.caffeine());
+        return interpretation.apply(user.id(), saved); // 저장 트랜잭션이 끝난 뒤 AI 해석을 붙인다
     }
 
     private void validate(ConditionRequest request) {

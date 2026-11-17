@@ -334,7 +334,7 @@ integration의 adapter → 그 port를 구현 + Google/OpenAI SDK
 </tbody>
 </table>
 <ul>
-<li><strong>integration.google</strong>은 일정축이 작성한다. <strong>ai·integration.openai</strong>는 핵심 기능 완성 후 AI 도입 단계에서 담당을 정한다. 그 전까지 문구는 각 소유 기능의 규칙 기반 문구(<code>fallback: true</code>)로 내려준다.</li>
+<li><strong>integration.google</strong>은 일정축이 작성한다. <strong>ai·integration.openai</strong>는 HRV축이 작성했다(2026-11-17): ai가 프롬프트·결과 검증·캐시(<code>ai_outputs</code>)·대체 규칙을 갖고 <code>ai.contract.AiCompletionPort</code>를 integration.openai가 구현한다. AI를 쓸 수 없으면 각 소유 기능의 규칙 기반 문구(<code>fallback: true</code>)를 내려준다.</li>
 <li><strong>PRE_START 규칙</strong>은 일정축이 작성하지만 파일 위치는 <code>recommendation/domain/policy/</code>다. 제안 저장·상태 전이는 recommendation의 계약을 통해서만 한다.</li>
 <li><strong>제안 승인 흐름</strong>(experience.suggestions)은 일정축이 Google 등록·타임아웃 재확인·재시도를 조합하고, recommendation의 상태 전이 계약(HRV축)을 호출한다. 상태 전이 계약은 승인 흐름 구현 전에 인터페이스 PR로 먼저 합의한다.</li>
 <li><strong>홈</strong>(experience.home)은 HRV축이 조합하고 일정축은 주간 부하·PRE_START 제안 읽기 계약을 제공한다.</li>

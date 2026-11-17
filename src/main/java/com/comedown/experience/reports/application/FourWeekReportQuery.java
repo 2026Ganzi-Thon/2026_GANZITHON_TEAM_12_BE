@@ -1,6 +1,7 @@
 package com.comedown.experience.reports.application;
 
 import com.comedown.account.contract.AccountAccessQuery;
+import com.comedown.ai.contract.AiInterpretation;
 import com.comedown.account.contract.HealthDataAccess;
 import com.comedown.cbi.contract.CbiQuery;
 import com.comedown.cbi.contract.CbiResult;
@@ -46,10 +47,11 @@ public class FourWeekReportQuery {
     private final ServiceTime serviceTime;
     private final SubscriptionQuery subscriptionQuery;
     private final ObjectProvider<ProgramWeekLoadQuery> weekLoads;
+    private final AiInterpretation ai;
 
     public FourWeekReportQuery(AccountAccessQuery accountAccess, CbiQuery cbiQuery, RecoveryQuery recoveryQuery,
             SuggestionQuery suggestionQuery, ServiceTime serviceTime, ObjectProvider<ProgramWeekLoadQuery> weekLoads,
-            SubscriptionQuery subscriptionQuery) {
+            SubscriptionQuery subscriptionQuery, AiInterpretation ai) {
         this.subscriptionQuery = subscriptionQuery;
         this.accountAccess = accountAccess;
         this.cbiQuery = cbiQuery;
@@ -57,6 +59,7 @@ public class FourWeekReportQuery {
         this.suggestionQuery = suggestionQuery;
         this.serviceTime = serviceTime;
         this.weekLoads = weekLoads;
+        this.ai = ai;
     }
 
     /** 온보딩 완료 후에만(403). */
@@ -85,7 +88,7 @@ public class FourWeekReportQuery {
         FourWeekReport.Recovery recovery = recovery(userId, day1, day28);
         FourWeekReport.Suggestions suggestions = suggestions(userId, day1, day28);
         return new FourWeekReport(true, false, day28, null, cbi, recovery, load(userId, day1), suggestions,
-                interpretation(cbi, recovery), plan(userId));
+                interpretation(userId, day28, cbi, recovery), plan(userId));
     }
 
     private FourWeekReport.Plan plan(long userId) {
@@ -157,7 +160,31 @@ public class FourWeekReportQuery {
                 inPeriod.stream().filter(s -> s.doneAt() != null).count());
     }
 
-    /** AI 도입 전 규칙 기반 문구(사실만 전달, 진단·권고 없음). */
+    /** 4주 요약 한 줄. AI가 쓰고(같은 값이면 저장된 문구), 쓸 수 없으면 아래 규칙 기반 문구다. */
+    private RecoveryReport.Interpretation interpretation(long userId, LocalDate day28, FourWeekReport.Cbi cbi,
+            FourWeekReport.Recovery recovery) {
+        RecoveryReport.Interpretation fallback = interpretation(cbi, recovery);
+        List<String> facts = new java.util.ArrayList<>();
+        if (cbi.diff() != null) {
+            facts.add("몸과 마음의 피로 점수 변화(4주 전 대비, 낮을수록 덜 지침): " + signed(cbi.diff().personal()) + "점");
+            facts.add("일·공부로 인한 피로 점수 변화(4주 전 대비, 낮을수록 덜 지침): " + signed(cbi.diff().work()) + "점");
+        }
+        if (recovery.changePct() != null) {
+            facts.add("첫 주 대비 마지막 주 회복(HRV) 변화: " + signed(recovery.changePct()) + "%");
+        }
+        if (facts.isEmpty()) {
+            return fallback; // 전할 수치가 없으면 AI에 묻지 않는다
+        }
+        AiInterpretation.Text text = ai.interpret(new AiInterpretation.Request(userId,
+                AiInterpretation.FOUR_WEEK_SUMMARY, day28, facts, fallback.text()));
+        return new RecoveryReport.Interpretation(text.text(), text.aiGenerated(), text.fallback());
+    }
+
+    private static String signed(BigDecimal value) {
+        return (value.signum() > 0 ? "+" : "") + value.stripTrailingZeros().toPlainString();
+    }
+
+    /** 규칙 기반 문구(사실만 전달, 진단·권고 없음). AI를 쓸 수 없을 때의 대체 문구다. */
     static RecoveryReport.Interpretation interpretation(FourWeekReport.Cbi cbi, FourWeekReport.Recovery recovery) {
         StringBuilder text = new StringBuilder();
         if (cbi.diff() != null) {

@@ -4,6 +4,7 @@ import com.comedown.account.contract.AccountCommands;
 import com.comedown.account.contract.AccountDeletion;
 import com.comedown.account.contract.GoogleAccessRevocation;
 import com.comedown.account.contract.UserSessions;
+import com.comedown.ai.contract.AiDataDeletion;
 import com.comedown.calendar.contract.CalendarDataDeletion;
 import com.comedown.cbi.contract.CbiDataDeletion;
 import com.comedown.checkin.contract.CheckinDataDeletion;
@@ -36,13 +37,14 @@ public class LifecycleTransactions {
     private final CalendarDataDeletion calendar;
     private final ScheduleDataDeletion schedule;
     private final IdempotencyService idempotency;
+    private final AiDataDeletion aiOutputs;
 
     @SuppressWarnings("checkstyle:ParameterNumber")
     public LifecycleTransactions(AccountCommands account, AccountDeletion deletion, GoogleAccessRevocation revocation,
             UserSessions sessions, SuggestionDataDeletion suggestionHealth,
             SuggestionCalendarDeletion suggestionCalendar, SafetyDataDeletion safety, CbiDataDeletion cbi,
             RecoveryDataDeletion recovery, CheckinDataDeletion checkin, CalendarDataDeletion calendar,
-            ScheduleDataDeletion schedule, IdempotencyService idempotency) {
+            ScheduleDataDeletion schedule, IdempotencyService idempotency, AiDataDeletion aiOutputs) {
         this.account = account;
         this.deletion = deletion;
         this.revocation = revocation;
@@ -56,9 +58,10 @@ public class LifecycleTransactions {
         this.calendar = calendar;
         this.schedule = schedule;
         this.idempotency = idempotency;
+        this.aiOutputs = aiOutputs;
     }
 
-    /** 건강 기록 삭제: 제안 근거 → 안전 안내 → CBI → 회복 → 측정·체크 → 재시도 응답 캐시 순서. */
+    /** 건강 기록 삭제: 제안 근거 → 안전 안내 → CBI → 회복 → AI 문구 캐시 → 측정·체크 → 재시도 응답 캐시 순서. */
     @Transactional
     public void eraseHealthData(long userId) {
         deletion.lock(userId);
@@ -113,6 +116,7 @@ public class LifecycleTransactions {
         safety.deleteAll(userId);
         cbi.deleteAll(userId);
         recovery.deleteAll(userId);
+        aiOutputs.deleteAll(userId); // 회복 해석·4주 요약 문구(건강 기록에서 나온 값)
         checkin.eraseHealthData(userId);
         idempotency.deleteForUser(userId, "hrv-");
         idempotency.deleteForUser(userId, "cbi-");
