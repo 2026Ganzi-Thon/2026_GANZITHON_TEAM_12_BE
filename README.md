@@ -184,6 +184,8 @@ docker compose up -d        # MySQL 8.4 → localhost:3307
 
 실행하면 Flyway가 기준선 스키마를 자동으로 만듭니다.
 
+local 프로필은 저장소 루트의 `.env`를 읽습니다(`GOOGLE_*`, `COMEDOWN_TOKEN_KEY`, `OPENAI_*`). 따로 환경 변수로 내보내지 않아도 되고, 같은 이름의 환경 변수가 있으면 그 값이 우선합니다. `OPENAI_API_KEY`를 넣으면 해석 문구·추천 카드 문구·일정 분류에 AI를 쓰고, 비워 두면 규칙 기반으로만 동작합니다.
+
 `GOOGLE_CLIENT_ID`를 넣으면 Google 로그인이 켜집니다. 이때 `GOOGLE_CLIENT_SECRET`이나 `COMEDOWN_TOKEN_KEY`(Base64로 인코딩한 32바이트)가 비어 있으면 서버가 시작하지 않습니다(로그인마다 실패하는 상태로 뜨지 않게). 셋 다 비워 두면 Google 로그인 없이 실행됩니다.
 
 ### 프록시 뒤에 배포할 때 (GCP 등)

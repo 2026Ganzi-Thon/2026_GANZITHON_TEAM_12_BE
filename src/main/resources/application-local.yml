@@ -1,5 +1,9 @@
 # 로컬 전용 설정. docker-compose.yml의 MySQL(3307)과 맞춘다. 운영 비밀값이 아니다.
 spring:
+  config:
+    # 저장소 루트의 .env(Git 제외)를 읽는다: GOOGLE_*·COMEDOWN_TOKEN_KEY·OPENAI_* 값을 따로 export하지 않아도 된다.
+    # 파일이 없으면 건너뛰고, 같은 이름의 실제 환경 변수가 있으면 그 값이 우선한다.
+    import: optional:file:.env[.properties]
   datasource:
     url: jdbc:mysql://localhost:3307/comedown
     username: comedown
