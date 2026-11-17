@@ -30,6 +30,11 @@ public class AccountAccessQueryService implements AccountAccessQuery {
     }
 
     @Override
+    public boolean aiNoticeConsented(long userId) {
+        return reader.hasActiveConsent(userId, AccountAccessReader.AI_NOTICE);
+    }
+
+    @Override
     public Optional<String> findNickname(long userId) {
         return reader.findNickname(userId);
     }

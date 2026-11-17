@@ -3,6 +3,7 @@ package com.comedown.experience.calendarflow.application;
 import com.comedown.account.contract.AccountAccessQuery;
 import com.comedown.account.contract.CalendarCredential;
 import com.comedown.account.contract.CalendarCredentialProvider;
+import com.comedown.calendar.contract.CalendarAiClassifier;
 import com.comedown.calendar.contract.CalendarEventSource;
 import com.comedown.experience.suggestions.application.PreStartGenerationFlow;
 import com.comedown.calendar.contract.SyncResult;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -38,16 +40,18 @@ public class CalendarSyncFlow {
     private final CalendarCredentialProvider credentials;
     private final CalendarEventSource source;
     private final CalendarSyncCommit commit;
+    private final CalendarAiClassifier aiClassifier;
     private final PreStartGenerationFlow preStart;
     private final ServiceTime time;
 
     public CalendarSyncFlow(AccountAccessQuery accountAccess, CalendarCredentialProvider credentials,
             CalendarEventSource source, CalendarSyncCommit commit, PreStartGenerationFlow preStart,
-            ServiceTime time) {
+            ServiceTime time, CalendarAiClassifier aiClassifier) {
         this.accountAccess = accountAccess;
         this.credentials = credentials;
         this.source = source;
         this.commit = commit;
+        this.aiClassifier = aiClassifier;
         this.preStart = preStart;
         this.time = time;
     }
@@ -73,7 +77,11 @@ public class CalendarSyncFlow {
                 case FAILURE, UNCERTAIN -> new ApiException(ErrorCode.CALENDAR_API_ERROR);
             };
         }
-        SyncResult saved = commit.commit(userId, range, fetched, mondaysBetween(fromDate, toDate));
+        // 규칙으로 분류하지 못한 제목만 AI에 묻는다. 저장 트랜잭션 전에 부르고, 실패하면 규칙 분류만으로 저장한다.
+        // 제목을 외부 AI에 보내므로 AI 활용 안내 동의가 있을 때만 한다.
+        Map<String, String> aiCategories = accountAccess.aiNoticeConsented(userId)
+                ? aiClassifier.classify(userId, fetched) : Map.of();
+        SyncResult saved = commit.commit(userId, range, fetched, mondaysBetween(fromDate, toDate), aiCategories);
         refreshSuggestions(userId);
         return new Result(range.start(), range.endExclusive(), fetched.size(), saved);
     }

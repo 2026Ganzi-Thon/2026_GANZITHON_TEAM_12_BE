@@ -7,6 +7,7 @@ import com.comedown.calendar.domain.CategoryOverride;
 import com.comedown.calendar.domain.CategorySource;
 import com.comedown.calendar.domain.Classification;
 import com.comedown.calendar.domain.ClassificationResolver;
+import com.comedown.calendar.domain.EventCategory;
 import com.comedown.calendar.domain.RuleClassifier;
 import com.comedown.calendar.infrastructure.persistence.CalendarEventStore;
 import com.comedown.calendar.infrastructure.persistence.CategoryOverrideStore;
@@ -51,7 +52,7 @@ public class CalendarSyncService implements CalendarEventSync {
     @Override
     @Transactional
     public SyncResult apply(long userId, InstantRange range, List<SyncedEvent> events,
-            Set<Long> referencedEventIds) {
+            Set<Long> referencedEventIds, Map<String, String> aiCategories) {
         Instant now = time.now();
         List<CategoryOverride> rules = overrides.findAll(userId);
         Map<String, Incoming> incoming = normalize(userId, events);
@@ -66,7 +67,8 @@ public class CalendarSyncService implements CalendarEventSync {
             SyncedEvent s = in.source();
             StoredEvent row = existing.get(s.googleEventId());
             Classification stored = row == null ? null : row.classification();
-            Classification automatic = automatic(s, stored);
+            boolean titleUnchanged = row != null && Objects.equals(row.titleHash(), in.titleHash());
+            Classification automatic = automatic(s, stored, titleUnchanged, aiCategories.get(s.googleEventId()));
             Classification resolved = ClassificationResolver.resolve(
                     new com.comedown.calendar.domain.EventKeys(s.googleEventId(), s.recurringEventId(), in.titleHash()),
                     rules, stored, automatic);
@@ -99,12 +101,19 @@ public class CalendarSyncService implements CalendarEventSync {
     }
 
     /**
-     * 직접 수정 규칙이 없을 때 쓸 자동 분류. 저장된 AI 분류는 그대로 두고(AI &gt; 규칙), 그 외에는 지금 제목으로 규칙 분류를
-     * 다시 한다(제목이 바뀌거나 규칙표가 바뀌면 다음 동기화에서 반영된다).
+     * 직접 수정 규칙이 없을 때 쓸 자동 분류(AI &gt; 규칙). 이번에 AI가 분류했으면 그 값, 아니면 저장된 AI 분류를 제목이
+     * 그대로일 때만 유지하고, 그 외에는 지금 제목으로 규칙 분류를 다시 한다(제목이 바뀌거나 규칙표가 바뀌면 다음
+     * 동기화에서 반영된다). Come & Down이 넣은 일정은 항상 규칙 분류(RECOVERY)다.
      */
-    private static Classification automatic(SyncedEvent event, Classification stored) {
-        if (stored != null && stored.source() == CategorySource.AI) {
-            return stored;
+    private static Classification automatic(SyncedEvent event, Classification stored, boolean titleUnchanged,
+            String aiCategory) {
+        if (!event.createdByApp()) {
+            if (aiCategory != null) {
+                return RuleClassifier.withDefaults(EventCategory.valueOf(aiCategory), CategorySource.AI);
+            }
+            if (stored != null && stored.source() == CategorySource.AI && titleUnchanged) {
+                return stored;
+            }
         }
         return RuleClassifier.classify(event.title(), event.createdByApp());
     }

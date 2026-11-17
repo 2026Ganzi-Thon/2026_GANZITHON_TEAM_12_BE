@@ -16,6 +16,7 @@ public class AccountAccessReader {
 
     static final String SENSITIVE_HRV = "SENSITIVE_HRV";
     public static final String CALENDAR = "CALENDAR";
+    public static final String AI_NOTICE = "AI_NOTICE";
     static final String ACTIVE = "ACTIVE";
 
     private final JdbcClient jdbc;

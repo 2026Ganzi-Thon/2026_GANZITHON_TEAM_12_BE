@@ -2,6 +2,7 @@ package com.comedown.calendar.contract;
 
 import com.comedown.shared.time.InstantRange;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** 동기화한 일정을 저장하는 계약. calendar_events 쓰기는 calendar만 한다. */
@@ -13,5 +14,15 @@ public interface CalendarEventSync {
      *
      * @param referencedEventIds 다른 기능(제안)이 참조하는 일정 id. 사라졌어도 지우지 않고 취소 상태로 둔다
      */
-    SyncResult apply(long userId, InstantRange range, List<SyncedEvent> events, Set<Long> referencedEventIds);
+    default SyncResult apply(long userId, InstantRange range, List<SyncedEvent> events,
+            Set<Long> referencedEventIds) {
+        return apply(userId, range, events, referencedEventIds, Map.of());
+    }
+
+    /**
+     * @param aiCategories {@link CalendarAiClassifier}가 낸 google event id → EventCategory 이름.
+     *                     사용자가 직접 고친 분류와 분류 수정 규칙보다는 낮고 제목 규칙보다는 높다(USER &gt; AI &gt; RULE)
+     */
+    SyncResult apply(long userId, InstantRange range, List<SyncedEvent> events, Set<Long> referencedEventIds,
+            Map<String, String> aiCategories);
 }

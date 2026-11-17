@@ -18,5 +18,13 @@ public interface AiCompletionPort {
      * @param user   요청과 사실
      * @return 모델이 쓴 문장(가공 전)
      */
-    String complete(String system, String user);
+    default String complete(String system, String user) {
+        return complete(system, user, DEFAULT_MAX_OUTPUT_TOKENS);
+    }
+
+    /** 두 문장 안팎의 문구에 충분한 길이. */
+    int DEFAULT_MAX_OUTPUT_TOKENS = 200;
+
+    /** @param maxOutputTokens 응답 길이 상한(목록·JSON처럼 긴 응답이 필요할 때 늘린다) */
+    String complete(String system, String user, int maxOutputTokens);
 }

@@ -29,8 +29,6 @@ class OpenAiClient implements AiCompletionPort {
     static final String DEFAULT_MODEL = "gpt-4.1-mini";
     static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
     static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
-    /** 두 문장 안팎이면 충분한 길이. */
-    static final int MAX_OUTPUT_TOKENS = 200;
 
     private final RestClient client;
     private final String apiKey;
@@ -69,13 +67,13 @@ class OpenAiClient implements AiCompletionPort {
     }
 
     @Override
-    public String complete(String system, String user) {
+    public String complete(String system, String user, int maxOutputTokens) {
         if (!available()) {
             throw new ExternalServiceException(Kind.FAILURE, "OpenAI API 키가 설정되지 않았습니다.");
         }
         Map<String, Object> body = Map.of(
                 "model", model,
-                "max_completion_tokens", MAX_OUTPUT_TOKENS,
+                "max_completion_tokens", maxOutputTokens,
                 "messages", List.of(
                         Map.of("role", "system", "content", system),
                         Map.of("role", "user", "content", user)));
