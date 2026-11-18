@@ -111,6 +111,19 @@ public class LifecycleTransactions {
         deletion.deleteUser(userId);
     }
 
+    /**
+     * 시연 모드 로그아웃 초기화({@link LogoutReset}): 탈퇴 시작·마무리와 같은 순서로 모두 지우되 구글 철회는 하지 않는다
+     * (건강 기록 → 참조 해제·일정·파생 → 세션 → 사용자, 나머지는 FK CASCADE). 이미 지워진 사용자면 아무것도 하지 않는다.
+     */
+    @Transactional
+    public void resetForLogout(long userId) {
+        deletion.lock(userId);
+        eraseHealthRecords(userId);
+        deleteCalendarDerived(userId);
+        sessions.revokeAll(userId);
+        deletion.deleteUser(userId);
+    }
+
     private void eraseHealthRecords(long userId) {
         suggestionHealth.removeHealthBasis(userId);
         safety.deleteAll(userId);
