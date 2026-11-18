@@ -69,6 +69,9 @@ spec:
                   key: latest
             - name: OPENAI_MODEL
               value: '${OPENAI_MODEL}'
+            # 시연 모드: 로그아웃하면 그 사용자를 가입 전 상태로 되돌린다(2026-11-19 결정). 행사가 끝나면 지운다.
+            - name: COMEDOWN_DEMO_RESET_ON_LOGOUT
+              value: 'true'
 #OPENAI_SECRET            - name: OPENAI_API_KEY
 #OPENAI_SECRET              valueFrom:
 #OPENAI_SECRET                secretKeyRef:

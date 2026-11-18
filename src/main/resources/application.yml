@@ -42,4 +42,8 @@ comedown:
     api-key: ${OPENAI_API_KEY:}
     # 비워 두면 기본 모델(gpt-4.1-mini)을 쓴다.
     model: ${OPENAI_MODEL:}
+  demo:
+    # 시연 모드: 로그아웃하면 그 사용자의 데이터를 모두 지워 가입 전 상태로 되돌린다(구글 권한 철회는 하지 않음).
+    # 계정 하나로 시연을 반복하려고 둔 설정이며 운영 서비스 정의에서만 켠다. 행사가 끝나면 끈다.
+    reset-on-logout: ${COMEDOWN_DEMO_RESET_ON_LOGOUT:false}
 # Spring Session 테이블도 Flyway migration으로 만든다(initialize-schema: never).
