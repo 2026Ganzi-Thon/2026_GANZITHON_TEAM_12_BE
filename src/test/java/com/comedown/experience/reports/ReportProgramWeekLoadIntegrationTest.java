@@ -33,6 +33,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -122,6 +123,45 @@ class ReportProgramWeekLoadIntegrationTest {
                 .andExpect(jsonPath("$.graph.loadWeeks.length()").value(2))
                 .andExpect(jsonPath("$.graph.loadWeeks[0].loadScore").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.graph.loadWeeks[1].loadScore").value(Matchers.nullValue()));
+    }
+
+    @Test
+    void 기준선_확정_전에도_잠긴_리포트에_일정_부하_평소_대비는_준다() throws Exception {
+        // 서울 11-04 온보딩, 오늘 9일차(2주차)인데 측정 기록이 없어 기준선이 없다.
+        long user = insertUser("2026-11-03 16:00:00");
+
+        mvc.perform(get("/api/reports/recovery?days=14").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {"locked":true,"unavailableReason":null,"unlock":{"requiredDays":7,"validDays":0},
+                         "graph":null,"hrvVsUsualPct":null,"recoveryStatus":null,"latestQuality":null,
+                         "loadVsUsualPct":10.0,"interpretation":null,"rangePosition":null}
+                        """, JsonCompareMode.STRICT));
+    }
+
+    @Test
+    void 건강정보_동의가_없어도_일정_부하_평소_대비는_준다() throws Exception {
+        long user = userWithBaseline();
+        jdbc.update("UPDATE user_consents SET withdrawn_at = '2026-11-11 00:00:00' WHERE user_id = ?", user);
+
+        mvc.perform(get("/api/reports/recovery?days=14").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locked").value(true))
+                .andExpect(jsonPath("$.unavailableReason").value("CONSENT_REQUIRED"))
+                .andExpect(jsonPath("$.graph").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.hrvVsUsualPct").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.loadVsUsualPct").value(10.0));
+    }
+
+    @Test
+    void 잠긴_리포트도_캘린더가_연결되지_않았으면_일정_부하는_null() throws Exception {
+        long user = insertUser("2026-11-03 16:00:00");
+        FakeWeekLoads.DISCONNECTED.add(user);
+
+        mvc.perform(get("/api/reports/recovery?days=14").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locked").value(true))
+                .andExpect(jsonPath("$.loadVsUsualPct").value(Matchers.nullValue()));
     }
 
     @Test
