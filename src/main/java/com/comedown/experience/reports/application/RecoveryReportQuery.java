@@ -76,10 +76,10 @@ public class RecoveryReportQuery {
         RecoveryReport.Unlock unlock = new RecoveryReport.Unlock(REQUIRED_DAYS, validDays);
 
         if (!access.sensitiveHrvConsented()) {
-            return locked(CONSENT_REQUIRED, unlock);
+            return locked(CONSENT_REQUIRED, unlock, lockedLoadVsUsualPct(access, today, days));
         }
         if (latest.isEmpty() || !latest.get().baselineEstablished()) {
-            return locked(null, unlock);
+            return locked(null, unlock, lockedLoadVsUsualPct(access, today, days));
         }
         DailyRecoverySnapshot current = latest.get();
         LocalDate onboardingDate = serviceTime.toServiceDate(access.onboardingCompletedAt());
@@ -167,8 +167,19 @@ public class RecoveryReportQuery {
         return new RecoveryReport.Interpretation(text.text(), text.aiGenerated(), text.fallback());
     }
 
-    private static RecoveryReport locked(String reason, RecoveryReport.Unlock unlock) {
-        return new RecoveryReport(true, reason, unlock, null, null, null, null, null, null, null);
+    /**
+     * 잠긴 리포트(기준선 확정 전·건강정보 동의 없음)에도 주는 진행 중인 주차의 일정 부하 평소 대비. 건강 기록이 아니라
+     * 캘린더에서 나온 값이라 잠금과 무관하게 보여준다(2026-11-19 결정: 1~7일차 화면의 "평소 대비 일정 부하" 카드).
+     */
+    private BigDecimal lockedLoadVsUsualPct(HealthDataAccess access, LocalDate today, int days) {
+        LocalDate onboardingDate = serviceTime.toServiceDate(access.onboardingCompletedAt());
+        ProgramWeeks weeks = ProgramWeeks.recent(onboardingDate, today, days);
+        return loadVsUsualPct(weeks, findLoads(access.userId(), weeks));
+    }
+
+    /** 잠금: 적격일 수와 일정 부하 평소 대비만 주고 건강 기록에서 나온 값은 모두 null. */
+    private static RecoveryReport locked(String reason, RecoveryReport.Unlock unlock, BigDecimal loadVsUsualPct) {
+        return new RecoveryReport(true, reason, unlock, null, null, null, null, loadVsUsualPct, null, null);
     }
 
     static double round1(double value) {
