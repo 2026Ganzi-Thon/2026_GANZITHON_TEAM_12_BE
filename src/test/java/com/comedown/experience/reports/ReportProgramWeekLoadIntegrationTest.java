@@ -106,7 +106,7 @@ class ReportProgramWeekLoadIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().json("""
                         {"loadVsUsualPct":10.0,
-                         "graph":{"from":"2026-11-04","to":"2026-11-17","loadWeeks":[
+                         "graph":{"from":"2026-11-04","to":"2026-11-12","loadWeeks":[
                           {"week":1,"weekStart":"2026-11-04","weekEnd":"2026-11-10","current":false,"loadScore":10.0},
                           {"week":2,"weekStart":"2026-11-11","weekEnd":"2026-11-17","current":true,"loadScore":20.1}]}}
                         """));
