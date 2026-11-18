@@ -5,10 +5,16 @@ import com.comedown.recommendation.contract.SuggestionCommands;
 import com.comedown.recommendation.contract.SuggestionPayload;
 import com.comedown.recommendation.contract.SuggestionPayloads;
 import com.comedown.recommendation.contract.SuggestionQuery;
+import com.comedown.shared.time.ServiceTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -31,20 +37,22 @@ public class SuggestionMessageAi {
 
     static final int MAX_PER_CALL = 3;
     private static final Logger log = LoggerFactory.getLogger(SuggestionMessageAi.class);
-    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("M월 d일 HH:mm");
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("M월 d일 EEEE", Locale.KOREAN);
 
     private final AiInterpretation ai;
     private final SuggestionCommands commands;
     private final SuggestionQuery query;
     private final SuggestionPayloads payloads;
+    private final ServiceTime time;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     public SuggestionMessageAi(AiInterpretation ai, SuggestionCommands commands, SuggestionQuery query,
-            SuggestionPayloads payloads) {
+            SuggestionPayloads payloads, ServiceTime time) {
         this.ai = ai;
         this.commands = commands;
         this.query = query;
         this.payloads = payloads;
+        this.time = time;
     }
 
     /** 아직 규칙 기반 문구인 PROPOSED 제안의 문구를 AI 문구로 바꿔 돌려준다. 순서와 나머지 값은 그대로다. */
@@ -83,7 +91,7 @@ public class SuggestionMessageAi {
 
     private Optional<String> write(SuggestionPayload s) {
         try {
-            return ai.write(AiInterpretation.SUGGESTION_MESSAGE, facts(s), s.message().text());
+            return ai.write(AiInterpretation.SUGGESTION_MESSAGE, facts(s, time.today()), s.message().text());
         } catch (RuntimeException e) {
             log.warn("추천 문구 AI 생성 실패: {}", e.getClass().getSimpleName());
             return Optional.empty();
@@ -100,12 +108,18 @@ public class SuggestionMessageAi {
         }
     }
 
-    static List<String> facts(SuggestionPayload s) {
+    /**
+     * AI에 보낼 사실. 날짜·시각은 모델이 계산하지 않게 코드가 화면에 쓸 표현으로 정해 준다(모델은 오늘 날짜를 모른다):
+     * 날짜는 오늘·내일이면 "오늘(11월 18일 수요일)"처럼, 그 밖의 날은 "11월 24일 화요일", 시각은 "오전 7시"·"오후 4시 30분".
+     */
+    static List<String> facts(SuggestionPayload s, LocalDate today) {
         List<String> facts = new ArrayList<>();
         boolean preStart = "PRE_START".equals(s.type());
+        ZonedDateTime start = s.start().atZoneSameInstant(ServiceTime.ZONE);
         facts.add("제안 종류: " + (preStart ? "마감 전에 미리 시작하기" : "회복을 위한 가벼운 활동"));
         facts.add("제안 내용: " + s.title() + " (" + s.durationMin() + "분)");
-        facts.add("제안 시간: " + s.start().format(WHEN));
+        facts.add("제안 날짜: " + dayLabel(start.toLocalDate(), today));
+        facts.add("제안 시각: " + timeLabel(start.toLocalTime()));
         String reason = switch (s.reasonCode() == null ? "" : s.reasonCode()) {
             case "LOW_RECOVERY" -> "오늘 아침 심박변이도(HRV) 측정값이 지난주 평균보다 10% 이상 낮음";
             case "OVERLOAD" -> "이번 주 캘린더 일정이 평소보다 많음";
@@ -119,5 +133,23 @@ public class SuggestionMessageAi {
             facts.add("이번 주 일정도 평소보다 많음");
         }
         return facts;
+    }
+
+    static String dayLabel(LocalDate date, LocalDate today) {
+        String day = date.format(DAY);
+        long days = ChronoUnit.DAYS.between(today, date);
+        if (days == 0) {
+            return "오늘(" + day + ")";
+        }
+        if (days == 1) {
+            return "내일(" + day + ")";
+        }
+        return day;
+    }
+
+    static String timeLabel(LocalTime t) {
+        int hour12 = t.getHour() % 12 == 0 ? 12 : t.getHour() % 12;
+        String label = (t.getHour() < 12 ? "오전 " : "오후 ") + hour12 + "시";
+        return t.getMinute() == 0 ? label : label + " " + t.getMinute() + "분";
     }
 }

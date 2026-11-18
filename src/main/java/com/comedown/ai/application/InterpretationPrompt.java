@@ -6,6 +6,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 해석 문구 프롬프트와 결과 검증(ai 소유 제품 규칙, 순수 계산). 모델은 주어진 사실을 자연스러운 문장으로 옮기기만 하고
@@ -34,8 +36,10 @@ final class InterpretationPrompt {
             + TAIL;
     /** 추천 카드: 사실에 있는 제안 하나만 가볍게 권한다. */
     static final String SUGGESTION_SYSTEM = HEAD
-            + "   사실에 있는 '제안 내용'과 '제안 시간'만 가볍게 권한다. 다른 조언이나 몸 상태에 대한 평가는 덧붙이지 않는다.\n"
-            + "   강요하지 않고 물어보는 말투로 끝낸다.\n"
+            + "   사실에 있는 '제안 내용'과 그 날짜·시각만 가볍게 권한다. 다른 조언이나 몸 상태에 대한 평가는 덧붙이지 않는다.\n"
+            + "   날짜와 시각은 '제안 날짜'·'제안 시각'에 적힌 표현을 그대로 쓴다. '오늘'·'내일'은 '제안 날짜'에 그 말이"
+            + " 있을 때만 쓴다.\n"
+            + "   강요하지 않고 물어보는 말투로 끝낸다. 문장마다 마침표나 물음표로 끝낸다.\n"
             + TAIL;
 
     static String system(String kind) {
@@ -44,6 +48,10 @@ final class InterpretationPrompt {
 
     /** 결과에 있으면 버리는 말(진단·의료 표현). */
     private static final List<String> FORBIDDEN = List.of("진단", "질병", "질환", "치료", "처방", "병원", "약을", "우울증");
+    /** 추천 카드 문구에서 사실에 그 말이 없으면 버리는 상대 날짜 표현. */
+    private static final List<String> RELATIVE_DAYS = List.of("오늘", "내일", "모레", "어제");
+    private static final Pattern DATE = Pattern.compile("(\\d{1,2})\\s*월\\s*(\\d{1,2})\\s*일");
+    private static final Pattern HOUR = Pattern.compile("(\\d{1,2})\\s*시(?!간)");
 
     private InterpretationPrompt() {
     }
@@ -99,6 +107,46 @@ final class InterpretationPrompt {
             }
         }
         return Optional.of(text);
+    }
+
+    /**
+     * 종류별 검증까지 한 결과. 추천 카드 문구는 {@link #clean(String)}에 더해 날짜·시각이 사실과 맞아야 한다:
+     * 사실에 없는 '오늘'·'내일' 같은 말, 사실에 없는 "M월 D일"이나 "N시"가 있으면 버린다(모델이 오늘 날짜를 모르면서
+     * 며칠 뒤 제안을 "오늘"이라고 쓰거나 다른 날짜를 지어내는 것을 막는다).
+     */
+    static Optional<String> clean(String kind, String raw, List<String> facts) {
+        Optional<String> cleaned = clean(raw);
+        if (!"SUGGESTION_MESSAGE".equals(kind)) {
+            return cleaned;
+        }
+        String factText = String.join("\n", facts);
+        return cleaned.filter(text -> datesMatchFacts(text, factText));
+    }
+
+    private static boolean datesMatchFacts(String text, String factText) {
+        for (String word : RELATIVE_DAYS) {
+            if (text.contains(word) && !factText.contains(word)) {
+                return false;
+            }
+        }
+        Matcher date = DATE.matcher(text);
+        while (date.find()) {
+            if (!inFacts(factText, Integer.parseInt(date.group(1)) + "월 " + Integer.parseInt(date.group(2)) + "일")) {
+                return false;
+            }
+        }
+        Matcher hour = HOUR.matcher(text);
+        while (hour.find()) {
+            if (!inFacts(factText, Integer.parseInt(hour.group(1)) + "시")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 앞에 다른 숫자가 붙지 않은 그 표현이 사실에 있는지("2시"가 "12시"에 걸리지 않게). */
+    private static boolean inFacts(String factText, String phrase) {
+        return Pattern.compile("(?<!\\d)" + Pattern.quote(phrase)).matcher(factText).find();
     }
 
     private static boolean isQuote(char c) {

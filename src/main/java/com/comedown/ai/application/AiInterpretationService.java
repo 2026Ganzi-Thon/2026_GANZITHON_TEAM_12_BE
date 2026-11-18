@@ -71,7 +71,7 @@ class AiInterpretationService implements AiInterpretation, AiDataDeletion {
         try {
             String raw = port.complete(InterpretationPrompt.system(kind),
                     InterpretationPrompt.user(kind, facts, fallbackText));
-            Optional<String> cleaned = InterpretationPrompt.clean(raw);
+            Optional<String> cleaned = InterpretationPrompt.clean(kind, raw, facts);
             if (cleaned.isEmpty()) {
                 log.warn("AI 문구가 검증을 통과하지 못해 대체 문구를 씁니다(kind={}).", kind);
             }
