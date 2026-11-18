@@ -97,9 +97,9 @@ class RecoveryReportApiIntegrationTest {
         report("?days=14").andExpect(status().isOk())
                 .andExpect(jsonPath("$.locked").value(false))
                 .andExpect(jsonPath("$.unlock.validDays").value(7))
-                // 2주 = 1~2주차, 진행 중인 2주차 끝(11-17)까지
+                // 2주 = 1~2주차, 날짜 축은 오늘(11-12)까지(진행 중인 2주차의 남은 날은 그리지 않음)
                 .andExpect(jsonPath("$.graph.from").value("2026-11-04"))
-                .andExpect(jsonPath("$.graph.to").value("2026-11-17"))
+                .andExpect(jsonPath("$.graph.to").value("2026-11-12"))
                 .andExpect(jsonPath("$.graph.points.length()").value(8))
                 .andExpect(jsonPath("$.graph.points[0].date").value("2026-11-04"))
                 .andExpect(jsonPath("$.graph.points[0].excluded").value(true))
@@ -163,10 +163,10 @@ class RecoveryReportApiIntegrationTest {
         }
         recoveryCommands.recalculate(user, first, LocalDate.of(2026, 11, 11));
 
-        // 28일 → 4주차~7주차, 오늘 이후 날짜까지 포함
+        // 28일 → 4주차~7주차, 날짜 축은 오늘(11-12)까지. 막대 칸은 진행 중인 주차까지 준다.
         mvc.perform(get("/api/reports/recovery?days=28").with(loginAs(user)))
                 .andExpect(jsonPath("$.graph.from").value("2026-10-22"))
-                .andExpect(jsonPath("$.graph.to").value("2026-11-18"))
+                .andExpect(jsonPath("$.graph.to").value("2026-11-12"))
                 .andExpect(jsonPath("$.graph.loadWeeks.length()").value(4))
                 .andExpect(jsonPath("$.graph.loadWeeks[0].week").value(4))
                 .andExpect(jsonPath("$.graph.loadWeeks[3].week").value(7))

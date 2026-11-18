@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
  * 회복 리포트(C1) 조합. recovery 읽기 계약의 스냅샷만 쓰고 계산·저장하지 않는다.
  * <p>
  * 그래프의 주는 온보딩 기준 n주차이며, 진행 중인 주차까지 포함한 최근 n개 주차를 보여준다({@link ProgramWeeks}).
+ * 날짜 축의 끝은 오늘이다(진행 중인 주차의 남은 날은 그리지 않음).
  * 일정 부하는 schedule의 {@link ProgramWeekLoadQuery}로 읽는다. 일정축 구현 전(bean 없음)·캘린더 미연결이면 부하 값은 null이다.
  * <p>
  * 아직 비어 있는 값: rangePosition.load(schedule 계약), AI 해석(규칙 기반 문구로 대체).
@@ -87,8 +88,9 @@ public class RecoveryReportQuery {
         List<DailyRecoverySnapshot> states = recoveryQuery.findRange(userId, weeks.from(), today);
         Map<Integer, ProgramWeekLoad> loads = findLoads(userId, weeks);
 
+        // 날짜 축은 첫 주차 시작 ~ 오늘(지난 날까지만 그린다): 7일이 지나면 1주차, 14일이 지나면 2주차 경계까지 보인다.
         RecoveryReport.Graph graph = new RecoveryReport.Graph(
-                weeks.from(), weeks.to(),
+                weeks.from(), today,
                 states.stream().filter(s -> s.dailyLnRmssd() != null)
                         .map(s -> new RecoveryReport.Point(s.date(), round1(Math.exp(s.dailyLnRmssd())),
                                 s.confounded(), s.qualityLevel()))
