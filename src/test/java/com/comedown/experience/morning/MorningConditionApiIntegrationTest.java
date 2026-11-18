@@ -236,7 +236,8 @@ class MorningConditionApiIntegrationTest {
         org.mockito.ArgumentCaptor<String> sent = org.mockito.ArgumentCaptor.forClass(String.class);
         org.mockito.Mockito.verify(aiPort, org.mockito.Mockito.times(1)).complete(
                 org.mockito.ArgumentMatchers.contains("가볍게 권한다"), sent.capture());
-        assertThat(sent.getValue()).contains("제안 내용: 20분 걷기 (20분)").contains("제안 시간: 11월 12일 07:30")
+        assertThat(sent.getValue()).contains("제안 내용: 20분 걷기 (20분)")
+                .contains("제안 날짜: 오늘(11월 12일 목요일)").contains("제안 시각: 오전 7시 30분")
                 .contains("제안 이유: 오늘 아침 심박변이도(HRV) 측정값이 지난주 평균보다 10% 이상 낮음").doesNotContain("아리");
 
         // 이미 AI 문구인 제안은 다시 묻지 않는다(다시 저장해도, 다시 조회해도).
