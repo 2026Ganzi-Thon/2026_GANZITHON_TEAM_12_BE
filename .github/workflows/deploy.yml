@@ -52,15 +52,20 @@ jobs:
           ref: main
           path: frontend
 
+      # 프론트 앱(Expo)은 저장소의 mobile/ 아래에 있다. 나중에 맨 위로 옮겨도 그대로 돌게 맨 위를 먼저 본다.
       - name: 프론트 빌드 대상 확인
         id: fe
         run: |
-          if [ -f frontend/package.json ]; then
-            echo "build=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::프론트 저장소 main에 package.json이 없어 확인용 화면으로 배포합니다."
-          fi
+          for dir in frontend frontend/mobile; do
+            if [ -f "$dir/package.json" ]; then
+              echo "build=true" >> "$GITHUB_OUTPUT"
+              echo "dir=$dir" >> "$GITHUB_OUTPUT"
+              echo "::notice::프론트 앱 위치: $dir"
+              exit 0
+            fi
+          done
+          echo "build=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::프론트 저장소 main에 package.json이 없어 확인용 화면으로 배포합니다."
 
       - name: Node 설치
         if: steps.fe.outputs.build == 'true'
@@ -68,12 +73,30 @@ jobs:
         with:
           node-version: '22'
 
+      # 운영 빌드는 실제 API를 불러야 한다. 프론트 client.js의 목업 스위치(USE_MOCK)가 켜져 있으면
+      # 이 빌드에서만 끄고(프론트 저장소는 바꾸지 않음), 그래도 켜져 있으면 목업 화면을 배포하지 않도록 멈춘다.
+      # 빌드 명령: package.json에 build 스크립트가 있으면 그것을, 없으면 Expo 웹 빌드(expo export)를 쓴다.
       - name: 프론트 빌드
         if: steps.fe.outputs.build == 'true'
-        working-directory: frontend
+        working-directory: ${{ steps.fe.outputs.dir }}
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
-          npm run build
+          client=src/api/client.js
+          if [ -f "$client" ]; then
+            if grep -Eq '^\s*const\s+USE_MOCK\s*=\s*true\s*;?' "$client"; then
+              sed -i -E 's/^(\s*const\s+USE_MOCK\s*=\s*)true(\s*;?)/\1false\2/' "$client"
+              echo "::notice::프론트 USE_MOCK을 이 배포 빌드에서만 false로 바꿨습니다."
+            fi
+            if grep -Eq 'USE_MOCK\s*=\s*true' "$client"; then
+              echo "::error::프론트가 목업 모드(USE_MOCK = true)라 배포하지 않습니다."
+              exit 1
+            fi
+          fi
+          if node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)"; then
+            npm run build
+          else
+            npx expo export --platform web --output-dir dist
+          fi
           test -f dist/index.html || { echo "::error::프론트 빌드 결과에 dist/index.html이 없습니다."; exit 1; }
 
       - name: GCP 인증(Workload Identity)
@@ -90,13 +113,14 @@ jobs:
         shell: pwsh
         env:
           FRONTEND_BUILD: ${{ steps.fe.outputs.build }}
+          FRONTEND_DIR: ${{ steps.fe.outputs.dir }}
         run: |
           $params = @{
               ProjectId      = $env:GCP_PROJECT_ID
               DbHost         = $env:CLOUD_SQL_PRIVATE_IP
               GoogleClientId = $env:GOOGLE_CLIENT_ID
           }
-          if ($env:FRONTEND_BUILD -eq 'true') { $params.FrontendDist = 'frontend/dist' }
+          if ($env:FRONTEND_BUILD -eq 'true') { $params.FrontendDist = "$env:FRONTEND_DIR/dist" }
           if ($env:DEPLOY_WITH_OPENAI -eq 'true') { $params.WithOpenAi = $true }
           ./scripts/deploy-cloudrun.ps1 @params
 
