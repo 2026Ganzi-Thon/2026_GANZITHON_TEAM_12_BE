@@ -63,6 +63,9 @@ class GoogleOAuthCallbackIntegrationTest {
     /** 구글 쪽에 캘린더 허용이 남아 있어 일반 로그인 응답에도 캘린더 범위가 함께 오는 상황(include_granted_scopes). */
     private static volatile boolean loginReturnsCalendarScope;
 
+    /** 구글 동의 화면에서 캘린더 항목 체크를 해제한 상황(캘린더 권한 화면에서도 범위 없이 돌아옴). */
+    private static volatile boolean calendarDeclined;
+
     @Autowired
     MockMvc mvc;
 
@@ -105,7 +108,7 @@ class GoogleOAuthCallbackIntegrationTest {
                 boolean calendar = GoogleOAuthConfig.CALENDAR_REGISTRATION
                         .equals(request.getClientRegistration().getRegistrationId());
                 Set<String> scopes = new LinkedHashSet<>(List.of("openid", "email"));
-                if (calendar || loginReturnsCalendarScope) {
+                if ((calendar && !calendarDeclined) || loginReturnsCalendarScope) {
                     scopes.add(CALENDAR);
                 }
                 OAuth2AccessTokenResponse.Builder response = OAuth2AccessTokenResponse
@@ -150,6 +153,7 @@ class GoogleOAuthCallbackIntegrationTest {
     @BeforeEach
     void setUp() {
         loginReturnsCalendarScope = false;
+        calendarDeclined = false;
     }
 
     @AfterEach
@@ -177,6 +181,9 @@ class GoogleOAuthCallbackIntegrationTest {
     void 로그인한_사용자가_같은_구글_계정으로_캘린더를_연결하면_그_사용자에_연결된다() throws Exception {
         Browser browser = new Browser();
         String sub = newSub();
+        oauth(new Browser(), "google-calendar", sub);
+        // 캘린더가 연결된 사용자는 일반 로그인으로 들어온다(구글은 이전에 허용한 캘린더 범위를 로그인 토큰에도 준다).
+        loginReturnsCalendarScope = true;
         assertThat(oauth(browser, "google", sub).getResponse().getRedirectedUrl()).isEqualTo("/");
         long user = userId(sub);
 
@@ -194,7 +201,7 @@ class GoogleOAuthCallbackIntegrationTest {
         Browser browser = new Browser();
         String mine = newSub();
         String other = newSub();
-        oauth(browser, "google", mine);
+        oauth(browser, "google-calendar", mine);
         long user = userId(mine);
         Map<String, Object> tokenBefore = tokenRow(user);
         int usersBefore = jdbc.queryForObject("SELECT COUNT(*) FROM users", Integer.class);
@@ -210,14 +217,14 @@ class GoogleOAuthCallbackIntegrationTest {
                 other)).isZero();
         assertThat(tokenRow(user)).isEqualTo(tokenBefore);
         assertThat((Object) authorizedClients.loadAuthorizedClient("google-calendar", String.valueOf(user))).isNull();
-        // 기존 세션은 원래 사용자로 로그인된 그대로이고 캘린더는 연결되지 않았다.
+        // 기존 세션은 원래 사용자로 로그인된 그대로이고 원래 캘린더 연결도 그대로다.
         send(browser, get("/api/me"), status().isOk(), jsonPath("$.id").value(user),
                 jsonPath("$.email").value(mine + "@example.com"),
-                jsonPath("$.calendar.scopeGranted").value(false));
+                jsonPath("$.calendar.scopeGranted").value(true));
     }
 
     @Test
-    void 철회_대기_중에_일반_로그인해도_연결은_되살아나지_않고_캘린더_연결을_다시_해야_풀린다() throws Exception {
+    void 철회_대기_중에_일반_로그인하면_연결은_되살아나지_않고_세션_없이_캘린더_연결로_보낸다() throws Exception {
         String sub = newSub();
         oauth(new Browser(), "google-calendar", sub);
         long user = userId(sub);
@@ -227,20 +234,52 @@ class GoogleOAuthCallbackIntegrationTest {
         loginReturnsCalendarScope = true;
 
         Browser browser = new Browser();
-        assertThat(oauth(browser, "google", sub).getResponse().getRedirectedUrl()).isEqualTo("/");
+        assertThat(oauth(browser, "google", sub).getResponse().getRedirectedUrl())
+                .isEqualTo("/oauth2/authorization/google-calendar");
 
-        // 로그인은 됐지만 보관한 토큰·철회 요청은 그대로이고 캘린더는 끊긴 상태다.
+        // 보관한 토큰·철회 요청은 그대로이고, 캘린더가 끊긴 채로는 로그인 세션도 없다.
         assertThat(tokenRow(user)).isEqualTo(pending);
-        send(browser, get("/api/me"), status().isOk(), jsonPath("$.id").value(user),
-                jsonPath("$.calendar.connected").value(false),
-                jsonPath("$.calendar.scopeGranted").value(false));
+        send(browser, get("/api/me"), status().isUnauthorized());
 
-        // 사용자가 캘린더 연결을 다시 허용해야 철회 요청이 풀린다.
+        // 사용자가 캘린더 연결을 다시 허용해야 철회 요청이 풀리고 들어올 수 있다.
         assertThat(oauth(browser, "google-calendar", sub).getResponse().getRedirectedUrl())
                 .isEqualTo("/onboarding/cbi");
         assertThat(tokenRow(user).get("revoke_requested_at")).isNull();
         send(browser, get("/api/me"), status().isOk(), jsonPath("$.calendar.connected").value(true),
                 jsonPath("$.calendar.scopeGranted").value(true));
+    }
+
+    @Test
+    void 캘린더_권한이_없는_첫_로그인은_세션을_만들지_않고_캘린더_권한_화면으로_보낸다() throws Exception {
+        Browser browser = new Browser();
+        String sub = newSub();
+
+        MvcResult callback = oauth(browser, "google", sub);
+
+        assertThat(callback.getResponse().getRedirectedUrl()).isEqualTo("/oauth2/authorization/google-calendar");
+        send(browser, get("/api/me"), status().isUnauthorized());
+
+        // 이어서 캘린더 권한을 허용하면 그 사용자로 들어온다.
+        assertThat(oauth(browser, "google-calendar", sub).getResponse().getRedirectedUrl())
+                .isEqualTo("/onboarding/cbi");
+        send(browser, get("/api/me"), status().isOk(), jsonPath("$.id").value(userId(sub)),
+                jsonPath("$.calendar.scopeGranted").value(true));
+    }
+
+    @Test
+    void 캘린더_권한_화면에서_캘린더를_허용하지_않으면_세션_없이_시작_화면으로_돌아간다() throws Exception {
+        Browser browser = new Browser();
+        String sub = newSub();
+        calendarDeclined = true;
+
+        MvcResult callback = oauth(browser, "google-calendar", sub);
+
+        assertThat(callback.getResponse().getRedirectedUrl()).isEqualTo("/?authError=true");
+        send(browser, get("/api/me"), status().isUnauthorized());
+        // 다시 일반 로그인해도 캘린더가 없으니 들어오지 못한다.
+        assertThat(oauth(browser, "google", sub).getResponse().getRedirectedUrl())
+                .isEqualTo("/oauth2/authorization/google-calendar");
+        send(browser, get("/api/me"), status().isUnauthorized());
     }
 
     // ---------- 도우미 ----------

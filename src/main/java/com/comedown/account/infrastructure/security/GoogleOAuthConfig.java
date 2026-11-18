@@ -1,6 +1,7 @@
 package com.comedown.account.infrastructure.security;
 
 import com.comedown.account.application.GoogleAccountService;
+import com.comedown.account.contract.CalendarConnectionQuery;
 import com.comedown.account.infrastructure.crypto.TokenCipher;
 import com.comedown.shared.security.SecurityFilterChainContributor;
 import java.util.concurrent.atomic.AtomicReference;
@@ -86,12 +87,13 @@ class GoogleOAuthConfig {
 
     @Bean
     SecurityFilterChainContributor googleOAuthLogin(ClientRegistrationRepository registrations,
-            OAuth2AuthorizedClientService clients, GoogleAccountService accounts) {
+            OAuth2AuthorizedClientService clients, GoogleAccountService accounts,
+            CalendarConnectionQuery calendarConnection) {
         OAuth2AuthorizationRequestResolver resolver = authorizationRequestResolver(registrations);
         return http -> http.oauth2Login(login -> login
                 .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(resolver))
                 .userInfoEndpoint(info -> info.oidcUserService(new AccountOidcUserService(new OidcUserService(), accounts)))
-                .successHandler(new GoogleOAuthSuccessHandler(clients, accounts))
+                .successHandler(new GoogleOAuthSuccessHandler(clients, accounts, calendarConnection))
                 .failureHandler((request, response, exception) -> response.sendRedirect("/?authError=true")));
     }
 

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.comedown.account.application.GoogleAccountService;
 import com.comedown.account.application.GoogleAccountService.TokenGrant;
+import com.comedown.account.contract.CalendarConnectionQuery;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -34,7 +36,13 @@ class GoogleOAuthSuccessHandlerTest {
 
     private final OAuth2AuthorizedClientService clients = mock(OAuth2AuthorizedClientService.class);
     private final GoogleAccountService accounts = mock(GoogleAccountService.class);
-    private final GoogleOAuthSuccessHandler handler = new GoogleOAuthSuccessHandler(clients, accounts);
+    private final CalendarConnectionQuery calendar = mock(CalendarConnectionQuery.class);
+    private final GoogleOAuthSuccessHandler handler = new GoogleOAuthSuccessHandler(clients, accounts, calendar);
+
+    @org.junit.jupiter.api.BeforeEach
+    void connected() {
+        when(calendar.isConnected(42L)).thenReturn(true);
+    }
 
     private OAuth2AuthenticationToken authentication(String registrationId) {
         OidcIdToken idToken = new OidcIdToken("t", ISSUED, ISSUED.plusSeconds(60), Map.of("sub", "google-sub"));
@@ -100,17 +108,56 @@ class GoogleOAuthSuccessHandlerTest {
     }
 
     @Test
-    void 토큰_저장에_실패해도_로그인은_유지하고_클라이언트는_지운다() throws Exception {
+    void 토큰_저장에_실패하면_캘린더가_없는_것으로_보고_세션을_끊고_클라이언트는_지운다() throws Exception {
         when(clients.loadAuthorizedClient("google-calendar", "42"))
                 .thenReturn(client("google-calendar", "r", "openid"));
         doThrow(new IllegalStateException("db down")).when(accounts)
                 .saveCalendarTokens(any(Long.class), any(), any());
+        when(calendar.isConnected(42L)).thenReturn(false);
+        MockHttpServletRequest request = withSession();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication("google-calendar"));
+        handler.onAuthenticationSuccess(request, response, authentication("google-calendar"));
 
         verify(clients).removeAuthorizedClient("google-calendar", "42");
-        assertThat(response.getRedirectedUrl()).isEqualTo("/onboarding/cbi");
+        assertThat(((MockHttpSession) request.getSession(false))).isNull();
+        assertThat(response.getRedirectedUrl()).isEqualTo("/?authError=true");
+    }
+
+    @Test
+    void 일반_로그인인데_캘린더가_연결되지_않았으면_세션을_끊고_캘린더_권한_화면으로_보낸다() throws Exception {
+        // 처음 가입하는 사람, 또는 연결 해제로 철회 대기 중인 사람
+        when(clients.loadAuthorizedClient("google", "42")).thenReturn(client("google", null, "openid", "email"));
+        when(calendar.isConnected(42L)).thenReturn(false);
+        MockHttpServletRequest request = withSession();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(request, response, authentication("google"));
+
+        verify(accounts).saveLoginTokens(eq(42L), eq("google-sub"), any());
+        assertThat(request.getSession(false)).isNull();
+        assertThat(response.getRedirectedUrl()).isEqualTo("/oauth2/authorization/google-calendar");
+    }
+
+    @Test
+    void 캘린더_권한_화면에서_캘린더를_허용하지_않았으면_세션을_끊고_시작_화면으로_보낸다() throws Exception {
+        // 구글 동의 화면에서 캘린더 항목 체크를 해제해 범위 없이 돌아왔다.
+        when(clients.loadAuthorizedClient("google-calendar", "42"))
+                .thenReturn(client("google-calendar", "r", "openid", "email"));
+        when(calendar.isConnected(42L)).thenReturn(false);
+        MockHttpServletRequest request = withSession();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(request, response, authentication("google-calendar"));
+
+        assertThat(request.getSession(false)).isNull();
+        assertThat(response.getRedirectedUrl()).isEqualTo("/?authError=true");
+    }
+
+    private static MockHttpServletRequest withSession() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSession(new MockHttpSession());
+        return request;
     }
 
     @Test
