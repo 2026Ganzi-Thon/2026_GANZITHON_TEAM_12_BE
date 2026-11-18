@@ -282,6 +282,26 @@ class GoogleOAuthCallbackIntegrationTest {
         send(browser, get("/api/me"), status().isUnauthorized());
     }
 
+    @Test
+    void 로그인_뒤_캘린더가_끊긴_세션은_닉네임_저장을_포함한_API를_못_쓰고_세션도_끊긴다() throws Exception {
+        Browser browser = new Browser();
+        String sub = newSub();
+        oauth(browser, "google-calendar", sub);
+        long user = userId(sub);
+        send(browser, get("/api/me"), status().isOk());
+        // 결정 전에 만들어진 세션이거나 그 뒤 캘린더 연결을 해제한 상태
+        jdbc.update("UPDATE oauth_tokens SET revoke_requested_at = '2026-11-11 22:00:00' WHERE user_id = ?", user);
+
+        send(browser, get("/api/me"), status().isUnauthorized(), jsonPath("$.code").value("UNAUTHENTICATED"));
+        // 세션이 끊겨 가입 정보(닉네임) 저장 단계에도 들어갈 수 없다.
+        send(browser, org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/onboarding/profile").contentType("application/json").content("{}")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                                .csrf()),
+                status().isUnauthorized());
+        assertThat(jdbc.queryForObject("SELECT nickname FROM users WHERE id = ?", String.class, user)).isNull();
+    }
+
     // ---------- 도우미 ----------
 
     /**

@@ -3,6 +3,7 @@ package com.comedown.account.infrastructure.security;
 import com.comedown.account.application.GoogleAccountService;
 import com.comedown.account.contract.CalendarConnectionQuery;
 import com.comedown.account.infrastructure.crypto.TokenCipher;
+import com.comedown.shared.error.ErrorResponseWriter;
 import com.comedown.shared.security.SecurityFilterChainContributor;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,7 @@ import org.springframework.security.oauth2.client.registration.InMemoryClientReg
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.config.oauth2.client.CommonOAuth2Provider;
 
 /**
@@ -95,6 +97,21 @@ class GoogleOAuthConfig {
                 .userInfoEndpoint(info -> info.oidcUserService(new AccountOidcUserService(new OidcUserService(), accounts)))
                 .successHandler(new GoogleOAuthSuccessHandler(clients, accounts, calendarConnection))
                 .failureHandler((request, response, exception) -> response.sendRedirect("/?authError=true")));
+    }
+
+    /**
+     * 캘린더 권한 없는 세션의 API 요청을 막는다({@link CalendarRequiredFilter}). 구글 로그인이 켜진 환경에서만 쓰며
+     * {@code comedown.security.require-calendar=false}면 끈다(local의 테스트 로그인·시연 데이터용).
+     */
+    @Bean
+    SecurityFilterChainContributor calendarRequired(CalendarConnectionQuery calendarConnection,
+            ErrorResponseWriter errors,
+            @Value("${comedown.security.require-calendar:true}") boolean requireCalendar) {
+        if (!requireCalendar) {
+            return http -> { };
+        }
+        CalendarRequiredFilter filter = new CalendarRequiredFilter(calendarConnection, errors);
+        return http -> http.addFilterAfter(filter, AuthorizationFilter.class);
     }
 
     static OAuth2AuthorizationRequestResolver authorizationRequestResolver(
