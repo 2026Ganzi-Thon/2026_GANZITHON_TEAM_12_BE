@@ -104,7 +104,7 @@ class GoogleOAuthSuccessHandlerTest {
         verify(accounts, never()).saveLoginTokens(any(Long.class), any(), any());
         assertThat(grant.getValue().refreshToken()).isEqualTo("refresh-value");
         assertThat(grant.getValue().scopes()).contains(calendar);
-        assertThat(response.getRedirectedUrl()).isEqualTo("/onboarding/cbi");
+        assertThat(response.getRedirectedUrl()).isEqualTo("/");
     }
 
     @Test

@@ -168,7 +168,7 @@ class GoogleOAuthCallbackIntegrationTest {
 
         MvcResult callback = oauth(browser, "google-calendar", sub);
 
-        assertThat(callback.getResponse().getRedirectedUrl()).isEqualTo("/onboarding/cbi");
+        assertThat(callback.getResponse().getRedirectedUrl()).isEqualTo("/");
         long user = userId(sub);
         Map<String, Object> token = tokenRow(user);
         assertThat((String) token.get("scopes")).contains(CALENDAR);
@@ -189,7 +189,7 @@ class GoogleOAuthCallbackIntegrationTest {
 
         MvcResult callback = oauth(browser, "google-calendar", sub);
 
-        assertThat(callback.getResponse().getRedirectedUrl()).isEqualTo("/onboarding/cbi");
+        assertThat(callback.getResponse().getRedirectedUrl()).isEqualTo("/");
         assertThat(userCount(sub)).isEqualTo(1);
         assertThat((String) tokenRow(user).get("scopes")).contains(CALENDAR);
         send(browser, get("/api/me"), status().isOk(), jsonPath("$.id").value(user),
@@ -243,7 +243,7 @@ class GoogleOAuthCallbackIntegrationTest {
 
         // 사용자가 캘린더 연결을 다시 허용해야 철회 요청이 풀리고 들어올 수 있다.
         assertThat(oauth(browser, "google-calendar", sub).getResponse().getRedirectedUrl())
-                .isEqualTo("/onboarding/cbi");
+                .isEqualTo("/");
         assertThat(tokenRow(user).get("revoke_requested_at")).isNull();
         send(browser, get("/api/me"), status().isOk(), jsonPath("$.calendar.connected").value(true),
                 jsonPath("$.calendar.scopeGranted").value(true));
@@ -261,7 +261,7 @@ class GoogleOAuthCallbackIntegrationTest {
 
         // 이어서 캘린더 권한을 허용하면 그 사용자로 들어온다.
         assertThat(oauth(browser, "google-calendar", sub).getResponse().getRedirectedUrl())
-                .isEqualTo("/onboarding/cbi");
+                .isEqualTo("/");
         send(browser, get("/api/me"), status().isOk(), jsonPath("$.id").value(userId(sub)),
                 jsonPath("$.calendar.scopeGranted").value(true));
     }

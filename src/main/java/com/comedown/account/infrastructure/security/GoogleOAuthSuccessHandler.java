@@ -20,7 +20,9 @@ import org.springframework.security.web.authentication.logout.SecurityContextLog
 
 /**
  * 로그인·캘린더 권한 허용 성공 처리. 구글이 준 토큰을 암호화해 저장하고 메모리의 인증 클라이언트는 지운다.
- * 로그인은 {@code /}, 캘린더 권한은 {@code /onboarding/cbi}로 돌려보낸다. 토큰 값은 로그에 남기지 않는다.
+ * 로그인·캘린더 권한 모두 {@code /}로 돌려보내고, 프론트는 {@code GET /api/me}의 {@code onboardingStep}으로 화면을
+ * 정한다. 그래서 가입은 구글 로그인 → 캘린더 권한 → 닉네임·동의(PROFILE) → CBI 순서가 된다(2026-11-19 결정).
+ * 토큰 값은 로그에 남기지 않는다.
  * <p>
  * <b>캘린더 권한이 없으면 서비스에 들어올 수 없다</b>(2026-11-19 결정). 토큰을 저장한 뒤에도 캘린더가 연결되지 않았으면
  * 방금 만든 로그인 세션을 끊는다. 일반 로그인이면 캘린더 권한 화면({@code /oauth2/authorization/google-calendar},
@@ -35,6 +37,7 @@ class GoogleOAuthSuccessHandler implements AuthenticationSuccessHandler {
 
     static final String CALENDAR_START = "/oauth2/authorization/" + GoogleOAuthConfig.CALENDAR_REGISTRATION;
     static final String AUTH_ERROR = "/?authError=true";
+    static final String HOME = "/";
     private static final Logger log = LoggerFactory.getLogger(GoogleOAuthSuccessHandler.class);
 
     private final OAuth2AuthorizedClientService clients;
@@ -72,7 +75,7 @@ class GoogleOAuthSuccessHandler implements AuthenticationSuccessHandler {
             response.sendRedirect(calendarConnection ? AUTH_ERROR : CALENDAR_START);
             return;
         }
-        response.sendRedirect(calendarConnection ? "/onboarding/cbi" : "/");
+        response.sendRedirect(HOME);
     }
 
     private void saveTokens(OAuth2AuthenticationToken token, OAuth2AuthorizedClient client,
