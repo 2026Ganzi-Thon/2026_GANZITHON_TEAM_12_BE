@@ -6,6 +6,7 @@ import com.comedown.account.contract.GoogleTokenRefresher;
 import com.comedown.account.contract.GoogleTokenRefresher.RefreshedToken;
 import com.comedown.account.infrastructure.persistence.GoogleAccountWriter;
 import com.comedown.account.infrastructure.persistence.GoogleTokenReader;
+import com.comedown.account.infrastructure.persistence.GoogleTokenReader.ActiveTokens;
 import com.comedown.account.infrastructure.persistence.GoogleTokenReader.StoredTokens;
 import com.comedown.shared.error.ApiException;
 import com.comedown.shared.error.ErrorCode;
@@ -20,6 +21,9 @@ import org.springframework.stereotype.Service;
 /**
  * 캘린더 호출용 access token을 내어 준다. 만료됐으면 refresh token으로 갱신해 저장한다.
  * 구글 호출이 있어 트랜잭션으로 감싸지 않는다(DB 읽기·쓰기는 각각 짧게 끝난다).
+ * <p>
+ * 저장된 토큰을 지금 키로 복호화할 수 없으면(키 변경·암호문 손상) 500 대신 {@code CALENDAR_REAUTH_REQUIRED}로
+ * 다시 연결을 안내한다. 다시 연결하면 토큰이 지금 키로 새로 저장된다.
  */
 @Service
 public class CalendarCredentialService implements CalendarCredentialProvider {
@@ -43,7 +47,7 @@ public class CalendarCredentialService implements CalendarCredentialProvider {
 
     @Override
     public CalendarCredential credentialFor(long userId) {
-        StoredTokens stored = tokens.find(userId).orElseThrow(() -> new ApiException(ErrorCode.CALENDAR_NOT_CONNECTED));
+        StoredTokens stored = storedTokens(userId);
         if (!stored.hasCalendarScope()) {
             throw new ApiException(ErrorCode.CALENDAR_SCOPE_MISSING);
         }
@@ -63,5 +67,15 @@ public class CalendarCredentialService implements CalendarCredentialProvider {
             throw new ApiException(e.kind() == ExternalServiceException.Kind.FAILURE
                     ? ErrorCode.CALENDAR_API_ERROR : ErrorCode.CALENDAR_REAUTH_REQUIRED);
         }
+    }
+
+    private StoredTokens storedTokens(long userId) {
+        ActiveTokens active = tokens.find(userId)
+                .orElseThrow(() -> new ApiException(ErrorCode.CALENDAR_NOT_CONNECTED));
+        if (!active.decryptable()) {
+            log.warn("캘린더 토큰을 복호화할 수 없어 다시 연결을 안내합니다(userId={})", userId);
+            throw new ApiException(ErrorCode.CALENDAR_REAUTH_REQUIRED);
+        }
+        return active.tokens();
     }
 }
