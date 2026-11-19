@@ -27,6 +27,17 @@ public class GoogleTokenReader {
     }
 
     /**
+     * 쓰고 있는(철회 요청 전) 토큰 행. 저장된 값을 지금 키로 복호화할 수 없으면(키 변경·암호문 손상) {@code tokens}가
+     * null이다. 이 저장소 밖으로 복호화 예외를 던지면 Spring이 다른 예외로 바꾸므로 결과로 알린다.
+     */
+    public record ActiveTokens(StoredTokens tokens) {
+
+        public boolean decryptable() {
+            return tokens != null;
+        }
+    }
+
+    /**
      * 철회를 기다리는 토큰 행. 저장된 값을 지금 키로 복호화할 수 없으면(키 변경·암호문 손상) {@code tokens}가 null이고,
      * 그 토큰은 구글에 보낼 수 없다.
      */
@@ -45,13 +56,20 @@ public class GoogleTokenReader {
         this.cipher = cipher;
     }
 
-    public Optional<StoredTokens> find(long userId) {
+    /** 철회 요청 전인 토큰. 복호화 실패는 예외로 내보내지 않고 {@link ActiveTokens#decryptable()}로 알린다. */
+    public Optional<ActiveTokens> find(long userId) {
         return jdbc.sql("""
                         SELECT access_token_enc, refresh_token_enc, access_token_expires_at, scopes
                           FROM oauth_tokens WHERE user_id = ? AND revoke_requested_at IS NULL
                         """)
                 .params(userId)
-                .query(this::map)
+                .query((rs, n) -> {
+                    try {
+                        return new ActiveTokens(map(rs, n));
+                    } catch (TokenDecryptionException e) {
+                        return new ActiveTokens(null);
+                    }
+                })
                 .optional();
     }
 

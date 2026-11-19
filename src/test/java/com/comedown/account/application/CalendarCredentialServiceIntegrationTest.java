@@ -138,6 +138,18 @@ class CalendarCredentialServiceIntegrationTest {
     }
 
     @Test
+    void 저장된_토큰을_복호화할_수_없으면_500이_아니라_CALENDAR_REAUTH_REQUIRED() {
+        long id = user("s10");
+        tokens(id, "s10", "refresh-1", NOW.plusSeconds(3000), "openid", CALENDAR);
+        // 다른 키로 암호화된 값처럼 지금 키로 풀 수 없는 암호문(키 변경·손상)
+        jdbc.update("UPDATE oauth_tokens SET access_token_enc = ? WHERE user_id = ?",
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", id);
+
+        assertThat(codeOf(id)).isEqualTo(ErrorCode.CALENDAR_REAUTH_REQUIRED);
+        verify(google, never()).refresh(any(), any());
+    }
+
+    @Test
     void 자격_객체는_토큰을_문자열로_드러내지_않는다() {
         long id = user("s8");
         tokens(id, "s8", "r", NOW.plusSeconds(3000), "openid", CALENDAR);

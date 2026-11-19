@@ -345,7 +345,7 @@ integration의 adapter → 그 port를 구현 + Google/OpenAI SDK
 <li>공통 영역은 HRV축이 편집하고 일정축이 리뷰한다. 일정축이 공통 코드를 바꿔야 하면 이슈로 요청하거나 같은 PR에서 리뷰를 받는다. OAuth 로그인 설정은 <code>SecurityFilterChainContributor</code>로 account(일정축)에서 덧붙이므로 shared.security 파일을 동시에 고치지 않는다.</li>
 <li>Google 로그인 완성 전에도 HRV축이 로컬에서 API를 시험할 수 있도록 local 전용 테스트 로그인을 공통 작업으로 둔다.</li>
 <li>local 전용 시계 이동(<code>shared.time.AdjustableClock</code>)과 시연 시드(<code>experience.devseed</code>)도 공통 작업으로 HRV축이 작성한다. 시드는 각 기능 contract로만 기록을 넣고, 계정 상태는 account의 local 전용 <code>DemoAccountSetup</code> 계약(일정축 리뷰)으로 준비한다. 일정 시드(캘린더 일정·주간 부하)는 schedule·calendar 쓰기 계약이 생기면 그 계약으로 추가한다.</li>
-<li>회복·28일차 리포트의 일정 부하는 월~일 주가 아니라 온보딩 기준 n주차다. 읽기 계약 <code>schedule.contract.ProgramWeekLoadQuery</code>는 HRV축이 리포트에 필요한 모양으로 정의했고 구현은 일정축(schedule)이 한다. 구현 전에는 bean이 없어 리포트의 부하 값이 null이다.</li>
+<li>회복·28일차 리포트의 일정 부하는 월~일 주가 아니라 온보딩 기준 n주차다. 읽기 계약 <code>schedule.contract.ProgramWeekLoadQuery</code>는 HRV축이 리포트에 필요한 모양으로 정의했고 구현은 일정축(schedule)의 <code>ProgramWeekLoadService</code>다(주차별 부하·평소 대비, 내 범위 중 현재 위치의 부하).</li>
 </ul>
 <h2>9. 구현 순서와 미확정 사항</h2>
 <ol>

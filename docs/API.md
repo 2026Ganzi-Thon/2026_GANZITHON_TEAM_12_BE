@@ -58,7 +58,7 @@
 |---|---|---|---|
 | 400 | `VALIDATION_FAILED` | 값 범위·형식 오류 | 필드 옆에 메시지 |
 | 401 | `UNAUTHENTICATED` | 로그인 안 됨/세션 만료 | 시작 화면(A1) |
-| 401 | `CALENDAR_REAUTH_REQUIRED` | 구글 재인증 필요(토큰 갱신 실패·권한 철회 등) | "캘린더 다시 연결" |
+| 401 | `CALENDAR_REAUTH_REQUIRED` | 구글 재인증 필요(토큰 갱신 실패·권한 철회, 저장된 토큰을 지금 키로 풀 수 없음 등) | "캘린더 다시 연결" |
 | 403 | `ONBOARDING_REQUIRED` | 온보딩 미완료 | `onboardingStep` 화면으로 |
 | 403 | `CALENDAR_SCOPE_MISSING` | 구글 화면에서 캘린더 체크 해제 | "캘린더 권한이 필요해요" |
 | 403 | `HRV_CONSENT_REQUIRED` / `HRV_DISABLED` | 건강정보 미동의 / 측정 꺼짐 | 동의 화면 / 마이페이지 |
