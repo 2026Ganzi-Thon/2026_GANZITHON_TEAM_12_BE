@@ -22,4 +22,14 @@ public interface ProgramWeekLoadQuery {
      * @return 주차 순서대로 {@code toWeek − fromWeek + 1}개. 캘린더가 연결되지 않았으면 empty
      */
     Optional<List<ProgramWeekLoad>> find(long userId, LocalDate onboardingDate, int fromWeek, int toWeek);
+
+    /**
+     * 일정 부하의 내 범위 중 현재 위치(계산 정책 6절). 표본은 1주차~{@code currentWeek}의 부하 점수이며, 지난 주차는
+     * 집계 대상 일정이 있던 주차만 센다(평소 대비의 "자료 있는 주차"와 같은 기준). 진행 중인 주차는 항상 센다.
+     *
+     * @param onboardingDate 온보딩 완료 서울 날짜(1주차 시작)
+     * @param currentWeek    진행 중인 주차(1 이상). 현재 값은 이 주차의 부하 점수다
+     * @return 캘린더가 연결되지 않았으면 empty
+     */
+    Optional<ProgramWeekLoadRange> range(long userId, LocalDate onboardingDate, int currentWeek);
 }

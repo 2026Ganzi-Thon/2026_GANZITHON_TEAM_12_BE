@@ -1,10 +1,12 @@
 package com.comedown.schedule.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import com.comedown.account.contract.CalendarConnectionQuery;
 import com.comedown.schedule.contract.ProgramWeekLoad;
 import com.comedown.schedule.contract.ProgramWeekLoadQuery;
+import com.comedown.schedule.contract.ProgramWeekLoadRange;
 import com.comedown.support.FixedClockTestConfig;
 import com.comedown.support.MySqlContainerTestConfig;
 import java.time.LocalDate;
@@ -92,6 +94,61 @@ class ProgramWeekLoadServiceIntegrationTest {
         insertEvent(other, "o1", "2026-11-04 01:00:00", "2026-11-04 09:00:00");
 
         assertThat(query.find(userId, ONBOARDING, 1, 1).orElseThrow().get(0).loadScore()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void 내_범위_위치는_1주차부터_진행_중인_주차까지의_부하로_계산한다() {
+        insertToken(userId, "google-calendar", "p-6", CALENDAR_SCOPES);
+        // 각 주차 수요일(서울) 10시부터 1·4·3·2시간 수업 → 부하 1·4·3·2, 4주차(진행 중) = 2
+        insertEvent(userId, "w1", "2026-11-04 01:00:00", "2026-11-04 02:00:00");
+        insertEvent(userId, "w2", "2026-11-11 01:00:00", "2026-11-11 05:00:00");
+        insertEvent(userId, "w3", "2026-11-18 01:00:00", "2026-11-18 04:00:00");
+        insertEvent(userId, "w4", "2026-11-25 01:00:00", "2026-11-25 03:00:00");
+
+        ProgramWeekLoadRange range = query.range(userId, ONBOARDING, 4).orElseThrow();
+
+        // 정렬 1·2·3·4 → 하위 5% = 1.15, 상위 5% = 3.85, 위치 = (2 − 1.15) ÷ 2.7 × 100
+        assertThat(range.sampleCount()).isEqualTo(4);
+        assertThat(range.low()).isCloseTo(1.15, within(1e-9));
+        assertThat(range.high()).isCloseTo(3.85, within(1e-9));
+        assertThat(range.position()).isCloseTo(31.4815, within(1e-3));
+    }
+
+    @Test
+    void 일정이_없던_지난_주차는_표본에서_빼고_4개_미만이면_위치를_주지_않는다() {
+        insertToken(userId, "google-calendar", "p-7", CALENDAR_SCOPES);
+        // 1주차는 일정 없음
+        insertEvent(userId, "x2", "2026-11-11 01:00:00", "2026-11-11 05:00:00");
+        insertEvent(userId, "x3", "2026-11-18 01:00:00", "2026-11-18 04:00:00");
+        insertEvent(userId, "x4", "2026-11-25 01:00:00", "2026-11-25 03:00:00");
+
+        ProgramWeekLoadRange range = query.range(userId, ONBOARDING, 4).orElseThrow();
+
+        assertThat(range.sampleCount()).isEqualTo(3);
+        assertThat(range.position()).isNull();
+        assertThat(range.low()).isNull();
+        assertThat(range.high()).isNull();
+    }
+
+    @Test
+    void 진행_중인_주차는_일정이_없어도_현재_값으로_센다() {
+        insertToken(userId, "google-calendar", "p-8", CALENDAR_SCOPES);
+        insertEvent(userId, "y1", "2026-11-04 01:00:00", "2026-11-04 02:00:00");
+        insertEvent(userId, "y2", "2026-11-11 01:00:00", "2026-11-11 05:00:00");
+        insertEvent(userId, "y3", "2026-11-18 01:00:00", "2026-11-18 04:00:00");
+
+        ProgramWeekLoadRange range = query.range(userId, ONBOARDING, 4).orElseThrow();
+
+        // 0·1·3·4 → 4주차 부하 0이 가장 낮다
+        assertThat(range.sampleCount()).isEqualTo(4);
+        assertThat(range.position()).isZero();
+    }
+
+    @Test
+    void 캘린더가_연결되지_않았으면_내_범위_위치도_empty() {
+        insertEvent(userId, "z1", "2026-11-04 01:00:00", "2026-11-04 02:00:00");
+
+        assertThat(query.range(userId, ONBOARDING, 4)).isEmpty();
     }
 
     private long insertUser(String sub) {

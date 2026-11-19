@@ -67,7 +67,7 @@ public record RecoveryReport(
      * @param available                 28일차 이후이고 7일 추세 값이 20개 이상
      * @param availableFrom             공개 가능 날짜(온보딩 서울 날짜 + 27일)
      * @param recovery                  회복 위치. 최저 = 최고면 null
-     * @param load                      일정 부하 위치. schedule 읽기 계약 전까지 null
+     * @param load                      일정 부하 위치(부하 점수). 캘린더 미연결·주차 표본 4개 미만·최저 = 최고면 null
      * @param recoveryUnavailableReason recovery가 null인 이유(INSUFFICIENT_DATA). 공개 전이면 null
      * @param loadUnavailableReason     load가 null인 이유(INSUFFICIENT_DATA). 공개 전이면 null
      */
@@ -75,7 +75,7 @@ public record RecoveryReport(
             String recoveryUnavailableReason, String loadUnavailableReason) {
     }
 
-    /** @param position 0~100(정수 반올림), low·high는 ms 표시값 */
+    /** @param position 0~100(정수 반올림), low·high는 표시값(회복은 ms, 일정 부하는 부하 점수) */
     public record RangeValue(long position, double low, double high) {
     }
 }
