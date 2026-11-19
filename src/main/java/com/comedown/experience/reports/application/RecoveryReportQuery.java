@@ -33,7 +33,7 @@ import org.springframework.stereotype.Service;
  * 날짜 축의 끝은 오늘이다(진행 중인 주차의 남은 날은 그리지 않음).
  * 일정 부하는 schedule의 {@link ProgramWeekLoadQuery}로 읽는다. 일정축 구현 전(bean 없음)·캘린더 미연결이면 부하 값은 null이다.
  * <p>
- * 아직 비어 있는 값: rangePosition.load(schedule 계약), AI 해석(규칙 기반 문구로 대체).
+ * 내 범위 중 현재 위치의 회복은 recovery 계약, 일정 부하는 schedule 계약({@link ProgramWeekLoadQuery#range})이 계산한 값을 싣는다.
  */
 @Service
 public class RecoveryReportQuery {
@@ -153,8 +153,21 @@ public class RecoveryReportQuery {
         }
         RecoveryReport.RangeValue recovery = range.position() == null ? null : new RecoveryReport.RangeValue(
                 Math.round(range.position()), round1(Math.exp(range.lowLn())), round1(Math.exp(range.highLn())));
-        return new RecoveryReport.RangePosition(true, availableFrom, recovery, null,
-                recovery == null ? INSUFFICIENT_DATA : null, INSUFFICIENT_DATA);
+        RecoveryReport.RangeValue load = loadRange(userId, onboardingDate, today);
+        return new RecoveryReport.RangePosition(true, availableFrom, recovery, load,
+                recovery == null ? INSUFFICIENT_DATA : null, load == null ? INSUFFICIENT_DATA : null);
+    }
+
+    /** 일정 부하 위치(부하 점수). 일정축 구현 전·캘린더 미연결·주차 표본 부족·최저 = 최고면 null. */
+    private RecoveryReport.RangeValue loadRange(long userId, LocalDate onboardingDate, LocalDate today) {
+        ProgramWeekLoadQuery query = weekLoads.getIfAvailable();
+        if (query == null) {
+            return null;
+        }
+        return query.range(userId, onboardingDate, ProgramWeeks.weekOf(onboardingDate, today))
+                .filter(r -> r.position() != null)
+                .map(r -> new RecoveryReport.RangeValue(Math.round(r.position()), round1(r.low()), round1(r.high())))
+                .orElse(null);
     }
 
     /**

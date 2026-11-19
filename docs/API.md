@@ -578,11 +578,11 @@ Come & Down이 넣은 그 일정만 구글에서 지우고 `UNDONE`으로 바꿉
 
 - 두 그래프를 겹쳐 그리거나 위아래로 나눠 X축만 맞추는 것은 프론트 선택입니다. `normalRange`는 오늘 기준 정상 범위(요약 표시용)입니다. 캘린더 미연결이면 `loadWeeks`의 `loadScore`와 `loadVsUsualPct`가 null입니다(주차 칸은 그대로 줌).
 - `loadVsUsualPct` = 진행 중인 주차의 부하 ÷ 직전 4개 주차 평균 − 1(%, 소수 첫째 자리). 온보딩 전 기간(0주차 이하)도 동기화된 일정으로 계산합니다. 못 구하면 null입니다([계산_정책.md](계산_정책.md) 1절 "온보딩 기준 주차 부하").
-- `rangePosition`(dayIndex ≥ 28이면서 7일 추세 값이 20개 이상일 때): `recovery`·`load` 각각 `{ "position": 35, "low": 33.2, "high": 55.0 }`. `position` = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + `INSUFFICIENT_DATA`. 회복과 부하는 따로 계산합니다([계산_정책.md](계산_정책.md) 6절).
+- `rangePosition`(dayIndex ≥ 28이면서 7일 추세 값이 20개 이상일 때): `recovery`·`load` 각각 `{ "position": 35, "low": 33.2, "high": 55.0 }`. `position` = (현재 − 최저) ÷ (최고 − 최저) × 100, 0~100으로 제한. 최저·최고 = 지금까지의 7일 추세 값(회복은 ln, 부하는 주간 부하 점수)의 하위 5%·상위 5% 백분위. 최저 = 최고면 null + `INSUFFICIENT_DATA`. 회복과 부하는 따로 계산합니다([계산_정책.md](계산_정책.md) 6절). 부하는 온보딩 기준 n주차 부하 점수로 계산하고, 표본(1주차~진행 중인 주차, 지난 주차는 집계 대상 일정이 있던 주차만)이 4개 이상이어야 하며 현재 = 진행 중인 주차의 부하 점수입니다(2026-11-19 결정). 캘린더 미연결이면 `load`는 null입니다.
 - `days`는 7~90(아니면 400). 온보딩 완료 후에만 조회합니다(403). 건강정보 동의가 없으면 200 + `locked: true` + `unavailableReason: "CONSENT_REQUIRED"`이며, 잠금일 때는 `unlock`과 `loadVsUsualPct` 외 항목이 null입니다. `loadVsUsualPct`(진행 중인 주차의 일정 부하 평소 대비)는 건강 기록이 아니라 캘린더에서 나온 값이라 잠금(기준선 확정 전·동의 없음)과 무관하게 주며, 캘린더 미연결·자료 부족이면 null입니다(2026-11-19 결정: 1~7일차 화면의 "평소 대비 일정 부하" 카드).
 - 그래프 값은 ms 소수 첫째 자리입니다. `points.excluded`는 교란일, `normalRange`·`hrvVsUsualPct`·`recoveryStatus`는 오늘 이하 가장 최근 회복 상태 기준, `latestQuality`는 기간 안에서 가장 최근 대표 측정의 품질입니다. `recoveryStatus`(`NORMAL` `LOW` `INSUFFICIENT`)는 C1-2의 "낮음" 칩에 씁니다. %가 음수여도 `NORMAL`일 수 있으므로 칩을 %로 추측하지 않습니다.
-- `rangePosition.availableFrom` = 온보딩 완료 서울 날짜 + 27일(28일차). 공개 전이면 `recovery`·`load`가 null입니다. 공개 후 null인 항목은 `recoveryUnavailableReason`·`loadUnavailableReason`(`INSUFFICIENT_DATA`)으로 이유를 줍니다. `position`은 정수로 반올림하고 `low`·`high`는 ms 표시값입니다.
-- **현재 구현 범위**: 부하 값은 schedule의 `ProgramWeekLoadQuery` 계약으로 읽으며, 일정축 구현 전에는 `loadWeeks[].loadScore`·`loadVsUsualPct`가 null입니다. `rangePosition.load`는 null + `INSUFFICIENT_DATA`입니다. `interpretation`은 AI가 쓴 문구이고 AI를 쓸 수 없으면 규칙 기반 문구(`fallback: true`)입니다(0절 "AI 문구 표시").
+- `rangePosition.availableFrom` = 온보딩 완료 서울 날짜 + 27일(28일차). 공개 전이면 `recovery`·`load`가 null입니다. 공개 후 null인 항목은 `recoveryUnavailableReason`·`loadUnavailableReason`(`INSUFFICIENT_DATA`)으로 이유를 줍니다. `position`은 정수로 반올림하고 `low`·`high`는 표시값입니다(회복은 ms, 부하는 부하 점수, 소수 첫째 자리).
+- **현재 구현 범위**: 부하 값과 `rangePosition.load`는 schedule의 `ProgramWeekLoadQuery` 계약(`find`·`range`)으로 읽습니다. `interpretation`은 AI가 쓴 문구이고 AI를 쓸 수 없으면 규칙 기반 문구(`fallback: true`)입니다(0절 "AI 문구 표시").
 
 ### `GET /api/reports/four-week` → 200 — 28일차 비교 리포트
 ```json

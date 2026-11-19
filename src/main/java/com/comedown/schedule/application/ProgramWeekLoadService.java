@@ -4,8 +4,10 @@ import com.comedown.account.contract.CalendarConnectionQuery;
 import com.comedown.calendar.contract.CalendarEventReader;
 import com.comedown.schedule.contract.ProgramWeekLoad;
 import com.comedown.schedule.contract.ProgramWeekLoadQuery;
+import com.comedown.schedule.contract.ProgramWeekLoadRange;
 import com.comedown.schedule.domain.LoadCalculator;
 import com.comedown.schedule.domain.LoadEvent;
+import com.comedown.schedule.domain.LoadRangePolicy;
 import com.comedown.schedule.domain.PriorWeek;
 import com.comedown.schedule.domain.WeekLoad;
 import com.comedown.shared.time.InstantRange;
@@ -50,7 +52,43 @@ public class ProgramWeekLoadService implements ProgramWeekLoadQuery {
         if (!connection.isConnected(userId)) {
             return Optional.empty();
         }
-        // 비교 대상(직전 4개 주차, 0주차 이하 포함)까지 한 번에 읽어 오래된 주차부터 계산한다.
+        List<WeekLoad> loads = compute(userId, onboardingDate, fromWeek, toWeek);
+        List<ProgramWeekLoad> result = new ArrayList<>();
+        for (int i = 0; i < loads.size(); i++) {
+            int week = fromWeek + i;
+            WeekLoad load = loads.get(i);
+            LocalDate start = windowStart(onboardingDate, week);
+            result.add(new ProgramWeekLoad(week, start, start.plusDays(6), load.loadScore(), load.vsUsualPct(),
+                    load.vsUsualUnavailableReason() == null ? null : load.vsUsualUnavailableReason().name()));
+        }
+        return Optional.of(List.copyOf(result));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ProgramWeekLoadRange> range(long userId, LocalDate onboardingDate, int currentWeek) {
+        if (currentWeek < 1) {
+            throw new IllegalArgumentException("invalid current week: " + currentWeek);
+        }
+        if (!connection.isConnected(userId)) {
+            return Optional.empty();
+        }
+        List<WeekLoad> loads = compute(userId, onboardingDate, 1, currentWeek);
+        WeekLoad current = loads.getLast();
+        // 지난 주차는 집계 대상 일정이 있던 주차만 표본으로 센다(평소 대비의 "자료 있는 주차", 정책 Q8 임시 해석).
+        List<Double> samples = new ArrayList<>();
+        for (WeekLoad load : loads) {
+            if (load == current || load.totalHours().signum() > 0) {
+                samples.add(load.loadScore().doubleValue());
+            }
+        }
+        return Optional.of(LoadRangePolicy.evaluate(samples, current.loadScore().doubleValue())
+                .map(p -> new ProgramWeekLoadRange(samples.size(), p.position(), p.low(), p.high()))
+                .orElse(new ProgramWeekLoadRange(samples.size(), null, null, null)));
+    }
+
+    /** fromWeek~toWeek 부하. 비교 대상(직전 4개 주차, 0주차 이하 포함)까지 한 번에 읽어 오래된 주차부터 계산한다. */
+    private List<WeekLoad> compute(long userId, LocalDate onboardingDate, int fromWeek, int toWeek) {
         int firstWeek = fromWeek - PRIOR_WEEKS;
         InstantRange range = time.dateRange(
                 windowStart(onboardingDate, firstWeek).minusDays(PADDING_DAYS),
@@ -59,18 +97,11 @@ public class ProgramWeekLoadService implements ProgramWeekLoadQuery {
                 .map(LoadEventMapper::toLoadEvent).toList();
 
         List<WeekLoad> computed = new ArrayList<>();
-        List<ProgramWeekLoad> result = new ArrayList<>();
         for (int week = firstWeek; week <= toWeek; week++) {
-            LocalDate start = windowStart(onboardingDate, week);
             List<PriorWeek> priors = week >= fromWeek ? priorsOf(computed) : NO_HISTORY;
-            WeekLoad load = LoadCalculator.calculateWindow(start, loadEvents, priors);
-            computed.add(load);
-            if (week >= fromWeek) {
-                result.add(new ProgramWeekLoad(week, start, start.plusDays(6), load.loadScore(), load.vsUsualPct(),
-                        load.vsUsualUnavailableReason() == null ? null : load.vsUsualUnavailableReason().name()));
-            }
+            computed.add(LoadCalculator.calculateWindow(windowStart(onboardingDate, week), loadEvents, priors));
         }
-        return Optional.of(List.copyOf(result));
+        return List.copyOf(computed.subList(PRIOR_WEEKS, computed.size()));
     }
 
     /** n주차 시작일 = 온보딩 날짜 + 7(n−1)일. 0주차 이하는 온보딩 전으로 거슬러 간다. */

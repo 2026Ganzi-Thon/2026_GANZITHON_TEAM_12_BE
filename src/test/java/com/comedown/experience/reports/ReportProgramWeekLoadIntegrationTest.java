@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.comedown.recovery.contract.RecoveryCommands;
 import com.comedown.schedule.contract.ProgramWeekLoad;
 import com.comedown.schedule.contract.ProgramWeekLoadQuery;
+import com.comedown.schedule.contract.ProgramWeekLoadRange;
 import com.comedown.support.FixedClockTestConfig;
 import com.comedown.support.MutableClock;
 import com.comedown.support.MySqlContainerTestConfig;
@@ -49,7 +50,10 @@ class ReportProgramWeekLoadIntegrationTest {
 
     private static final double[] BASE = {3.60, 3.90, 3.70, 3.80, 3.65, 3.85, 3.75};
 
-    /** n주차 부하 = 10n, 평소 대비 = 5n%. 1주차는 직전 자료 부족. 캘린더 미연결 사용자는 empty. */
+    /**
+     * n주차 부하 = 10n, 평소 대비 = 5n%. 1주차는 직전 자료 부족. 캘린더 미연결 사용자는 empty.
+     * 내 범위 위치는 진행 중인 주차가 4주차 이상이면 62.5(최저 11.5·최고 38.5), 그 전이면 표본 부족.
+     */
     @TestConfiguration(proxyBeanMethods = false)
     static class FakeWeekLoads {
 
@@ -58,19 +62,33 @@ class ReportProgramWeekLoadIntegrationTest {
         @Bean
         @Primary // 실제 schedule 구현이 있어도 이 테스트는 대체 구현으로 리포트 조합만 검증한다.
         ProgramWeekLoadQuery programWeekLoadQuery() {
-            return (userId, onboardingDate, fromWeek, toWeek) -> {
-                if (DISCONNECTED.contains(userId)) {
-                    return Optional.empty();
+            return new ProgramWeekLoadQuery() {
+                @Override
+                public Optional<List<ProgramWeekLoad>> find(long userId, LocalDate onboardingDate, int fromWeek,
+                        int toWeek) {
+                    if (DISCONNECTED.contains(userId)) {
+                        return Optional.empty();
+                    }
+                    List<ProgramWeekLoad> weeks = new ArrayList<>();
+                    for (int w = fromWeek; w <= toWeek; w++) {
+                        LocalDate start = onboardingDate.plusDays(7L * (w - 1));
+                        boolean first = w == 1;
+                        weeks.add(new ProgramWeekLoad(w, start, start.plusDays(6), BigDecimal.valueOf(10.04 * w),
+                                first ? null : BigDecimal.valueOf(5L * w).setScale(1),
+                                first ? "INSUFFICIENT_DATA" : null));
+                    }
+                    return Optional.of(weeks);
                 }
-                List<ProgramWeekLoad> weeks = new ArrayList<>();
-                for (int w = fromWeek; w <= toWeek; w++) {
-                    LocalDate start = onboardingDate.plusDays(7L * (w - 1));
-                    boolean first = w == 1;
-                    weeks.add(new ProgramWeekLoad(w, start, start.plusDays(6), BigDecimal.valueOf(10.04 * w),
-                            first ? null : BigDecimal.valueOf(5L * w).setScale(1),
-                            first ? "INSUFFICIENT_DATA" : null));
+
+                @Override
+                public Optional<ProgramWeekLoadRange> range(long userId, LocalDate onboardingDate, int currentWeek) {
+                    if (DISCONNECTED.contains(userId)) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(currentWeek >= ProgramWeekLoadRange.MIN_SAMPLES
+                            ? new ProgramWeekLoadRange(currentWeek, 62.5, 11.54, 38.46)
+                            : new ProgramWeekLoadRange(currentWeek, null, null, null));
                 }
-                return Optional.of(weeks);
             };
         }
     }
@@ -182,7 +200,44 @@ class ReportProgramWeekLoadIntegrationTest {
                 .andExpect(jsonPath("$.load").value(Matchers.nullValue()));
     }
 
+    @Test
+    void 이십팔일차_이후_내_범위_위치에_일정_부하도_싣는다() throws Exception {
+        long user = userWith30Trends();
+
+        mvc.perform(get("/api/reports/recovery").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rangePosition.available").value(true))
+                .andExpect(content().json("""
+                        {"rangePosition":{"load":{"position":63,"low":11.5,"high":38.5},
+                                          "loadUnavailableReason":null}}
+                        """));
+    }
+
+    @Test
+    void 캘린더가_연결되지_않았으면_내_범위_위치의_일정_부하는_null과_INSUFFICIENT_DATA() throws Exception {
+        long user = userWith30Trends();
+        FakeWeekLoads.DISCONNECTED.add(user);
+
+        mvc.perform(get("/api/reports/recovery").with(loginAs(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rangePosition.available").value(true))
+                .andExpect(jsonPath("$.rangePosition.recovery").value(Matchers.notNullValue()))
+                .andExpect(jsonPath("$.rangePosition.load").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$.rangePosition.loadUnavailableReason").value("INSUFFICIENT_DATA"));
+    }
+
     // ---------- 도우미 ----------
+
+    /** 서울 10-01 온보딩(오늘 43일차 = 7주차), 10-13부터 30일 기록 → 7일 추세 값 20개 이상. */
+    private long userWith30Trends() {
+        long user = insertUser("2026-10-01 01:00:00");
+        LocalDate first = LocalDate.of(2026, 10, 13);
+        for (int i = 0; i < 30; i++) {
+            seedDay(user, first.plusDays(i), 3.7 + 0.1 * Math.sin(i));
+        }
+        recoveryCommands.recalculate(user, first, LocalDate.of(2026, 11, 11));
+        return user;
+    }
 
     /** 서울 11-04 온보딩(오늘 9일차 = 2주차), 11-04~11-11 기록으로 기준선 확정. */
     private long userWithBaseline() {
