@@ -79,7 +79,7 @@
 }
 ```
 - 검증: 닉네임 1~20자. 동의 6개(`terms` `privacy` `age_14` `sensitive_hrv` `calendar` `ai_notice`)는 모두 true 필수이며 하나라도 빠지면 400 `validation_failed`(`fielderrors[].field`: `consents.&lt;종류&gt;`)입니다(`ai_notice`: 인공지능기본법상 ai 기반 운용 사실 사전 고지). 건강정보 동의(`sensitive_hrv`)는 2026-11-17 결정으로 가입 때 필수이고, 가입 뒤에는 마이페이지에서 철회할 수 있습니다(8절, 철회하면 측정 꺼짐).
-- 응답 200: `{ &quot;onboardingstep&quot;: &quot;cbi&quot;, &quot;calendarauthurl&quot;: &quot;/oauth2/authorization/google-calendar&quot; }` — `calendarauthurl`이 있으면(아직 캘린더 권한이 없으면) 그 주소로 이동합니다.
+- 응답 200: `{ &quot;onboardingstep&quot;: &quot;cbi&quot;, &quot;calendarauthurl&quot;: null }` — `calendarauthurl`이 있으면(아직 캘린더 권한이 없으면) 그 주소로 이동합니다. 캘린더 권한이 있어야 로그인 세션이 생기므로(0절) 보통 null이며, 호환을 위해 필드는 남겨 둡니다.
 
 " data-group="g1"><summary><span class="method PUT">PUT</span><div><div class="path">/api/onboarding/profile</div><div class="description">닉네임 · 약관 · 동의 저장</div></div></summary><div class="detail-body"><pre><code class="language-json">{
   &quot;nickname&quot;: &quot;아리&quot;,
@@ -89,7 +89,7 @@
 </code></pre>
 <ul>
 <li>검증: 닉네임 1~20자. 동의 6개(<code>TERMS</code> <code>PRIVACY</code> <code>AGE_14</code> <code>SENSITIVE_HRV</code> <code>CALENDAR</code> <code>AI_NOTICE</code>)는 모두 true 필수이며 하나라도 빠지면 400 <code>VALIDATION_FAILED</code>(<code>fieldErrors[].field</code>: <code>consents.&lt;종류&gt;</code>)입니다(<code>AI_NOTICE</code>: 인공지능기본법상 AI 기반 운용 사실 사전 고지). 건강정보 동의(<code>SENSITIVE_HRV</code>)는 2026-11-17 결정으로 가입 때 필수이고, 가입 뒤에는 마이페이지에서 철회할 수 있습니다(8절, 철회하면 측정 꺼짐).</li>
-<li>응답 200: <code>{ &quot;onboardingStep&quot;: &quot;CBI&quot;, &quot;calendarAuthUrl&quot;: &quot;/oauth2/authorization/google-calendar&quot; }</code> — <code>calendarAuthUrl</code>이 있으면(아직 캘린더 권한이 없으면) 그 주소로 이동합니다.</li>
+<li>응답 200: <code>{ &quot;onboardingStep&quot;: &quot;CBI&quot;, &quot;calendarAuthUrl&quot;: null }</code> — <code>calendarAuthUrl</code>이 있으면(아직 캘린더 권한이 없으면) 그 주소로 이동합니다. 캘린더 권한이 있어야 로그인 세션이 생기므로(0절) 보통 null이며, 호환을 위해 필드는 남겨 둡니다.</li>
 </ul>
 </div></details><details class="endpoint" data-search="get /api/cbi/questions cbi 문항 조회 ```json
 {
@@ -1085,12 +1085,12 @@
 <ul>
 <li>구글 로그인은 세션 쿠키 방식입니다. 프론트는 토큰을 다루지 않습니다.</li>
 <li><strong>로그인 시작</strong>: <code>GET /oauth2/authorization/google</code>로 이동(페이지 이동, fetch 아님). 성공하면 <code>/</code>로 돌아오고, 프론트는 <code>GET /api/me</code>의 <code>onboardingStep</code>으로 화면을 정합니다.</li>
-<li><strong>캘린더 권한이 없으면 들어올 수 없음</strong>(2026-11-19 결정): 로그인이 성공해도 캘린더가 연결돼 있지 않으면(<code>calendar.connected: false</code>, 처음 가입·연결 해제 후 철회 대기 포함) 로그인 세션을 만들지 않고 <code>/oauth2/authorization/google-calendar</code>로 보냅니다. 로그인하지 않은 상태라 그 주소는 로그인 + 캘린더 연결로 동작하고, 허용하면 <code>/onboarding/cbi</code>로 들어옵니다. 캘린더 권한 화면에서 캘린더 항목을 허용하지 않았거나 구글이 권한을 막은 계정(동의 화면 테스트 사용자가 아님 → 구글 &quot;액세스 차단됨&quot;)은 세션 없이 <code>/?authError=true</code>로 돌아갑니다. 토큰 저장에 실패해도 연결되지 않은 것으로 보고 같은 방식으로 끊습니다. 그래서 처음 가입하는 사용자는 구글 화면을 두 번(로그인 → 캘린더 권한) 거칩니다.
+<li><strong>캘린더 권한이 없으면 들어올 수 없음</strong>(2026-11-19 결정): 로그인이 성공해도 캘린더가 연결돼 있지 않으면(<code>calendar.connected: false</code>, 처음 가입·연결 해제 후 철회 대기 포함) 로그인 세션을 만들지 않고 <code>/oauth2/authorization/google-calendar</code>로 보냅니다. 로그인하지 않은 상태라 그 주소는 로그인 + 캘린더 연결로 동작하고, 허용하면 <code>/</code>로 들어옵니다(처음 가입이면 닉네임·동의 화면). 캘린더 권한 화면에서 캘린더 항목을 허용하지 않았거나 구글이 권한을 막은 계정(동의 화면 테스트 사용자가 아님 → 구글 &quot;액세스 차단됨&quot;)은 세션 없이 <code>/?authError=true</code>로 돌아갑니다. 토큰 저장에 실패해도 연결되지 않은 것으로 보고 같은 방식으로 끊습니다. 그래서 처음 가입하는 사용자는 구글 화면을 두 번(로그인 → 캘린더 권한) 거칩니다.
 <ul>
 <li>로그인한 뒤에도 같은 규칙을 지킵니다: 로그인한 <code>/api/**</code> 요청마다 캘린더 연결을 확인해, 연결돼 있지 않으면(이 결정 전에 만들어진 세션, 로그인 뒤 캘린더 연결 해제) 세션을 끊고 401 <code>UNAUTHENTICATED</code>(&quot;구글 캘린더 권한이 필요해요. 다시 로그인해 주세요.&quot;)로 답합니다. 가입 정보(닉네임·동의) 저장을 포함한 모든 단계가 막히고, 다시 로그인하면 캘린더 권한 화면을 거칩니다. 예외: <code>GET /api/auth/csrf</code>, <code>POST /api/auth/logout</code>, 개발용 <code>/api/dev/**</code>. local 프로필은 테스트 로그인·시연 데이터 사용자를 위해 이 확인을 끕니다(<code>comedown.security.require-calendar: false</code>).</li>
 </ul>
 </li>
-<li><strong>캘린더 권한 받기</strong>(권장 흐름): 로그인 때는 기본 정보만 받고, 가입 화면에서 캘린더 동의를 체크한 뒤 <code>GET /oauth2/authorization/google-calendar</code>로 이동해 캘린더 권한을 추가로 받습니다. 성공 시 <code>/onboarding/cbi</code>로 돌아옵니다. 마이페이지 &quot;다시 연결&quot;도 같은 주소입니다.</li>
+<li><strong>가입 순서</strong>(2026-11-19 결정): &quot;Google로 시작하기&quot; → 구글 로그인(<code>openid email</code>) → 캘린더 권한(<code>/oauth2/authorization/google-calendar</code>, 위 규칙으로 자동 이동) → 닉네임·동의(<code>PROFILE</code>) → CBI → 생활 정보 → 일정 분석 → 홈. 캘린더 권한이 성공하면 <code>/</code>로 돌아오고 프론트는 <code>GET /api/me</code>의 <code>onboardingStep</code>(처음 가입이면 <code>PROFILE</code>)으로 화면을 정합니다. 마이페이지 &quot;다시 연결&quot;도 같은 주소이며 끝나면 <code>/</code>로 돌아옵니다.</li>
 <li><strong>요청 범위</strong>: 로그인은 <code>openid email</code>(이름·프로필은 받지 않음), 캘린더는 추가로 <code>https://www.googleapis.com/auth/calendar.events</code>(일정 읽기·쓰기)입니다. 캘린더 연결은 refresh token을 받으려고 동의 화면을 다시 띄웁니다. 구글이 돌려준 실제 허용 범위가 <code>oauth_tokens.scopes</code>에 저장되며, 여기에 캘린더 범위가 있어야 &quot;연결됨&quot;입니다.</li>
 <li><strong>실패</strong>: 로그인·권한 허용이 실패하거나 취소되면 <code>/?authError=true</code>로 돌아옵니다. 탈퇴 진행 중인 계정은 로그인할 수 없습니다.</li>
 <li><strong>캘린더 연결은 로그인한 계정에만</strong>: 이미 로그인한 상태에서 <code>/oauth2/authorization/google-calendar</code>로 이동해 구글 계정 선택 화면에서 <strong>다른 구글 계정</strong>을 고르면 연결을 거부하고 <code>/?authError=true</code>로 돌아옵니다. 그 계정으로 새 사용자를 만들지 않고 토큰도 저장하지 않으며, 로그인 세션은 원래 사용자 그대로입니다. 로그인하지 않은 상태의 캘린더 연결은 로그인(처음이면 가입) + 연결로 동작합니다.
