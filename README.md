@@ -1,10 +1,10 @@
-# Come & Down(캄다운) Backend
+# Come & Down(컴다운) Backend
 
 [![CI](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_12_BE/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_12_BE/actions/workflows/ci.yml)
 
 > 2026 간지톤 TEAM 12 · 백엔드 저장소
 
-**Come & Down(캄다운)** 은 수업·과제·시험·동아리·아르바이트로 일정이 몰릴 때 번아웃을 미리 막도록 돕는 서비스입니다.
+**Come & Down(컴다운)** 은 수업·과제·시험·동아리·아르바이트로 일정이 몰릴 때 번아웃을 미리 막도록 돕는 서비스입니다.
 구글 캘린더로 **일정이 얼마나 몰려 있는지**, 아침 1분 손가락 측정(HRV)으로 **몸이 얼마나 회복됐는지**를 함께 보고, 남는 시간에 맞춘 **회복 활동이나 미리 시작할 작업을 추천해 캘린더에 바로 넣어 줍니다.**
 
 - 회복 수치와 안전 안내는 서비스의 표시 기준이며, 의료 진단이 아닙니다.

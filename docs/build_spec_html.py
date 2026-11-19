@@ -187,7 +187,7 @@ modules = {'account','cbi','calendar','schedule','checkin','recovery','recommend
 for owner in list(mapping['httpOwners'].values())+list(mapping['tableOwners'].values()):
     if owner.split('.')[0] not in modules:
         raise ValueError(f'Unknown target module: {owner}')
-mapping_md = '''# Come & Down(캄다운) API·테이블 책임 매핑
+mapping_md = '''# Come & Down(컴다운) API·테이블 책임 매핑
 
 설계 v1.0 · 기존 구현을 기준으로 하지 않은 목표 책임이다. 원본은 architecture-map.json이며 API.md·ERD.md의 모든 항목과 대조해 생성한다. API/테이블을 추가하면 JSON을 갱신하고 문서를 다시 생성한다.
 
