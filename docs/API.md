@@ -17,7 +17,8 @@
 - 프론트와 백엔드는 **같은 출처**에서 동작합니다. 백엔드에 CORS 설정이 없고 세션 쿠키가 `SameSite=Lax`이므로 API는 항상 상대 경로(`/api/...`)로 부릅니다.
   - 로컬: Vite가 `/api`, `/oauth2`, `/login/oauth2`를 백엔드(`localhost:8080`)로 전달합니다.
   - 운영(GCP Cloud Run, 2026-11-17 결정): 한 서비스 안의 nginx가 프론트 빌드 파일을 주고 위 세 경로만 같은 인스턴스의 백엔드로 넘깁니다. 주소는 `https://comedown-<프로젝트번호>.asia-northeast3.run.app` 하나만 씁니다([배포 가이드](배포_가이드.md) 7절).
-  - 프론트를 다른 도메인에 따로 올리거나 Firebase Hosting rewrite 뒤에 API를 두지 않습니다. Firebase Hosting은 `__session` 외의 쿠키를 지워서 `SESSION`·`XSRF-TOKEN`이 전달되지 않습니다.
+  - 프론트 Vercel 배포본(`https://comedown-fe.vercel.app`, 2026-11-19 추가): 프론트 `vercel.json`이 위 세 경로를 Cloud Run 주소로 넘깁니다(rewrite). 브라우저에는 Vercel 주소 하나만 보이므로 같은 출처 조건을 지킵니다. Cloud Run의 nginx는 `X-Forwarded-Host`가 이 주소일 때만 받아들여, 구글 로그인 돌아올 주소와 로그인 뒤 이동 주소를 Vercel 주소로 만듭니다(다른 값은 무시). 그래서 Vercel 주소와 Cloud Run 주소 모두에서 로그인할 수 있고, 각 주소의 세션은 따로입니다.
+  - 그 밖의 도메인에 프론트를 따로 올리거나 Firebase Hosting rewrite 뒤에 API를 두지 않습니다. Firebase Hosting은 `__session` 외의 쿠키를 지워서 `SESSION`·`XSRF-TOKEN`이 전달되지 않습니다.
 - 요청·응답은 JSON, 필드 이름은 camelCase.
 - 시각은 서울 시간대를 붙인 ISO 8601 (`2026-11-11T07:30:00+09:00`). 날짜는 서울 기준 `YYYY-MM-DD`. 주는 **월요일 시작**.
 - 값이 없으면 필드를 빼지 않고 `null`로 보냅니다.
