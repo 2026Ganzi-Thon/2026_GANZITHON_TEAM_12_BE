@@ -11,7 +11,7 @@ import java.util.Optional;
  * 평소 대비 비교에만 쓴다. 캘린더 탭·홈의 월~일 주({@code weekly_loads})와는 별개다.
  * 부하 점수·평소 대비 산식은 계산 정책 1절(load-v1)과 같고, 비교 대상이 "직전 4개 n주차"인 점만 다르다.
  * <p>
- * 구현 담당: 일정축(schedule). 구현 전에는 빈(bean 없음) 상태이며 리포트는 부하 값을 null로 둔다.
+ * 구현: {@code schedule.application.ProgramWeekLoadService}(일정축). bean이 없으면 리포트는 부하 값을 null로 둔다.
  */
 public interface ProgramWeekLoadQuery {
 

@@ -26,8 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 구글에서 읽은 일정을 저장된 일정과 맞춘다. 구글 호출은 이 트랜잭션 밖에서 끝난 뒤에 들어온다.
- * 분류 우선순위는 직접 수정 규칙 &gt; AI &gt; 제목 규칙이다. AI 분류기는 아직 없으므로 직접 수정 규칙이 없는 일정은
- * 제목 규칙({@link RuleClassifier})으로 분류한다. 제목은 분류와 해시 계산에만 쓰고 저장하지 않는다.
+ * 분류 우선순위는 직접 수정 규칙 &gt; AI &gt; 제목 규칙이다. AI 분류는 동기화 전에
+ * {@link com.comedown.calendar.contract.CalendarAiClassifier}가 제목 규칙({@link RuleClassifier})으로 분류되지 않는
+ * 제목만 골라 낸 결과를 받아 쓴다. 제목은 분류와 해시 계산에만 쓰고 저장하지 않는다.
  */
 @Service
 public class CalendarSyncService implements CalendarEventSync {
